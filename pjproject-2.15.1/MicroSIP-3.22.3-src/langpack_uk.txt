@@ -1,0 +1,643 @@
+﻿Language Pack
+Language: Ukrainian
+Last-Modified-Using: MicroSIP DUMA
+Authors: DUMA / Codex
+Author-email:
+Locale: 0422
+RTL: 0
+
+[A crash happened. It is strongly recommended that you update your version to continue using the software safely.]
+Стався збій. Наполегливо рекомендуємо оновити програму, щоб безпечно продовжити роботу.
+
+[AA]
+АВ
+
+[AC]
+АК
+
+[Account]
+Обліковий запис
+
+[Account Name]
+Назва облікового запису
+
+[Active Calls]
+Активні дзвінки
+
+[Add]
+Додати
+
+[Add Account...]
+Додати обліковий запис...
+
+[Add Contact]
+Додати контакт
+
+[Address]
+Адреса
+
+[All Calls]
+Усі дзвінки
+
+[Allow access to the microphone in your antivirus settings.]
+Дозвольте доступ до мікрофона в налаштуваннях антивіруса.
+
+[Allow IP Rewrite]
+Дозволити перезапис IP
+
+[Always on Top]
+Завжди поверх інших
+
+[Answer]
+Відповісти
+
+[Answer with Video]
+Відповісти з відео
+
+[Are you sure you want to delete?]
+Ви впевнені, що хочете видалити?
+
+[Ask your SIP provider how to configure the account correctly.]
+Уточніть у SIP-провайдера, як правильно налаштувати обліковий запис.
+
+[Attended Transfer]
+Переадресація з консультацією
+
+[Auto]
+Авто
+
+[Auto Answer]
+Автовідповідь
+
+[Auto Conference]
+Автоконференція
+
+[Available Codecs]
+Доступні кодеки
+
+[Away]
+Відійшов
+
+[Backspace]
+Backspace
+
+[Blind Transfer]
+Сліпа переадресація
+
+[Bottom Position]
+Позиція знизу
+
+[Bring to Front on Incoming Call]
+Виводити на передній план при вхідному дзвінку
+
+[Call]
+Телефонувати
+
+[Call Forwarding]
+Переадресація дзвінків
+
+[Call Pickup]
+Перехоплення дзвінка
+
+[Call Recording]
+Запис дзвінка
+
+[Call Transfer]
+Переадресація дзвінка
+
+[Call Waiting]
+Очікування дзвінка
+
+[Call transfered successfully, disconnecting call]
+Дзвінок успішно переадресовано, відключаю виклик
+
+[Caller Number]
+Номер абонента
+
+[Calling]
+Виклик
+
+[Camera]
+Камера
+
+[Cancel]
+Скасувати
+
+[Check for Updates]
+Перевіряти оновлення
+
+[City]
+Місто
+
+[Clear]
+Очистити
+
+[Client Card]
+Картка клієнта
+
+[Client Card Host]
+Сервер картки клієнта
+
+[Close All]
+Закрити всі
+
+[Comment]
+Коментар
+
+[CONF]
+КОНФ
+
+[Conference]
+Конференція
+
+[Connected]
+Підключено
+
+[Connecting]
+Підключення
+
+[Connection Failed]
+Помилка підключення
+
+[Contact]
+Контакт
+
+[Contact already exists]
+Контакт уже існує
+
+[Contact with the same number already exists. Do you want to overwrite?]
+Контакт із таким номером уже існує. Перезаписати?
+
+[Contacts]
+Контакти
+
+[Control Button]
+Кнопка керування
+
+[Copy]
+Копіювати
+
+[DND]
+НТ
+
+[Daily]
+Щодня
+
+[Decline]
+Відхилити
+
+[Default]
+За замовчуванням
+
+[Default List Action]
+Дія списку за замовчуванням
+
+[Delay]
+Затримка
+
+[Delete]
+Видалити
+
+[Delete Account]
+Видалити обліковий запис
+
+[Delete contact]
+Видалити контакт
+
+[Deny Incoming]
+Заборонити вхідні
+
+[Dial Plan]
+План набору
+
+[Dialing Prefix]
+Префікс набору
+
+[Different Domain]
+Інший домен
+
+[Different Remote Domain]
+Інший віддалений домен
+
+[Different User]
+Інший користувач
+
+[Different User or Domain]
+Інший користувач або домен
+
+[Directory of Users]
+Каталог користувачів
+
+[Disable Messaging]
+Вимкнути повідомлення
+
+[Disable Session Timers]
+Вимкнути таймери сесії
+
+[Disable Video]
+Вимкнути відео
+
+[Disable name lookup in directory]
+Вимкнути пошук імен у каталозі
+
+[Disabled]
+Вимкнено
+
+[Disconnect]
+Відключити
+
+[Display Name]
+Відображуване ім'я
+
+[Diversion]
+Переадресовано через
+
+[Do Not Disturb]
+Не турбувати
+
+[Do you want to delete user data and program settings? This action cannot be undone.]
+Видалити дані користувача та налаштування програми? Цю дію неможливо скасувати.
+
+[Do you want to update now?]
+Оновити зараз?
+
+[Domain]
+Домен
+
+[DTMF Method]
+Метод DTMF
+
+[Duration]
+Тривалість
+
+[E-mail Address]
+Адреса e-mail
+
+[Edit]
+Редагувати
+
+[Edit Account]
+Редагувати обліковий запис
+
+[Edit Local Account]
+Редагувати локальний обліковий запис
+
+[Enable]
+Увімкнути
+
+[Enable Local Account]
+Увімкнути локальний обліковий запис
+
+[Enable Log File]
+Увімкнути файл журналу
+
+[Enabled Codecs]
+Увімкнені кодеки
+
+[End]
+Завершити
+
+[Exit]
+Вийти
+
+[Export]
+Експорт
+
+[FWD]
+ПЕР
+
+[Feature Codes]
+Коди функцій
+
+[Final]
+Фінальний
+
+[First Name]
+Ім'я
+
+[Fix microphone permission in the Windows settings (Windows Settings => Privacy => Microphone).]
+Виправте дозвіл мікрофона в налаштуваннях Windows (Налаштування Windows => Конфіденційність => Мікрофон).
+
+[Force Codec for Incoming]
+Примусовий кодек для вхідних
+
+[Handle IP changes]
+Обробляти зміну IP
+
+[Handle Media Buttons]
+Обробляти медіакнопки
+
+[Headset Support]
+Підтримка гарнітури
+
+[Help]
+Довідка
+
+[Hide Caller ID]
+Приховати Caller ID
+
+[Hold]
+Утримання
+
+[Idle]
+Очікування
+
+[Import]
+Імпорт
+
+[Incoming Call]
+Вхідний дзвінок
+
+[Incorrect Password]
+Неправильний пароль
+
+[Info]
+Інформація
+
+[Invite to Conference]
+Запросити до конференції
+
+[Label]
+Мітка
+
+[Last Call]
+Останній дзвінок
+
+[Last Name]
+Прізвище
+
+[Local Video]
+Локальне відео
+
+[Login]
+Логін
+
+[Logs]
+Журнал
+
+[Make Active]
+Зробити активним
+
+[Mandatory]
+Обов'язково
+
+[Media Encryption]
+Шифрування медіа
+
+[Menu]
+Меню
+
+[Merge]
+Об'єднати
+
+[Merge All]
+Об'єднати всі
+
+[Message]
+Повідомлення
+
+[Microphone]
+Мікрофон
+
+[Microphone Amplification]
+Підсилення мікрофона
+
+[Microphone Level]
+Рівень мікрофона
+
+[Mobile Number]
+Мобільний номер
+
+[Monthly]
+Щомісяця
+
+[Multi Monitor Support]
+Підтримка кількох моніторів
+
+[Mute Microphone]
+Вимкнути мікрофон
+
+[Mute Speaker]
+Вимкнути динамік
+
+[Name]
+Ім'я
+
+[Nameserver]
+DNS-сервер
+
+[Never]
+Ніколи
+
+[No]
+Ні
+
+[Number]
+Номер
+
+[OK]
+OK
+
+[Offline]
+Офлайн
+
+[Online]
+Онлайн
+
+[Optional]
+Необов'язково
+
+[Options]
+Опції
+
+[Password]
+Пароль
+
+[Phone]
+Телефон
+
+[Phone Number]
+Номер телефону
+
+[Please fill out at least the required fields marked with *.]
+Заповніть принаймні обов'язкові поля, позначені *.
+
+[Postal Code]
+Поштовий індекс
+
+[Presence Subscription]
+Підписка на присутність
+
+[Public Address]
+Публічна адреса
+
+[Publish Presence]
+Публікувати присутність
+
+[Quarterly]
+Щокварталу
+
+[REC]
+ЗАП
+
+[Random Popup Position]
+Випадкова позиція popup
+
+[Redial]
+Повторити набір
+
+[Register Refresh]
+Оновлення реєстрації
+
+[Ring Device]
+Пристрій дзвінка
+
+[Ringtone]
+Мелодія дзвінка
+
+[Ringtone Volume]
+Гучність дзвінка
+
+[RTP Ports]
+Порти RTP
+
+[Run at System Startup]
+Запускати разом із системою
+
+[Save]
+Зберегти
+
+[Select All]
+Вибрати все
+
+[Send]
+Надіслати
+
+[Separate]
+Відокремити
+
+[Separate All]
+Відокремити всі
+
+[Settings]
+Налаштування
+
+[Shortcuts]
+Ярлики
+
+[Single Call Mode]
+Режим одного дзвінка
+
+[SIP Header]
+SIP-заголовок
+
+[SIP Proxy]
+SIP-проксі
+
+[SIP Server]
+SIP-сервер
+
+[Software Level Adjustment]
+Програмне регулювання рівня
+
+[Sound Events]
+Звукові події
+
+[Source Port]
+Вихідний порт
+
+[Speaker]
+Динамік
+
+[Speaker Level]
+Рівень динаміка
+
+[Speakers and microphone both are required. To make calls you must have input and output sound device in your system.]
+Для дзвінків потрібні і динамік, і мікрофон. У системі мають бути пристрої введення та виведення звуку.
+
+[Starred]
+Обраний
+
+[State]
+Область/штат
+
+[STUN Server]
+STUN-сервер
+
+[Symmetric NAT detected!]
+Виявлено симетричний NAT!
+
+[The received data cannot be recognized]
+Отримані дані не вдалося розпізнати
+
+[The server returned an error code:]
+Сервер повернув код помилки:
+
+[Time]
+Час
+
+[To]
+Кому
+
+[Toggle]
+Перемкнути
+
+[Transfer]
+Переадресувати
+
+[Transfer Call To]
+Переадресувати дзвінок до
+
+[Transport]
+Транспорт
+
+[Type]
+Тип
+
+[Unable to initialize network sockets.]
+Не вдалося ініціалізувати мережеві сокети.
+
+[Update Available]
+Доступне оновлення
+
+[Use Delele key to disable selected codec]
+Натисніть Delete, щоб вимкнути вибраний кодек
+
+[Use Space key to enable selected codec]
+Натисніть Space, щоб увімкнути вибраний кодек
+
+[Username]
+Ім'я користувача
+
+[Video Bitrate]
+Бітрейт відео
+
+[Video Call]
+Відеодзвінок
+
+[Video Codec]
+Відеокодек
+
+[View Log File]
+Переглянути файл журналу
+
+[Visit Website]
+Відвідати сайт
+
+[Voicemail Number]
+Номер голосової пошти
+
+[Weekly]
+Щотижня
+
+[Would you like to update it now?]
+Бажаєте оновити зараз?
+
+[close window to ignore call]
+закрийте вікно, щоб проігнорувати дзвінок
+
+[display password]
+показати пароль
+
+[sec]
+с

@@ -1,0 +1,6 @@
+node_modules/
+.env
+data/client-notes.json
+data/call-summaries.json
+data/*.tmp
+npm-debug.log*

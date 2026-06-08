@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <script>
+      (() => {
+        let savedTheme = null;
+        try {
+          savedTheme = localStorage.getItem("ewe-ticket-theme");
+        } catch {}
+        const theme =
+          savedTheme === "light" || savedTheme === "dark"
+            ? savedTheme
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <title>Картка клієнта | DUMA</title>
+    <link rel="icon" href="/duma-logo.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css?v=20260608-monitor-operator-duration-1">
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand-lockup">
+        <a class="brand" href="/client-card" aria-label="DUMA">
+          <img src="/duma-logo.svg" alt="DUMA">
+        </a>
+        <nav class="app-tabs" aria-label="Основна навігація">
+          <a href="/client-card" data-view-link="client-card">Картка</a>
+          <a href="/calls-monitor" data-view-link="calls-monitor">Дзвінки</a>
+          <a href="/call-analytics" data-view-link="call-analytics">AI-аналітика</a>
+        </nav>
+        <h1 id="page-title">Картка клієнта</h1>
+      </div>
+
+      <div class="header-actions">
+        <form class="phone-search" id="phone-search" role="search">
+          <label class="sr-only" for="phone-input">Номер телефону</label>
+          <span class="search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m16.5 16.5 4 4"></path>
+            </svg>
+          </span>
+          <input
+            id="phone-input"
+            name="phone"
+            inputmode="tel"
+            autocomplete="tel"
+            placeholder="+380 67 111 22 33"
+          >
+          <button class="primary-button" type="submit">Знайти</button>
+        </form>
+
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Перемкнути тему">
+          <span class="theme-toggle-track" aria-hidden="true"><span></span></span>
+          <span id="theme-toggle-label">Темна тема</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <section class="empty-state" id="empty-state">
+        <div class="empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92z"></path>
+          </svg>
+        </div>
+        <h1>Картка клієнта</h1>
+        <p>Введіть номер телефону або відкрийте сторінку з MicroSIP.</p>
+      </section>
+
+      <div class="loading-state hidden" id="loading-state" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        Завантажуємо історію клієнта…
+      </div>
+
+      <section class="client-card hidden" id="client-card" aria-live="polite">
+        <div class="warning-stack" id="warning-stack"></div>
+
+        <div class="identity-row">
+          <div>
+            <p class="section-label">Картка клієнта</p>
+            <h1 id="client-name">Невідомий клієнт</h1>
+            <div class="identity-meta">
+              <a id="client-phone" href="#"></a>
+              <span aria-hidden="true">•</span>
+              <span id="client-email">Email не вказаний</span>
+            </div>
+          </div>
+          <div class="source-indicator" id="source-indicator"></div>
+        </div>
+
+        <div class="profile-grid">
+          <section class="profile-block">
+            <h2>Пов’язані пасажири</h2>
+            <div class="passenger-list" id="passenger-list"></div>
+          </section>
+          <section class="profile-block profile-dates">
+            <div>
+              <span>Перше замовлення</span>
+              <strong id="first-order">—</strong>
+            </div>
+            <div>
+              <span>Останнє замовлення</span>
+              <strong id="last-order">—</strong>
+            </div>
+          </section>
+        </div>
+
+        <section class="upcoming-section" id="upcoming-section">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Актуальна поїздка</p>
+              <h2>Найближчий рейс</h2>
+            </div>
+            <span class="status" id="upcoming-status"></span>
+          </div>
+          <div class="upcoming-trip" id="upcoming-trip"></div>
+        </section>
+
+        <section class="calls-section">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Телефонія</p>
+              <h2>Дзвінки Binotel</h2>
+            </div>
+            <span class="muted" id="call-count-label"></span>
+          </div>
+
+          <article class="ai-summary-card" id="ai-summary-card">
+            <div class="ai-summary-head">
+              <div>
+                <p class="section-label">AI-підсумок</p>
+                <h3>Останній записаний дзвінок</h3>
+              </div>
+              <span class="status" id="ai-summary-status">—</span>
+            </div>
+            <p class="ai-summary-text" id="ai-summary-text">
+              Очікуємо дані дзвінка…
+            </p>
+            <div class="ai-summary-details" id="ai-summary-details"></div>
+          </article>
+
+          <div class="call-list" id="call-list"></div>
+        </section>
+
+        <div class="content-grid">
+          <section class="tickets-section">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Історія</p>
+                <h2>Останні квитки</h2>
+              </div>
+              <span class="muted" id="ticket-count-label"></span>
+            </div>
+
+            <div class="ticket-list" id="ticket-list"></div>
+          </section>
+
+          <aside class="notes-section">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Для операторів</p>
+                <h2>Примітки</h2>
+              </div>
+            </div>
+
+            <form class="note-form" id="note-form">
+              <label class="sr-only" for="note-text">Нова примітка</label>
+              <textarea
+                id="note-text"
+                maxlength="2000"
+                placeholder="Додати важливу інформацію про клієнта…"
+              ></textarea>
+              <button class="primary-button" type="submit">Додати примітку</button>
+              <p class="form-message" id="note-message" aria-live="polite"></p>
+            </form>
+
+            <div class="notes-list" id="notes-list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="monitor-page hidden" id="calls-monitor-page" aria-live="polite">
+        <div class="monitor-hero">
+          <div>
+            <p class="section-label">Телефонія</p>
+            <h1>Дзвінки Binotel у реальному часі</h1>
+            <p>Компактна історія дзвінків. Відкрийте потрібний дзвінок, щоб переглянути запис, транскрипт і повний AI-аналіз.</p>
+          </div>
+          <div class="monitor-status-grid">
+            <div>
+              <span>Стан</span>
+              <strong id="monitor-status">—</strong>
+            </div>
+            <div>
+              <span>Остання синхронізація</span>
+              <strong id="monitor-updated">—</strong>
+            </div>
+            <div>
+              <span>Наступна спроба</span>
+              <strong id="monitor-next-sync">—</strong>
+            </div>
+          </div>
+        </div>
+
+        <section class="monitor-panel">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Нові дзвінки</p>
+              <h2>Жива стрічка</h2>
+            </div>
+            <span class="muted" id="monitor-count-label"></span>
+          </div>
+
+          <form class="monitor-toolbar" id="monitor-search" role="search">
+            <label class="sr-only" for="monitor-query">Пошук у дзвінках</label>
+            <input id="monitor-query" name="q" placeholder="Номер, оператор або Binotel ID">
+            <label class="monitor-page-size">
+              <span>На сторінці</span>
+              <select id="monitor-page-size">
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+            <button class="secondary-button" type="submit">Фільтрувати</button>
+            <button class="primary-button" id="monitor-refresh" type="button">Оновити</button>
+          </form>
+
+          <div class="monitor-list" id="monitor-list"></div>
+          <nav class="monitor-pagination" id="monitor-pagination" aria-label="Пагінація дзвінків">
+            <button class="secondary-button" id="monitor-prev-page" type="button">Назад</button>
+            <div class="monitor-page-numbers" id="monitor-page-numbers"></div>
+            <button class="secondary-button" id="monitor-next-page" type="button">Вперед</button>
+            <span class="muted" id="monitor-page-info"></span>
+          </nav>
+        </section>
+      </section>
+
+      <section class="analytics-page hidden" id="analytics-page" aria-live="polite">
+        <div class="monitor-hero analytics-hero">
+          <div>
+            <p class="section-label">AI-аналітика</p>
+            <h1>Які питання переважають</h1>
+            <p>Розподіл дзвінків за головною причиною звернення, яку визначив AI після аналізу розмови.</p>
+          </div>
+          <label class="monitor-period analytics-period">
+            <span>Період аналізу</span>
+            <select id="monitor-analytics-period">
+              <option value="7">7 днів</option>
+              <option value="30" selected>30 днів</option>
+              <option value="all">Весь час</option>
+            </select>
+          </label>
+        </div>
+
+        <section class="monitor-panel monitor-analytics">
+          <div class="monitor-analytics-summary">
+            <div>
+              <span>Проаналізовано</span>
+              <strong id="analytics-analyzed">0</strong>
+              <small id="analytics-analyzed-caption">із 0 доступних для AI</small>
+            </div>
+            <div>
+              <span>Найчастіше звертаються</span>
+              <strong id="analytics-top-type">Ще немає даних</strong>
+              <small id="analytics-top-caption">—</small>
+            </div>
+            <div>
+              <span>Очікують аналізу</span>
+              <strong id="analytics-pending">0</strong>
+              <small id="analytics-pending-caption">помилок: 0</small>
+            </div>
+            <div>
+              <span>Хвилин записів</span>
+              <strong id="analytics-audio-minutes">0</strong>
+              <small id="analytics-audio-caption">середня тривалість: —</small>
+            </div>
+            <div>
+              <span>OpenAI токени</span>
+              <strong id="analytics-tokens">0</strong>
+              <small id="analytics-tokens-caption">usage ще не зібрано</small>
+            </div>
+            <div>
+              <span>Орієнтовна вартість</span>
+              <strong id="analytics-cost">$0.00</strong>
+              <small id="analytics-cost-caption">Soniox + OpenAI summary</small>
+            </div>
+            <div>
+              <span>Ескалації</span>
+              <strong id="analytics-escalations">0</strong>
+              <small id="analytics-escalations-caption">потребують передачі</small>
+            </div>
+            <div>
+              <span>Ризик втрати</span>
+              <strong id="analytics-churn-risk">0</strong>
+              <small id="analytics-churn-risk-caption">високий ризик</small>
+            </div>
+          </div>
+
+          <div class="call-type-overview hidden" id="call-type-overview" aria-hidden="true"></div>
+          <div class="call-type-chart" id="call-type-chart" aria-live="polite"></div>
+          <p class="no-data hidden" id="call-type-empty">
+            За вибраний період ще немає класифікованих AI дзвінків.
+          </p>
+
+          <div class="analytics-subsection">
+            <div>
+              <p class="section-label">Питання клієнтів</p>
+              <h2>Часті питання</h2>
+            </div>
+          </div>
+          <div class="call-type-chart" id="customer-question-chart" aria-live="polite"></div>
+          <p class="no-data hidden" id="customer-question-empty">
+            За вибраний період AI ще не виділив типові питання клієнтів.
+          </p>
+        </section>
+      </section>
+
+      <section class="call-detail-page hidden" id="call-detail-page" aria-live="polite">
+        <a class="detail-back-link" href="/calls-monitor">
+          <span aria-hidden="true">←</span>
+          До списку дзвінків
+        </a>
+
+        <div class="call-detail-hero">
+          <div>
+            <p class="section-label">Деталі дзвінка</p>
+            <h1 id="detail-phone">—</h1>
+            <p id="detail-date">—</p>
+          </div>
+          <div class="call-detail-badges">
+            <span class="status" id="detail-call-type">Без типу дзвінка</span>
+            <span class="status" id="detail-ai-status">—</span>
+          </div>
+        </div>
+
+        <div class="call-detail-facts">
+          <div>
+            <span>Хто прийняв</span>
+            <strong id="detail-operator">—</strong>
+          </div>
+          <div>
+            <span>Напрямок і статус</span>
+            <strong id="detail-direction">—</strong>
+          </div>
+          <div>
+            <span>Тривалість розмови</span>
+            <strong id="detail-duration">—</strong>
+          </div>
+          <div>
+            <span>Binotel ID</span>
+            <strong id="detail-binotel-id">—</strong>
+          </div>
+        </div>
+
+        <section class="detail-panel detail-tickets-panel">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Квитки</p>
+              <h2>Квитки за цим номером</h2>
+            </div>
+            <span class="muted" id="detail-ticket-count">—</span>
+          </div>
+          <div class="ticket-list detail-ticket-list" id="detail-ticket-list"></div>
+        </section>
+
+        <div class="call-detail-grid">
+          <article class="detail-panel">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">AI-аналіз</p>
+                <h2>Підсумок розмови</h2>
+              </div>
+              <button class="secondary-action detail-reanalyze-button" id="detail-reanalyze-ai" type="button">
+                Запустити AI-аналіз заново
+              </button>
+            </div>
+            <p class="detail-summary" id="detail-summary">AI-підсумок ще готується.</p>
+            <div class="detail-analysis-list" id="detail-analysis-list"></div>
+          </article>
+          <article class="detail-panel call-quality-panel">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Оцінка дзвінка</p>
+                <h2>Якість оператора</h2>
+              </div>
+              <strong class="quality-score" id="detail-quality-score">—</strong>
+            </div>
+            <p class="quality-summary" id="detail-quality-summary">Оцінка зʼявиться після AI-аналізу дзвінка.</p>
+            <div class="quality-context" id="detail-quality-context"></div>
+            <div class="quality-criteria" id="detail-quality-criteria"></div>
+            <div class="quality-notes" id="detail-quality-notes"></div>
+          </article>
+        </div>
+
+        <section class="detail-panel transcript-panel">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Транскрипція</p>
+              <h2>Текст розмови</h2>
+            </div>
+            <span class="muted" id="detail-language"></span>
+          </div>
+          <div class="detail-audio" id="detail-audio-wrap">
+            <audio id="detail-audio" preload="auto"></audio>
+            <div class="audio-player" id="detail-audio-player">
+              <div class="audio-visual" id="detail-audio-visual" role="button" tabindex="0" aria-label="Перемотати запис">
+                <canvas id="detail-audio-canvas" aria-hidden="true"></canvas>
+                <button class="audio-play-button" id="detail-audio-play" type="button" aria-label="Відтворити запис">
+                  <span id="detail-audio-play-icon">▶</span>
+                </button>
+              </div>
+              <div class="audio-controls">
+                <span class="audio-time" id="detail-audio-current">0:00</span>
+                <input id="detail-audio-progress" class="audio-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Позиція відтворення">
+                <span class="audio-time" id="detail-audio-duration">0:00</span>
+                <button class="audio-speed" id="detail-audio-speed" type="button">1×</button>
+              </div>
+            </div>
+            <p id="detail-audio-status">Перевіряємо доступність запису…</p>
+          </div>
+          <div class="transcript-list" id="detail-transcript"></div>
+        </section>
+
+        <section class="detail-panel">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Технічні дані</p>
+              <h2>Стан AI-обробки</h2>
+            </div>
+          </div>
+          <div class="detail-technical" id="detail-technical"></div>
+        </section>
+      </section>
+    </main>
+
+    <dialog class="tickets-modal" id="tickets-modal" aria-labelledby="tickets-modal-title">
+      <div class="tickets-modal-panel">
+        <header class="tickets-modal-header">
+          <div>
+            <p class="section-label">Історія квитків</p>
+            <h2 id="tickets-modal-title">Усі квитки клієнта</h2>
+          </div>
+          <button class="modal-close" id="tickets-modal-close" type="button" aria-label="Закрити">
+            ×
+          </button>
+        </header>
+        <div class="tickets-modal-list ticket-list" id="tickets-modal-list"></div>
+      </div>
+    </dialog>
+
+    <dialog class="tickets-modal calls-modal" id="calls-modal" aria-labelledby="calls-modal-title">
+      <div class="tickets-modal-panel">
+        <header class="tickets-modal-header">
+          <div>
+            <p class="section-label">Історія дзвінків</p>
+            <h2 id="calls-modal-title">Усі дзвінки клієнта</h2>
+          </div>
+          <button class="modal-close" id="calls-modal-close" type="button" aria-label="Закрити">
+            ×
+          </button>
+        </header>
+        <div class="tickets-modal-list call-list" id="calls-modal-list"></div>
+      </div>
+    </dialog>
+
+    <template id="ticket-template">
+      <article class="ticket-row">
+        <div class="ticket-date">
+          <strong data-field="date"></strong>
+          <span data-field="time"></span>
+        </div>
+        <div class="ticket-main">
+          <div class="ticket-route">
+            <strong data-field="route"></strong>
+            <span class="status" data-field="status"></span>
+          </div>
+          <p data-field="stations"></p>
+          <div class="ticket-schedule">
+            <span data-field="depart-time"></span>
+            <span data-field="arrive-time"></span>
+            <span data-field="route-code"></span>
+          </div>
+          <div class="ticket-meta">
+            <span data-field="passenger"></span>
+            <span data-field="numbers"></span>
+            <span data-field="seat"></span>
+            <span data-field="agent"></span>
+          </div>
+        </div>
+        <div class="ticket-price">
+          <strong data-field="price"></strong>
+          <span data-field="carrier"></span>
+          <a class="order-link" data-field="order-link" href="#" target="_blank" rel="noopener noreferrer">
+            Перейти в замовлення
+          </a>
+        </div>
+      </article>
+    </template>
+
+    <template id="call-template">
+      <a class="call-row" data-field="detail-link">
+        <div class="call-date">
+          <strong data-field="date"></strong>
+          <span data-field="time"></span>
+        </div>
+        <div class="call-main">
+          <div class="call-title">
+            <span class="call-direction-icon" data-field="direction-icon" aria-hidden="true"></span>
+            <strong data-field="direction"></strong>
+            <span class="status" data-field="disposition"></span>
+          </div>
+          <p data-field="operator"></p>
+          <div class="call-meta">
+            <span data-field="numbers"></span>
+            <span data-field="duration"></span>
+            <span data-field="recording"></span>
+          </div>
+        </div>
+        <div class="call-side">
+          <strong data-field="phone"></strong>
+          <span data-field="binotel-id"></span>
+        </div>
+      </a>
+    </template>
+
+    <template id="monitor-call-template">
+      <a class="monitor-call-row monitor-call-link" data-field="detail-link">
+        <div class="monitor-call-identity">
+          <div class="monitor-call-phone">
+            <span class="call-direction-icon" data-field="direction-icon" aria-hidden="true"></span>
+            <strong data-field="phone"></strong>
+          </div>
+          <span data-field="type"></span>
+        </div>
+        <div class="monitor-call-fact">
+          <span>Дата і час</span>
+          <strong data-field="time"></strong>
+        </div>
+        <div class="monitor-call-fact">
+          <span>Хто прийняв</span>
+          <strong data-field="operator"></strong>
+        </div>
+        <div class="monitor-call-fact">
+          <span>Тривалість</span>
+          <strong data-field="duration"></strong>
+        </div>
+        <svg class="monitor-call-arrow" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m9 18 6-6-6-6"></path>
+        </svg>
+      </a>
+    </template>
+
+    <script src="/app.js?v=20260608-monitor-operator-duration-1" defer></script>
+  </body>
+</html>
