@@ -1,0 +1,19 @@
+[Unit]
+Description=EWE CRM client info API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=ewetech
+Group=ewetech
+WorkingDirectory=/home/ewetech/ewe_crm/client-info-api
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /home/ewetech/ewe_crm/client-info-api/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target
