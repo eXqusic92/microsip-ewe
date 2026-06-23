@@ -7,6 +7,11 @@ function text(value) {
   return value === null || value === undefined ? "" : String(value).trim();
 }
 
+function finiteNumber(value, fallback = null) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -111,6 +116,36 @@ function normalizeUsage(response) {
   };
 }
 
+function combineUsage(steps) {
+  const normalizedSteps = Object.fromEntries(
+    Object.entries(steps || {}).filter(([, usage]) => Boolean(usage))
+  );
+
+  const totals = {
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    billableInputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    totalTokens: 0
+  };
+
+  for (const usage of Object.values(normalizedSteps)) {
+    for (const key of Object.keys(totals)) {
+      totals[key] += Number(usage[key] || 0);
+    }
+  }
+
+  if (!Object.values(totals).some((value) => value > 0)) {
+    return null;
+  }
+
+  return {
+    ...totals,
+    steps: normalizedSteps
+  };
+}
+
 function transcriptSegments(transcription) {
   const segments = Array.isArray(transcription.segments)
     ? transcription.segments
@@ -149,6 +184,144 @@ function buildTranscriptText(segments, fallbackText) {
       return `${prefix}: ${segment.text}`;
     })
     .join("\n");
+}
+
+function compactSecondaryTranscript(value, primaryText, maxChars = 4000) {
+  const normalized = text(value);
+  if (!normalized || normalized === text(primaryText)) {
+    return "";
+  }
+
+  if (normalized.length <= maxChars) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxChars)}\n[текст обрізано для економії токенів]`;
+}
+
+function callMetadata(call) {
+  return {
+    startedAt: call.startedAt,
+    type: call.typeLabel,
+    disposition: call.dispositionLabel,
+    operator: call.employee && call.employee.name,
+    externalNumber: call.externalNumber
+  };
+}
+
+function truncateText(value, maxChars = 280) {
+  const normalized = text(value);
+  if (!normalized || normalized.length <= maxChars) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxChars).trim()}...`;
+}
+
+function compactTicketForAi(ticket) {
+  if (!ticket || typeof ticket !== "object") {
+    return null;
+  }
+
+  return {
+    id: ticket.id || null,
+    orderId: ticket.orderId || null,
+    ticketNumber: ticket.ticketNumber || null,
+    status: ticket.status || null,
+    passenger: truncateText(ticket.passenger, 80) || null,
+    departAt: ticket.departAt || null,
+    arriveAt: ticket.arriveAt || null,
+    route: truncateText(ticket.route, 120) || null,
+    boarding: truncateText(ticket.boarding, 120) || null,
+    destination: truncateText(ticket.destination, 120) || null,
+    seat: ticket.seat || null
+  };
+}
+
+function compactTicketListForAi(value, maxItems) {
+  return (Array.isArray(value) ? value : [])
+    .slice(0, maxItems)
+    .map(compactTicketForAi)
+    .filter(Boolean);
+}
+
+function compactClientContextForAi(clientContext) {
+  if (!clientContext || typeof clientContext !== "object") {
+    return clientContext || null;
+  }
+
+  const contact = clientContext.contact || {};
+  const stats = clientContext.stats || {};
+  const notes = (Array.isArray(clientContext.notes) ? clientContext.notes : [])
+    .slice(0, 3)
+    .map((note) => ({
+      text: truncateText(note && note.text, 260),
+      source: text(note && note.source) || null,
+      createdAt: (note && note.createdAt) || null
+    }))
+    .filter((note) => note.text);
+
+  return {
+    purpose:
+      "Compact CRM context. Use only when it clearly matches the transcript.",
+    found: Boolean(clientContext.found),
+    source: text(clientContext.source) || null,
+    contact: {
+      phone: contact.phone || null,
+      primaryName: truncateText(contact.primaryName, 80) || null,
+      relatedPassengers: (Array.isArray(contact.relatedPassengers)
+        ? contact.relatedPassengers
+        : []
+      ).slice(0, 4).map((value) => truncateText(value, 80)).filter(Boolean)
+    },
+    stats: {
+      orders: stats.orders || 0,
+      tickets: stats.tickets || 0,
+      firstOrderAt: stats.firstOrderAt || null,
+      lastOrderAt: stats.lastOrderAt || null
+    },
+    activeTripCandidates: compactTicketListForAi(
+      clientContext.activeTripCandidates,
+      2
+    ),
+    upcomingTrip: compactTicketForAi(clientContext.upcomingTrip),
+    recentTickets: compactTicketListForAi(clientContext.recentTickets, 3),
+    notes
+  };
+}
+
+function providedAnalysisCallType(call, analysisProfile) {
+  const candidates = [
+    call && call.analysisCallType,
+    call && call.analysisCallTypeKey,
+    call && call.aiAnalysisType,
+    call && call.aiAnalysisTypeKey,
+    call && call.aiCallType,
+    call && call.aiCallTypeKey,
+    call && call.customCallType,
+    call && call.customCallTypeKey
+  ].map(text).filter(Boolean);
+
+  for (const candidate of candidates) {
+    const resolved = AiPrompts.findAnalysisCallType(analysisProfile, candidate);
+    if (
+      resolved &&
+      (
+        resolved.key === candidate ||
+        text(resolved.label).toLowerCase() === candidate.toLowerCase()
+      )
+    ) {
+      return {
+        callType: resolved.key,
+        callTypeLabel: resolved.label,
+        confidence: 1,
+        reason: "Тип дзвінка передано явно, тому AI-класифікацію пропущено.",
+        source: "provided"
+      };
+    }
+  }
+
+  return null;
 }
 
 function textStats(value, segments = []) {
@@ -215,10 +388,31 @@ class OpenAiClient {
   constructor(config) {
     this.config = config.openai || {};
     this.provider = "openai";
+    this.analysisSettingsProvider = null;
   }
 
   get enabled() {
     return Boolean(this.config.enabled && this.config.apiKey);
+  }
+
+  setAnalysisSettingsProvider(provider) {
+    this.analysisSettingsProvider = typeof provider === "function" ? provider : null;
+  }
+
+  async currentAnalysisProfile() {
+    if (!this.analysisSettingsProvider) {
+      return {
+        settings: null,
+        schemaVersion: "static",
+        revision: "static"
+      };
+    }
+
+    return this.analysisSettingsProvider();
+  }
+
+  summaryModel() {
+    return this.config.summaryModel || "gpt-5.5";
   }
 
   async request(path, options) {
@@ -417,7 +611,7 @@ class OpenAiClient {
     };
   }
 
-  async summarizeTranscript({ call, transcript, clientContext }) {
+  async classifyTranscript({ call, transcript, analysisProfile }) {
     if (!this.enabled) {
       throw new Error("OPENAI_API_KEY не налаштований");
     }
@@ -428,31 +622,21 @@ class OpenAiClient {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: this.config.summaryModel || "gpt-5.5",
+        model: this.summaryModel(),
         reasoning: {
           effort: "low"
         },
         input: [
           {
             role: "system",
-            content: AiPrompts.CALL_SUMMARY_SYSTEM_PROMPT
+            content: AiPrompts.buildCallTypeClassificationSystemPrompt(analysisProfile)
           },
           {
             role: "user",
             content: JSON.stringify({
-              call: {
-                startedAt: call.startedAt,
-                type: call.typeLabel,
-                disposition: call.dispositionLabel,
-                operator: call.employee && call.employee.name,
-                externalNumber: call.externalNumber
-              },
+              call: callMetadata(call),
               domainTerms: AiPrompts.DOMAIN_TERMS,
-              clientContext: clientContext || null,
-              diarizedTranscript: transcript.text,
-              promptedTranscript: transcript.promptedText || "",
-              originalPromptedTranscript: transcript.originalPromptedText || "",
-              segments: transcript.segments
+              diarizedTranscript: transcript.text
             })
           }
         ],
@@ -460,9 +644,9 @@ class OpenAiClient {
           verbosity: "low",
           format: {
             type: "json_schema",
-            name: "call_summary",
+            name: "call_type_classification",
             strict: true,
-            schema: AiPrompts.SUMMARY_SCHEMA
+            schema: AiPrompts.buildCallTypeClassificationSchema(analysisProfile)
           }
         }
       })
@@ -470,14 +654,160 @@ class OpenAiClient {
 
     const body = extractResponseText(data);
     if (!body) {
-      throw new Error("OpenAI не повернув текст підсумку");
+      throw new Error("OpenAI не повернув класифікацію типу дзвінка");
+    }
+
+    const parsed = JSON.parse(body);
+    const callType = AiPrompts.findAnalysisCallType(analysisProfile, parsed.callType);
+    return {
+      ...parsed,
+      callType: callType.key,
+      callTypeLabel: callType.label,
+      confidence: finiteNumber(parsed.confidence, 0.6),
+      usage: normalizeUsage(data)
+    };
+  }
+
+  async evaluateTranscript({
+    call,
+    transcript,
+    clientContext,
+    analysisProfile,
+    classification
+  }) {
+    if (!this.enabled) {
+      throw new Error("OPENAI_API_KEY не налаштований");
+    }
+
+    const callType = AiPrompts.findAnalysisCallType(
+      analysisProfile,
+      classification && classification.callType
+    );
+    const data = await this.request("responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: this.summaryModel(),
+        reasoning: {
+          effort: "low"
+        },
+        input: [
+          {
+            role: "system",
+            content: AiPrompts.buildCallEvaluationSystemPrompt(
+              analysisProfile,
+              callType.key
+            )
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              analysisSettings: {
+                schemaVersion: analysisProfile.schemaVersion,
+                revision: analysisProfile.revision
+              },
+              classifiedCallType: {
+                callType: callType.key,
+                callTypeLabel: callType.label,
+                confidence: finiteNumber(
+                  classification && classification.confidence,
+                  0.6
+                ),
+                reason: text(classification && classification.reason)
+              },
+              call: callMetadata(call),
+              domainTerms: AiPrompts.DOMAIN_TERMS,
+              clientContext: compactClientContextForAi(clientContext),
+              diarizedTranscript: transcript.text,
+              promptedTranscript: compactSecondaryTranscript(
+                transcript.promptedText,
+                transcript.text
+              ),
+              originalPromptedTranscript: compactSecondaryTranscript(
+                transcript.originalPromptedText,
+                transcript.text
+              )
+            })
+          }
+        ],
+        text: {
+          verbosity: "low",
+          format: {
+            type: "json_schema",
+            name: "call_evaluation",
+            strict: true,
+            schema: AiPrompts.buildCallEvaluationSchema(
+              analysisProfile,
+              callType.key
+            )
+          }
+        }
+      })
+    });
+
+    const body = extractResponseText(data);
+    if (!body) {
+      throw new Error("OpenAI не повернув аналіз дзвінка");
     }
 
     return {
       ...JSON.parse(body),
-      model: this.config.summaryModel || "gpt-5.5",
-      version: this.config.summaryVersion,
       usage: normalizeUsage(data)
+    };
+  }
+
+  async summarizeTranscript({ call, transcript, clientContext }) {
+    if (!this.enabled) {
+      throw new Error("OPENAI_API_KEY не налаштований");
+    }
+
+    const analysisProfile = await this.currentAnalysisProfile();
+    const providedClassification = providedAnalysisCallType(call, analysisProfile);
+    const classification = providedClassification || await this.classifyTranscript({
+      call,
+      transcript,
+      analysisProfile
+    });
+    const classificationUsage = classification.usage || null;
+    delete classification.usage;
+
+    const rawEvaluation = await this.evaluateTranscript({
+      call,
+      transcript,
+      clientContext,
+      analysisProfile,
+      classification
+    });
+    const evaluationUsage = rawEvaluation.usage || null;
+    delete rawEvaluation.usage;
+
+    const summary = AiPrompts.enrichCallEvaluation(
+      rawEvaluation,
+      analysisProfile,
+      classification.callType,
+      classification
+    );
+
+    return {
+      ...summary,
+      analysisPipeline: {
+        version: "two_stage_metric_evaluation",
+        classification
+      },
+      model: this.summaryModel(),
+      version: this.config.summaryVersion,
+      analysisProfile: {
+        schemaVersion: analysisProfile.schemaVersion,
+        revision: analysisProfile.revision,
+        semanticRevision: analysisProfile.semanticRevision,
+        scoringRevision: analysisProfile.scoringRevision
+      },
+      usage: combineUsage({
+        classification: classificationUsage,
+        evaluation: evaluationUsage
+      })
     };
   }
 }

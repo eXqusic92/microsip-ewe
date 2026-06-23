@@ -137,6 +137,11 @@ module.exports = {
     "..",
     process.env.CALL_SUMMARIES_FILE || "data/call-summaries.json"
   ),
+  aiAnalysisSettingsFile: path.resolve(
+    __dirname,
+    "..",
+    process.env.AI_ANALYSIS_SETTINGS_FILE || "data/ai-analysis-settings.json"
+  ),
   binotelCallsFile: path.resolve(
     __dirname,
     "..",
@@ -262,7 +267,7 @@ module.exports = {
     enabled: parseBoolean(process.env.SONIOX_ENABLED, Boolean(sonioxKey)),
     apiKey: sonioxKey,
     baseUrl: process.env.SONIOX_BASE_URL || "https://api.soniox.com/v1",
-    model: process.env.SONIOX_MODEL || "stt-async-v4",
+    model: process.env.SONIOX_MODEL || "stt-async-v5",
     languageHints: parseCsv(process.env.SONIOX_LANGUAGE_HINTS, [
       "uk",
       "ru",

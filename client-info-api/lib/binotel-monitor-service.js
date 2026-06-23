@@ -35,6 +35,11 @@ function numeric(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function optionalNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function addCounter(map, key, label) {
   const normalizedKey = String(key || "").trim();
   if (!normalizedKey) {
@@ -51,6 +56,79 @@ function addCounter(map, key, label) {
     current.label = String(label).trim();
   }
   map.set(normalizedKey, current);
+}
+
+function addCustomMetric(map, metric) {
+  const key = String(metric && metric.metricKey || "").trim();
+  if (!key) {
+    return;
+  }
+
+  const score = optionalNumber(metric.score);
+  const explicitMaxScore = optionalNumber(metric.maxScore);
+  const maxScore = explicitMaxScore && explicitMaxScore > 0
+    ? explicitMaxScore
+    : score !== null
+      ? 5
+      : null;
+  const optionKey = String(metric.selectedOptionKey || "").trim();
+  const optionLabel = String(metric.selectedOptionLabel || optionKey).trim();
+  const current = map.get(key) || {
+    key,
+    label: String(metric.metricLabel || key).trim(),
+    count: 0,
+    scoredCount: 0,
+    scoreSum: 0,
+    maxScoreSum: 0,
+    normalizedScoreSum: 0,
+    options: new Map()
+  };
+
+  current.count += 1;
+  if (metric.countsTowardScore !== false && score !== null && maxScore > 0) {
+    current.scoredCount += 1;
+    current.scoreSum += score;
+    current.maxScoreSum += maxScore;
+    current.normalizedScoreSum += (score / maxScore) * 100;
+  }
+
+  if (optionKey) {
+    const option = current.options.get(optionKey) || {
+      key: optionKey,
+      label: optionLabel,
+      score,
+      maxScore,
+      color: String(metric.color || "").trim(),
+      countsTowardScore: metric.countsTowardScore !== false && score !== null,
+      count: 0
+    };
+    option.count += 1;
+    current.options.set(optionKey, option);
+  }
+
+  map.set(key, current);
+}
+
+function customMetricAnalytics(metricMap) {
+  return [...metricMap.values()]
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    .map((metric) => ({
+      key: metric.key,
+      label: metric.label,
+      count: metric.count,
+      scoredCount: metric.scoredCount,
+      averageScore: metric.scoredCount
+        ? Math.round((metric.scoreSum / metric.scoredCount) * 100) / 100
+        : null,
+      averageMaxScore: metric.scoredCount
+        ? Math.round((metric.maxScoreSum / metric.scoredCount) * 100) / 100
+        : null,
+      averagePercent: metric.scoredCount
+        ? Math.round((metric.normalizedScoreSum / metric.scoredCount) * 100) / 100
+        : null,
+      options: [...metric.options.values()]
+        .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    }));
 }
 
 function openAiSummaryCostUsd(usage) {
@@ -362,11 +440,14 @@ class BinotelMonitorService {
       }
 
       const existing = await this.callSummaryService.store.get(callId);
-      if (existing && existing.status === "done") {
+      const existingIsCurrent = existing
+        ? await this.callSummaryService.isCurrentEntry(existing)
+        : false;
+      if (existing && existing.status === "done" && existingIsCurrent) {
         continue;
       }
 
-      if (existing && existing.status === "processing") {
+      if (existing && existing.status === "processing" && existingIsCurrent) {
         const processingAt = new Date(
           existing.startedAt || existing.updatedAt || 0
         ).getTime();
@@ -378,7 +459,7 @@ class BinotelMonitorService {
         }
       }
 
-      if (existing && existing.status === "queued") {
+      if (existing && existing.status === "queued" && existingIsCurrent) {
         const queuedAt = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
         if (
           Number.isFinite(queuedAt) &&
@@ -390,6 +471,7 @@ class BinotelMonitorService {
 
       if (
         existing &&
+        existingIsCurrent &&
         existing.status !== "done" &&
         (existing.terminalFailure || Number(existing.attempts || 0) >= aiMaxAttempts)
       ) {
@@ -406,7 +488,7 @@ class BinotelMonitorService {
         continue;
       }
 
-      if (existing && existing.status === "failed") {
+      if (existing && existing.status === "failed" && existingIsCurrent) {
         const updatedAt = new Date(existing.updatedAt || 0).getTime();
         if (Number.isFinite(updatedAt) && Date.now() - updatedAt < recordingRetryMillis) {
           continue;
@@ -601,6 +683,7 @@ class BinotelMonitorService {
     const questionMap = new Map();
     const churnRiskMap = new Map();
     const escalationLevelMap = new Map();
+    const customMetricMap = new Map();
     let recordableCalls = 0;
     let eligibleCalls = 0;
     let analyzedCalls = 0;
@@ -686,6 +769,10 @@ class BinotelMonitorService {
         );
       }
 
+      for (const metric of (summary.customEvaluation && summary.customEvaluation.metrics) || []) {
+        addCustomMetric(customMetricMap, metric);
+      }
+
       const type = String(summary.callType || "").trim();
       if (!type) {
         continue;
@@ -753,6 +840,7 @@ class BinotelMonitorService {
         levels: [...churnRiskMap.values()]
           .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type))
       },
+      customMetrics: customMetricAnalytics(customMetricMap),
       usage: {
         recordableRecordingSeconds,
         eligibleRecordingSeconds,

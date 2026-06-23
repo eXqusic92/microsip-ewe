@@ -161,13 +161,13 @@ function sendAudio(req, res, audio) {
   res.end(audio.bytes);
 }
 
-function readJsonBody(req) {
+function readJsonBody(req, maxBytes = 32768) {
   return new Promise((resolve, reject) => {
     let body = "";
 
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 32768) {
+      if (body.length > maxBytes) {
         reject(new Error("request_body_too_large"));
         req.destroy();
       }
@@ -217,6 +217,11 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/call-analytics") {
+    sendFile(res, "index.html");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/ai-settings") {
     sendFile(res, "index.html");
     return;
   }
@@ -294,6 +299,34 @@ async function handleRequest(req, res) {
     }
 
     sendJson(res, 200, await store.getCallSummary(phone));
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/ai-analysis-settings") {
+    sendJson(res, 200, await store.getAiAnalysisSettings());
+    return;
+  }
+
+  if (req.method === "PUT" && requestUrl.pathname === "/api/ai-analysis-settings") {
+    try {
+      const payload = await readJsonBody(req, 1024 * 1024);
+      sendJson(res, 200, await store.updateAiAnalysisSettings(payload.settings || payload));
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : 422;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: error.message
+      });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/api/ai-analysis-settings/reset") {
+    sendJson(res, 200, await store.resetAiAnalysisSettings());
     return;
   }
 

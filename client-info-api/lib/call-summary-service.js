@@ -2,6 +2,7 @@
 
 const { spawn } = require("child_process");
 
+const AiPrompts = require("./ai-prompts");
 const { phoneDigits } = require("./phone");
 
 const RECORDABLE_DISPOSITIONS = new Set(["ANSWER", "VM-SUCCESS", "SUCCESS"]);
@@ -36,13 +37,32 @@ function storedTranscriptionProvider(entry) {
   return model.startsWith("soniox:") ? "soniox" : "openai";
 }
 
-function isCurrentVersion(entry, config) {
+function isCurrentAnalysisProfile(entry, analysisProfile) {
+  const semanticRevision = text(analysisProfile && analysisProfile.semanticRevision);
+  const entrySemanticRevision = text(
+    entry && entry.analysisProfile && entry.analysisProfile.semanticRevision
+  );
+
+  if (semanticRevision && entrySemanticRevision) {
+    return entrySemanticRevision === semanticRevision;
+  }
+
+  const revision = text(analysisProfile && analysisProfile.revision);
+  if (!revision) {
+    return true;
+  }
+
+  return text(entry && entry.analysisProfile && entry.analysisProfile.revision) === revision;
+}
+
+function isCurrentVersion(entry, config, analysisProfile) {
   if (!entry || entry.version !== config.openai.summaryVersion) {
     return false;
   }
 
   return (
-    storedTranscriptionProvider(entry) === configuredTranscriptionProvider(config)
+    storedTranscriptionProvider(entry) === configuredTranscriptionProvider(config) &&
+    isCurrentAnalysisProfile(entry, analysisProfile)
   );
 }
 
@@ -63,16 +83,58 @@ function canHaveRecording(call) {
   return Number(call.billSec || 0) > 0;
 }
 
+function locallyRefreshedSummary(summary, analysisProfile) {
+  if (
+    !summary ||
+    !analysisProfile ||
+    !summary.customEvaluation ||
+    !Array.isArray(summary.customEvaluation.metrics)
+  ) {
+    return summary || null;
+  }
+
+  try {
+    const classification =
+      (summary.analysisPipeline && summary.analysisPipeline.classification) ||
+      {
+        confidence: summary.callTypeConfidence,
+        reason: "Локальне оновлення оцінок без повторного AI-запиту."
+      };
+    const refreshed = AiPrompts.enrichCallEvaluation(
+      summary,
+      analysisProfile,
+      summary.callType ||
+        (summary.customEvaluation && summary.customEvaluation.matchedCallType),
+      classification
+    );
+
+    return {
+      ...refreshed,
+      analysisProfile: {
+        schemaVersion: analysisProfile.schemaVersion,
+        revision: analysisProfile.revision,
+        semanticRevision: analysisProfile.semanticRevision,
+        scoringRevision: analysisProfile.scoringRevision
+      }
+    };
+  } catch (error) {
+    console.warn(`Local AI score refresh failed: ${error.message}`);
+    return summary;
+  }
+}
+
 function latestRecordableCall(calls) {
   return [...(calls || [])]
     .filter(canHaveRecording)
     .sort((a, b) => new Date(b.startedAt || 0) - new Date(a.startedAt || 0))[0] || null;
 }
 
-function publicEntry(entry, call) {
+function publicEntry(entry, call, analysisProfile = null) {
   if (!entry) {
     return null;
   }
+
+  const summary = locallyRefreshedSummary(entry.summary, analysisProfile);
 
   return {
     status: entry.status,
@@ -81,11 +143,12 @@ function publicEntry(entry, call) {
     callStartedAt: entry.callStartedAt || (call && call.startedAt) || null,
     updatedAt: entry.updatedAt || null,
     completedAt: entry.completedAt || null,
-    summary: entry.summary || null,
+    summary,
     error: entry.error || "",
     message: entry.message || "",
     attempts: entry.attempts || 0,
     terminalFailure: Boolean(entry.terminalFailure),
+    analysisProfile: analysisProfile || entry.analysisProfile || null,
     models: entry.models || null,
     usage: entry.usage || null,
     callDurationSec: Number(entry.callDurationSec || (call && call.billSec) || 0)
@@ -178,6 +241,15 @@ class CallSummaryService {
     this.clientContextProvider = typeof provider === "function" ? provider : null;
   }
 
+  async isCurrentEntry(entry) {
+    const analysisProfile = this.openAiClient &&
+      typeof this.openAiClient.currentAnalysisProfile === "function"
+      ? await this.openAiClient.currentAnalysisProfile()
+      : null;
+
+    return isCurrentVersion(entry, this.config, analysisProfile);
+  }
+
   async prepare(phone, calls) {
     if (!this.enabled) {
       return {
@@ -232,33 +304,37 @@ class CallSummaryService {
       )
     );
     const existing = await this.store.get(callId);
+    const analysisProfile = this.openAiClient &&
+      typeof this.openAiClient.currentAnalysisProfile === "function"
+      ? await this.openAiClient.currentAnalysisProfile()
+      : null;
 
-    if (existing && existing.status === "done" && isCurrentVersion(existing, this.config)) {
-      return publicEntry(existing, call);
+    if (existing && existing.status === "done" && isCurrentVersion(existing, this.config, analysisProfile)) {
+      return publicEntry(existing, call, analysisProfile);
     }
 
-    if (isCurrentVersion(existing, this.config) && isFreshProcessing(existing, staleMillis)) {
-      return publicEntry(existing, call);
+    if (isCurrentVersion(existing, this.config, analysisProfile) && isFreshProcessing(existing, staleMillis)) {
+      return publicEntry(existing, call, analysisProfile);
     }
 
     if (
       existing &&
-      isCurrentVersion(existing, this.config) &&
+      isCurrentVersion(existing, this.config, analysisProfile) &&
       (existing.terminalFailure || Number(existing.attempts || 0) >= maxAttempts)
     ) {
-      return publicEntry(existing, call);
+      return publicEntry(existing, call, analysisProfile);
     }
 
     if (
       existing &&
       existing.status === "failed" &&
-      isCurrentVersion(existing, this.config) &&
+      isCurrentVersion(existing, this.config, analysisProfile) &&
       !options.retryFailed
     ) {
-      return publicEntry(existing, call);
+      return publicEntry(existing, call, analysisProfile);
     }
 
-    const versionChanged = Boolean(existing && !isCurrentVersion(existing, this.config));
+    const versionChanged = Boolean(existing && !isCurrentVersion(existing, this.config, analysisProfile));
     const entry = await this.store.upsert(callId, {
       status: "queued",
       ...(versionChanged ? { attempts: 0, terminalFailure: false } : {}),
@@ -268,6 +344,7 @@ class CallSummaryService {
       callStartedAt: call.startedAt || null,
       callDurationSec: Number(call.billSec || 0),
       version: this.config.openai.summaryVersion,
+      analysisProfile,
       transcription: {
         ...(existing && existing.transcription ? existing.transcription : {}),
         provider: configuredTranscriptionProvider(this.config)
@@ -277,7 +354,7 @@ class CallSummaryService {
     });
 
     this.start(phone, call);
-    return publicEntry(entry, call);
+    return publicEntry(entry, call, analysisProfile);
   }
 
   async reanalyzeCall(phone, call) {
@@ -300,9 +377,13 @@ class CallSummaryService {
 
     const callId = String(call.generalCallId);
     const existing = await this.store.get(callId);
+    const analysisProfile = this.openAiClient &&
+      typeof this.openAiClient.currentAnalysisProfile === "function"
+      ? await this.openAiClient.currentAnalysisProfile()
+      : null;
 
     if (this.running.has(callId)) {
-      return publicEntry(existing, call) || {
+      return publicEntry(existing, call, analysisProfile) || {
         status: "processing",
         callId,
         generalCallId: callId,
@@ -322,6 +403,7 @@ class CallSummaryService {
       callStartedAt: call.startedAt || null,
       callDurationSec: Number(call.billSec || 0),
       version: this.config.openai.summaryVersion,
+      analysisProfile,
       summary: null,
       completedAt: null,
       models: {
@@ -337,7 +419,7 @@ class CallSummaryService {
     });
 
     this.start(phone, call);
-    return publicEntry(entry, call);
+    return publicEntry(entry, call, analysisProfile);
   }
 
   async status(callId) {
@@ -351,6 +433,10 @@ class CallSummaryService {
     }
 
     const entry = await this.store.get(id);
+    const analysisProfile = this.openAiClient &&
+      typeof this.openAiClient.currentAnalysisProfile === "function"
+      ? await this.openAiClient.currentAnalysisProfile()
+      : null;
     if (!entry) {
       return {
         status: "not_available",
@@ -361,7 +447,7 @@ class CallSummaryService {
       };
     }
 
-    return publicEntry(entry, null);
+    return publicEntry(entry, null, analysisProfile);
   }
 
   async details(callId) {
@@ -376,6 +462,10 @@ class CallSummaryService {
     }
 
     const entry = await this.store.get(id);
+    const analysisProfile = this.openAiClient &&
+      typeof this.openAiClient.currentAnalysisProfile === "function"
+      ? await this.openAiClient.currentAnalysisProfile()
+      : null;
     if (!entry) {
       return {
         status: "not_available",
@@ -388,7 +478,7 @@ class CallSummaryService {
     }
 
     return {
-      ...publicEntry(entry, null),
+      ...publicEntry(entry, null, analysisProfile),
       stage: entry.stage || "",
       version: entry.version || "",
       transcript: entry.transcript || null,
@@ -416,6 +506,10 @@ class CallSummaryService {
   async process(phone, call) {
     const callId = String(call.generalCallId);
     const existing = await this.store.get(callId);
+    const analysisProfile = this.openAiClient &&
+      typeof this.openAiClient.currentAnalysisProfile === "function"
+      ? await this.openAiClient.currentAnalysisProfile()
+      : null;
     const attempts = (existing && existing.attempts ? existing.attempts : 0) + 1;
     const maxAttempts = Math.max(
       1,
@@ -435,6 +529,7 @@ class CallSummaryService {
       callStartedAt: call.startedAt || null,
       callDurationSec: Number(call.billSec || 0),
       version: this.config.openai.summaryVersion,
+      analysisProfile,
       transcription: {
         ...(existing && existing.transcription ? existing.transcription : {}),
         provider: configuredTranscriptionProvider(this.config)
@@ -530,6 +625,7 @@ class CallSummaryService {
         message: "",
         completedAt: nowIso(),
         summary,
+        analysisProfile: summary.analysisProfile || analysisProfile,
         usage: {
           ...(existing && existing.usage ? existing.usage : {}),
           summary: summaryUsage

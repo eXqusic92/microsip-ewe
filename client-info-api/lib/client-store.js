@@ -3,6 +3,7 @@
 const { Pool } = require("pg");
 
 const { BinotelClient } = require("./binotel-client");
+const { AiAnalysisSettingsStore } = require("./ai-analysis-settings");
 const BookingRules = require("./booking-rules");
 const { CallSummaryService } = require("./call-summary-service");
 const { CallSummaryStore } = require("./call-summary-store");
@@ -846,6 +847,12 @@ function createClientStore(config) {
   );
   const binotelClient = new BinotelClient(config);
   const openAiClient = new OpenAiClient(config);
+  const aiAnalysisSettingsStore = new AiAnalysisSettingsStore(
+    config.aiAnalysisSettingsFile
+  );
+  openAiClient.setAnalysisSettingsProvider(() =>
+    aiAnalysisSettingsStore.getProfile()
+  );
   const transcriptionClient = createTranscriptionClient(config, openAiClient);
   const callSummaryStore = new CallSummaryStore(config.callSummariesFile);
   const callSummaryService = new CallSummaryService(
@@ -882,6 +889,13 @@ function createClientStore(config) {
   callSummaryService.setClientContextProvider((phone) =>
     store.getAiClientContext(phone)
   );
+  store.aiAnalysisSettingsStore = aiAnalysisSettingsStore;
+  store.getAiAnalysisSettings = () =>
+    aiAnalysisSettingsStore.getPublicSettings();
+  store.updateAiAnalysisSettings = (settings) =>
+    aiAnalysisSettingsStore.update(settings);
+  store.resetAiAnalysisSettings = () =>
+    aiAnalysisSettingsStore.reset();
 
   return store;
 }

@@ -2,6 +2,8 @@
 
 const { DOMAIN_TERMS, TRANSCRIPTION_DOMAIN_PROMPT } = require("./ai-prompts");
 
+const DEFAULT_SONIOX_ASYNC_MODEL = "stt-async-v5";
+
 function text(value) {
   return value === null || value === undefined ? "" : String(value).trim();
 }
@@ -42,9 +44,48 @@ function normalizeSpeaker(value) {
   return /^\d+$/.test(speaker) ? `speaker_${speaker}` : speaker;
 }
 
-function seconds(value) {
+function seconds(value, unit = "ms") {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed / 1000 : null;
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return unit === "ms" ? parsed / 1000 : parsed;
+}
+
+function tokenTimeSeconds(token, keys) {
+  for (const key of keys) {
+    if (!token || token[key] === null || token[key] === undefined) {
+      continue;
+    }
+
+    const normalized = seconds(token[key], /(?:^|_)ms$|Ms$/i.test(key) ? "ms" : "s");
+    if (normalized !== null) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+function sonioxErrorMessage(data, fallback) {
+  const error =
+    data && typeof data.error === "object" && data.error !== null
+      ? data.error
+      : {};
+  const errorType = text(data && (data.error_type || data.code || error.type));
+  const message = text(
+    data &&
+      (data.error_message ||
+        data.message ||
+        data.error_description ||
+        error.message ||
+        data.error)
+  );
+  const requestId = text(data && (data.request_id || data.requestId));
+  const base = [errorType, message].filter(Boolean).join(": ") || fallback;
+
+  return requestId ? `${base} (request_id: ${requestId})` : base;
 }
 
 function formatTimestamp(value) {
@@ -93,8 +134,22 @@ function transcriptSegments(tokens) {
       normalizeSpeaker(token.speaker) ||
       (current && current.speaker) ||
       "speaker_1";
-    const start = seconds(token.start_ms);
-    const end = seconds(token.end_ms);
+    const start = tokenTimeSeconds(token, [
+      "start_ms",
+      "start_time_ms",
+      "startMs",
+      "startTimeMs",
+      "start_time",
+      "start"
+    ]);
+    const end = tokenTimeSeconds(token, [
+      "end_ms",
+      "end_time_ms",
+      "endMs",
+      "endTimeMs",
+      "end_time",
+      "end"
+    ]);
     const gap =
       current &&
       Number.isFinite(start) &&
@@ -173,6 +228,8 @@ class SonioxApiError extends Error {
     super(message);
     this.name = "SonioxApiError";
     this.status = Number(options.status || 0);
+    this.errorType = text(options.errorType);
+    this.requestId = text(options.requestId);
     this.retryAfterMillis = Number(options.retryAfterMillis || 0);
     this.retryable = Boolean(options.retryable);
   }
@@ -233,12 +290,11 @@ class SonioxClient {
 
         if (!response.ok) {
           throw new SonioxApiError(
-            data.error_message ||
-              data.message ||
-              data.error ||
-              `Soniox HTTP ${response.status}`,
+            sonioxErrorMessage(data, `Soniox HTTP ${response.status}`),
             {
               status: response.status,
+              errorType: data.error_type,
+              requestId: data.request_id || data.requestId,
               retryAfterMillis: retryAfterMillis(response),
               retryable: isRetryableStatus(response.status)
             }
@@ -302,7 +358,11 @@ class SonioxClient {
 
       if (status.status === "error") {
         throw new SonioxApiError(
-          status.error_message || "Soniox не зміг розпізнати запис"
+          sonioxErrorMessage(status, "Soniox не зміг розпізнати запис"),
+          {
+            errorType: status.error_type,
+            requestId: status.request_id || status.requestId
+          }
         );
       }
 
@@ -345,7 +405,7 @@ class SonioxClient {
       }
 
       const body = {
-        model: this.config.model || "stt-async-v4",
+        model: this.config.model || DEFAULT_SONIOX_ASYNC_MODEL,
         file_id: fileId,
         language_hints: this.config.languageHints || ["uk", "ru", "en"],
         language_hints_strict: Boolean(this.config.languageHintsStrict),
@@ -373,7 +433,7 @@ class SonioxClient {
             },
             {
               key: "speakers",
-              value: "Usually 2 speakers: company operator and customer"
+              value: "Usually 2 primary speakers: company operator and customer. Background voices or third parties may appear."
             }
           ],
           text: TRANSCRIPTION_DOMAIN_PROMPT,
@@ -414,7 +474,7 @@ class SonioxClient {
         rawText,
         promptedText: "",
         originalPromptedText: "",
-        model: `soniox:${this.config.model || "stt-async-v4"}`,
+        model: `soniox:${this.config.model || DEFAULT_SONIOX_ASYNC_MODEL}`,
         promptedModel: "",
         language: dominantLanguages(
           tokens,

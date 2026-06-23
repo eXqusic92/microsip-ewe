@@ -21,7 +21,7 @@
     </script>
     <title>Картка клієнта | DUMA</title>
     <link rel="icon" href="/duma-logo.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/styles.css?v=20260608-monitor-operator-duration-1">
+    <link rel="stylesheet" href="/styles.css?v=20260609-quality-score-3">
   </head>
   <body>
     <header class="app-header">
@@ -33,6 +33,7 @@
           <a href="/client-card" data-view-link="client-card">Картка</a>
           <a href="/calls-monitor" data-view-link="calls-monitor">Дзвінки</a>
           <a href="/call-analytics" data-view-link="call-analytics">AI-аналітика</a>
+          <a href="/ai-settings" data-view-link="ai-settings">AI-налаштування</a>
         </nav>
         <h1 id="page-title">Картка клієнта</h1>
       </div>
@@ -324,6 +325,183 @@
         </section>
       </section>
 
+      <section class="ai-settings-page hidden" id="ai-settings-page" aria-live="polite">
+        <div id="ai-settings-tab-ai">
+          <div class="ai-soldly-hero" id="ai-settings-list-hero">
+            <div class="ai-hero-title">
+              <span class="ai-hero-icon" aria-hidden="true"></span>
+              <div>
+                <h1>Інструкції для метрик</h1>
+                <p>Оберіть тип дзвінка, відкрийте метрику і налаштуйте, як AI має її оцінювати.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="ai-soldly-hero hidden" id="ai-settings-detail-hero">
+            <button class="ai-hero-back" type="button" data-ai-action="back-to-types" aria-label="Назад до типів"></button>
+            <div class="ai-hero-title ai-hero-title-stack">
+              <span class="ai-hero-icon" aria-hidden="true"></span>
+              <div>
+                <h1 id="ai-detail-title">Тип дзвінка</h1>
+                <p id="ai-detail-description">Опис типу аналізу.</p>
+              </div>
+            </div>
+            <div class="ai-hero-actions">
+              <button class="ai-gradient-button ai-hero-settings" id="ai-general-settings" type="button" data-ai-action="open-type-settings">
+                <span class="ai-js-icon" data-icon="settings"></span>
+                Загальні налаштування
+              </button>
+            </div>
+          </div>
+
+          <div class="ai-soldly-list-panel" id="ai-settings-list-view" data-onboarding-anchor="ai-config-list">
+            <div class="ai-list-head">
+              <div class="ai-list-title">
+                <h2>Типи аналізу (<span id="ai-call-type-count">0</span>)</h2>
+                <button class="ai-quiet-button" id="ai-show-inactive" type="button" data-ai-action="toggle-show-inactive">
+                  <span class="ai-js-icon" data-icon="eye"></span>
+                  Показати неактивні
+                </button>
+              </div>
+              <button class="ai-gradient-button" type="button" data-ai-action="create-call-type" data-kind="call">
+                <span class="ai-js-icon" data-icon="plus"></span>
+                Тип дзвінка
+              </button>
+            </div>
+            <div class="ai-channel-line">
+              <span class="ai-channel-chip"><span class="ai-js-icon" data-icon="phone"></span>Дзвінки</span>
+            </div>
+            <div class="ai-type-grid" id="ai-call-type-list"></div>
+          </div>
+
+          <div class="ai-soldly-detail hidden" id="ai-settings-detail-view">
+            <div class="ai-detail-grid ai-detail-grid-single">
+              <section class="ai-detail-main">
+                <div class="ai-metrics-head">
+                  <div class="ai-metrics-title">
+                    <span class="ai-check-badge" aria-hidden="true"></span>
+                    <span class="ai-target-badge" aria-hidden="true"></span>
+                    <h2>Ваші метрики</h2>
+                    <span class="ai-count-pill" id="ai-metric-count">0/0</span>
+                  </div>
+                  <button class="ai-gradient-button" id="ai-add-metric" type="button" data-ai-action="add-metric">
+                    <span class="ai-js-icon" data-icon="plus"></span>
+                    Метрика
+                  </button>
+                </div>
+                <div class="ai-metric-list" id="ai-metric-list"></div>
+              </section>
+            </div>
+          </div>
+        </div>
+        <p class="form-message ai-settings-message" id="ai-settings-message" aria-live="polite"></p>
+        <p class="ai-settings-status" id="ai-settings-status">Завантаження налаштувань...</p>
+
+        <dialog class="ai-soldly-dialog" id="ai-metric-modal" aria-labelledby="ai-metric-modal-title">
+          <form id="ai-metric-modal-form" method="dialog">
+            <header class="ai-dialog-head">
+              <h2 id="ai-metric-modal-title">Редагувати метрику</h2>
+              <button type="button" id="ai-metric-modal-close" aria-label="Закрити">
+                <span class="ai-js-icon" data-icon="x"></span>
+              </button>
+            </header>
+
+            <div class="ai-dialog-body">
+              <div class="ai-modal-top-row">
+                <label>
+                  <span>Назва метрики <span class="ai-help-dot" aria-hidden="true"></span></span>
+                  <input id="ai-modal-metric-label" type="text" placeholder="Наприклад: Привітання">
+                </label>
+                <label>
+                  <span>Тип</span>
+                  <button class="ai-modal-type-button" type="button">
+                    <span class="ai-js-icon" data-icon="zap"></span>
+                    Список варіантів (AI)
+                    <span class="ai-js-icon" data-icon="chevronDown"></span>
+                  </button>
+                </label>
+                <label>
+                  <span>Оцінка</span>
+                  <span class="ai-modal-score-toggle">
+                    <span class="ai-js-icon" data-icon="star"></span>
+                    <input id="ai-modal-metric-enabled" type="checkbox">
+                    <span class="ai-toggle-ui" aria-hidden="true"></span>
+                  </span>
+                </label>
+              </div>
+
+              <label class="ai-dialog-field">
+                <span>Група <span class="ai-help-dot" aria-hidden="true"></span></span>
+                <input id="ai-modal-metric-group" type="text" placeholder="Наприклад: Етап привітання">
+              </label>
+
+              <label class="ai-dialog-field">
+                <span>Опис <span class="ai-help-dot" aria-hidden="true"></span></span>
+                <textarea id="ai-modal-metric-description" rows="3" placeholder="Наприклад: Чи представив менеджер себе на початку дзвінка"></textarea>
+              </label>
+
+              <label class="ai-dialog-field">
+                <span>Деталі для AI <b>AI</b> <span class="ai-help-dot" aria-hidden="true"></span></span>
+                <textarea id="ai-modal-metric-instructions" rows="3"></textarea>
+              </label>
+
+              <section class="ai-options-box">
+                <header>
+                  <div>
+                    <span class="ai-js-icon" data-icon="zap"></span>
+                    <div>
+                      <h3>Варіанти відповідей</h3>
+                      <p>AI обере найбільше відповідний варіант</p>
+                    </div>
+                  </div>
+                  <button type="button" id="ai-modal-add-option">
+                    <span class="ai-js-icon" data-icon="plus"></span>
+                    Додати
+                  </button>
+                </header>
+                <div class="ai-modal-option-list" id="ai-modal-option-list"></div>
+              </section>
+            </div>
+
+            <footer class="ai-dialog-footer">
+              <button class="ai-dialog-cancel" id="ai-metric-cancel" type="button">Скасувати</button>
+              <button class="ai-dialog-submit" type="submit">
+                <span class="ai-js-icon" data-icon="check"></span>
+                Оновити
+              </button>
+            </footer>
+          </form>
+        </dialog>
+
+        <dialog class="ai-soldly-dialog ai-type-dialog" id="ai-type-modal" aria-labelledby="ai-type-modal-title">
+          <form id="ai-type-modal-form" method="dialog">
+            <header class="ai-dialog-head">
+              <h2 id="ai-type-modal-title">Загальні налаштування</h2>
+              <button type="button" id="ai-type-modal-close" aria-label="Закрити">
+                <span class="ai-js-icon" data-icon="x"></span>
+              </button>
+            </header>
+            <div class="ai-dialog-body">
+              <label class="ai-dialog-field">
+                <span>Назва</span>
+                <input id="ai-type-label" type="text" placeholder="Наприклад: Бронювання квитків">
+              </label>
+              <label class="ai-dialog-field">
+                <span>Опис</span>
+                <textarea id="ai-type-description" rows="4" placeholder="Короткий опис сценарію дзвінка"></textarea>
+              </label>
+            </div>
+            <footer class="ai-dialog-footer">
+              <button class="ai-dialog-cancel" id="ai-type-cancel" type="button">Скасувати</button>
+              <button class="ai-dialog-submit" type="submit">
+                <span class="ai-js-icon" data-icon="check"></span>
+                Оновити
+              </button>
+            </footer>
+          </form>
+        </dialog>
+      </section>
+
       <section class="call-detail-page hidden" id="call-detail-page" aria-live="polite">
         <a class="detail-back-link" href="/calls-monitor">
           <span aria-hidden="true">←</span>
@@ -390,7 +568,7 @@
             <div class="section-heading">
               <div>
                 <p class="section-label">Оцінка дзвінка</p>
-                <h2>Якість оператора</h2>
+                <h2>Ваші метрики</h2>
               </div>
               <strong class="quality-score" id="detail-quality-score">—</strong>
             </div>
@@ -559,6 +737,6 @@
       </a>
     </template>
 
-    <script src="/app.js?v=20260608-monitor-operator-duration-1" defer></script>
+    <script src="/app.js?v=20260609-quality-score-3" defer></script>
   </body>
 </html>

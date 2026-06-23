@@ -162,6 +162,7 @@ const SUMMARY_SCHEMA = {
     "escalation",
     "churnRisk",
     "customerQuestions",
+    "speakers",
     "operatorEvaluation",
     "confidence"
   ],
@@ -272,6 +273,33 @@ const SUMMARY_SCHEMA = {
         }
       }
     },
+    speakers: {
+      type: "array",
+      description:
+        "Role assignment for every distinct diarized speaker label found in segments or diarizedTranscript. Use the exact speaker label from the transcript.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["speaker", "role", "confidence"],
+        properties: {
+          speaker: {
+            type: "string",
+            description:
+              "Exact diarized speaker label, for example speaker_1, speaker_2, A, or B."
+          },
+          role: {
+            type: "string",
+            enum: ["operator", "client", "unknown"],
+            description:
+              "operator is the DUMA/East West Eurolines employee; client is the caller/customer or partner agency asking for service."
+          },
+          confidence: {
+            type: "number",
+            description: "Confidence in this speaker role from 0 to 1."
+          }
+        }
+      }
+    },
     operatorEvaluation: {
       type: "object",
       additionalProperties: false,
@@ -360,6 +388,228 @@ const SUMMARY_SCHEMA = {
     }
   }
 };
+
+function cloneSchema(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function text(value) {
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function finiteNumber(value, fallback = null) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function settingsFromProfile(profileOrSettings) {
+  return profileOrSettings && profileOrSettings.settings
+    ? profileOrSettings.settings
+    : profileOrSettings;
+}
+
+function profileRevision(profileOrSettings) {
+  return text(profileOrSettings && profileOrSettings.revision);
+}
+
+function profileSchemaVersion(profileOrSettings) {
+  const settings = settingsFromProfile(profileOrSettings);
+  return text(
+    (profileOrSettings && profileOrSettings.schemaVersion) ||
+      (settings && settings.schemaVersion)
+  );
+}
+
+function sortedEnabled(items) {
+  return [...(Array.isArray(items) ? items : [])]
+    .filter((item) => item && item.enabled !== false)
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+}
+
+function analysisCallTypes(profileOrSettings) {
+  const settings = settingsFromProfile(profileOrSettings);
+  const configured = sortedEnabled(settings && settings.callTypes)
+    .map((callType, index) => ({
+      key: text(callType.key) || CALL_TYPES[index] || "other",
+      label: text(callType.label) || CALL_TYPE_LABELS[index] || text(callType.key),
+      description: text(callType.description),
+      color: text(callType.color),
+      metrics: sortedEnabled(callType.metrics)
+    }))
+    .filter((callType) => callType.key && callType.label);
+
+  if (configured.length) {
+    return configured;
+  }
+
+  return CALL_TYPES.map((key, index) => ({
+    key,
+    label: CALL_TYPE_LABELS[index] || key,
+    description: "",
+    color: "",
+    metrics: []
+  }));
+}
+
+function uniqueValues(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function analysisMetricKeys(callTypes) {
+  return uniqueValues(
+    callTypes.flatMap((callType) =>
+      (callType.metrics || []).map((metric) => text(metric.key))
+    )
+  );
+}
+
+function analysisOptionKeys(callTypes) {
+  return uniqueValues(
+    callTypes.flatMap((callType) =>
+      (callType.metrics || []).flatMap((metric) =>
+        (metric.options || []).map((option) => text(option.key))
+      )
+    )
+  );
+}
+
+function buildCustomEvaluationSchema(profileOrSettings) {
+  const callTypes = analysisCallTypes(profileOrSettings);
+  const callTypeKeys = uniqueValues(callTypes.map((callType) => callType.key));
+  const metricKeys = analysisMetricKeys(callTypes);
+  const optionKeys = analysisOptionKeys(callTypes);
+
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "profileVersion",
+      "profileRevision",
+      "matchedCallType",
+      "overallScore",
+      "overallColor",
+      "summary",
+      "metrics"
+    ],
+    properties: {
+      profileVersion: {
+        type: "string",
+        description: "AI analysis settings schemaVersion used for this evaluation."
+      },
+      profileRevision: {
+        type: "string",
+        description: "AI analysis settings revision used for this evaluation."
+      },
+      matchedCallType: {
+        type: "string",
+        enum: callTypeKeys.length ? callTypeKeys : CALL_TYPES
+      },
+      overallScore: {
+        type: ["number", "null"],
+        description:
+          "Normalized custom metric score from 0 to 100: sum(score * weight) / sum(maxScore * weight) * 100. Exclude null score, null/zero maxScore, and countsTowardScore=false. Use null when nothing can be scored."
+      },
+      overallColor: {
+        type: ["string", "null"],
+        description:
+          "Color for overallScore. Prefer a selected option color or null when overallScore is null."
+      },
+      summary: {
+        type: "string",
+        description:
+          "One short Ukrainian sentence summarizing custom metric evaluation."
+      },
+      metrics: {
+        type: "array",
+        description:
+          "Evaluations for all enabled metrics from the selected call type, in configured order.",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "metricKey",
+            "metricLabel",
+            "selectedOptionKey",
+            "selectedOptionLabel",
+            "score",
+            "maxScore",
+            "color",
+            "countsTowardScore",
+            "evidence",
+            "improvement",
+            "confidence"
+          ],
+          properties: {
+            metricKey: {
+              type: "string",
+              enum: metricKeys.length
+                ? metricKeys
+                : OPERATOR_EVALUATION_CRITERIA.map((item) => item.key)
+            },
+            metricLabel: {
+              type: "string"
+            },
+            selectedOptionKey: {
+              type: "string",
+              enum: optionKeys.length
+                ? optionKeys
+                : ["excellent", "partial", "missed", "not_applicable"]
+            },
+            selectedOptionLabel: {
+              type: "string"
+            },
+            score: {
+              type: ["number", "null"],
+              description:
+                "Exact selected option score. Use null only when the selected option is a dash/non-scored option."
+            },
+            maxScore: {
+              type: ["number", "null"],
+              description:
+                "Maximum numeric score available for this metric among scoring options. For options 0 and 2, maxScore must be 2."
+            },
+            color: {
+              type: "string",
+              description: "Exact option color from settings, usually a #RRGGBB value."
+            },
+            countsTowardScore: {
+              type: "boolean",
+              description: "Exact option countsTowardScore value from settings."
+            },
+            evidence: {
+              type: ["string", "null"],
+              description:
+                "Short evidence from the call, paraphrased in Ukrainian, or null when not applicable."
+            },
+            improvement: {
+              type: ["string", "null"],
+              description:
+                "One concrete improvement for this metric, or null when strong/not applicable."
+            },
+            confidence: {
+              type: "number",
+              description: "Confidence in this metric evaluation from 0 to 1."
+            }
+          }
+        }
+      }
+    }
+  };
+}
+
+function buildSummarySchema(profileOrSettings) {
+  const callTypes = analysisCallTypes(profileOrSettings);
+  const schema = cloneSchema(SUMMARY_SCHEMA);
+
+  if (callTypes.length) {
+    schema.properties.callType.enum = uniqueValues(callTypes.map((callType) => callType.key));
+    schema.properties.callTypeLabel.enum = uniqueValues(callTypes.map((callType) => callType.label));
+  }
+
+  schema.required = uniqueValues([...schema.required, "customEvaluation"]);
+  schema.properties.customEvaluation = buildCustomEvaluationSchema(profileOrSettings);
+  return schema;
+}
 
 const DOMAIN_TERMS = [
   "DUMA",
@@ -463,6 +713,16 @@ const SALES_SCRIPT_PROMPT = `
 - У кожній оцінці відповідай на головне питання: що оператор реально міг зробити краще саме в цьому дзвінку?
 `.trim();
 
+const COMPACT_EVALUATION_GUARDRAILS_PROMPT = `
+Контекст і guardrails для оцінки:
+- У user input може бути clientContext: короткий CRM-контекст. Використовуй його лише як допоміжну підказку; якщо transcript і clientContext суперечать одне одному, довіряй transcript.
+- Якщо факт уже очевидний з clientContext або клієнт сам його назвав, не штрафуй оператора за повторне неуточнення цього факту.
+- Не штрафуй оператора за те, що він не контролює: кордон, черги, погоду, водія, технічну несправність, правила повернення, дії прикордонників/митниці або політику перевізника.
+- Для вибору варіанту користуйся тільки інструкціями конкретної metric і її option нижче. Загальні guardrails не замінюють Soldly-інструкції.
+- Для документів, дітей, тварин, багажу, митниці та кордону не вигадуй юридичних гарантій; добре, коли оператор говорить обережно або скеровує до офіційного джерела.
+- Якщо запис дуже короткий, ролі спікерів неясні або ASR слабкий, знижуй confidence і став null там, де фактично немає доказів.
+`.trim();
+
 const CALL_SUMMARY_SYSTEM_PROMPT = `
 ${CLIENT_CONTEXT_PROMPT}
 
@@ -480,6 +740,13 @@ ${SALES_SCRIPT_PROMPT}
 - Якщо оператор знає факт, який є в clientContext, не штрафуй його за те, що він не уточнив цей факт у клієнта.
 - Транскрипт може містити ASR-помилки. Можна обережно нормалізувати очевидні назви міст, компанії та автобусні терміни зі словника, але тільки якщо це випливає з контексту.
 - Не включай довгий переказ. Усі текстові поля тримай короткими: 1 речення або null.
+
+Ролі спікерів:
+- У speakers поверни кожен distinct speaker label із segments або diarizedTranscript. speaker має бути точним label із транскрипту, наприклад speaker_1, speaker_2, A або B; не замінюй його на "operator" чи "client".
+- role: operator для працівника DUMA / East West Eurolines, client для клієнта/пасажира/партнерської каси чи агенції, яка звертається по сервіс; unknown тільки якщо роль справді неможливо встановити.
+- Оператор часто вітається від імені компанії, каже "чим можу допомогти", "слухаю вас", бачить бронювання/квитки/CRM, дає відповіді й наступні дії.
+- Клієнт або партнерська агенція зазвичай ставить питання, описує свою потребу, просить уточнити рейс/квиток/багаж/повернення або надає дані пасажира.
+- Якщо рівно два speaker labels і один очевидно operator, другий зазвичай client. Якщо один очевидно client, другий зазвичай operator.
 
 Підсумок дзвінка:
 - Поле summary має бути одним коротким реченням до 180 символів.
@@ -548,7 +815,721 @@ ${OPERATOR_EVALUATION_CRITERIA.map((item) => `  - ${item.key} / "${item.label}":
 - Якщо є originalPromptedTranscript, це транскрипт сирого запису без FFmpeg-очищення. Використовуй його як ще одне джерело для слів, які могли зникнути після шумоприглушення.
 `.trim();
 
+function compactInstruction(value) {
+  return text(value).replace(/\s+/g, " ");
+}
+
+function promptInstruction(primary, fallback = "") {
+  return compactInstruction(primary || fallback);
+}
+
+function metricInstructionForPrompt(metric) {
+  return promptInstruction(
+    metric && metric.aiBrief,
+    (metric && metric.aiInstructions) ||
+      (metric && metric.description) ||
+      (metric && metric.label)
+  );
+}
+
+function optionInstructionForPrompt(optionItem) {
+  return promptInstruction(
+    optionItem && optionItem.aiBrief,
+    (optionItem && optionItem.aiInstructions) ||
+      (optionItem && optionItem.label)
+  );
+}
+
+function callTypeDescriptionForPrompt(callType) {
+  return promptInstruction(
+    callType && callType.aiBrief,
+    (callType && callType.description) ||
+      (callType && callType.label)
+  );
+}
+
+function optionScoreForPrompt(optionItem) {
+  return optionItem.countsTowardScore === false ||
+    optionItem.score === null ||
+    optionItem.score === undefined
+    ? "—"
+    : String(optionItem.score);
+}
+
+function metricMaxScore(metric) {
+  const scores = ((metric && metric.options) || [])
+    .filter((optionItem) => optionItem.countsTowardScore !== false)
+    .map((optionItem) => Number(optionItem.score))
+    .filter((score) => Number.isFinite(score));
+
+  return scores.length ? Math.max(...scores) : null;
+}
+
+function metricPromptSignature(metric) {
+  return JSON.stringify({
+    label: text(metric && metric.label),
+    group: text(metric && metric.group),
+    weight: Number(metric && metric.weight || 0),
+    description: compactInstruction(metric && metric.description),
+    aiInstructions: metricInstructionForPrompt(metric),
+    options: [...((metric && metric.options) || [])]
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+      .map((optionItem) => ({
+        key: text(optionItem.key),
+        label: text(optionItem.label),
+        score: optionScoreForPrompt(optionItem),
+        color: text(optionItem.color),
+        countsTowardScore: optionItem.countsTowardScore !== false,
+        aiInstructions: optionInstructionForPrompt(optionItem)
+      }))
+  });
+}
+
+function buildMetricPromptScope(callTypes) {
+  const signaturesByKey = new Map();
+  const entries = [];
+
+  for (const callType of callTypes) {
+    for (const metric of sortedEnabled(callType.metrics)) {
+      const key = text(metric.key);
+      if (!key) {
+        continue;
+      }
+
+      const signature = metricPromptSignature(metric);
+      entries.push({
+        callTypeKey: callType.key,
+        key,
+        metric,
+        signature
+      });
+
+      if (!signaturesByKey.has(key)) {
+        signaturesByKey.set(key, new Set());
+      }
+      signaturesByKey.get(key).add(signature);
+    }
+  }
+
+  const refsByCallTypeKey = new Map();
+  const definitions = new Map();
+
+  for (const entry of entries) {
+    const hasMultipleDefinitions = (signaturesByKey.get(entry.key) || new Set()).size > 1;
+    const ref = hasMultipleDefinitions
+      ? `${entry.callTypeKey}.${entry.key}`
+      : entry.key;
+
+    if (!refsByCallTypeKey.has(entry.callTypeKey)) {
+      refsByCallTypeKey.set(entry.callTypeKey, []);
+    }
+    refsByCallTypeKey.get(entry.callTypeKey).push(ref);
+
+    if (!definitions.has(ref)) {
+      definitions.set(ref, {
+        ref,
+        metric: entry.metric
+      });
+    }
+  }
+
+  return {
+    definitions: [...definitions.values()],
+    refsByCallTypeKey
+  };
+}
+
+function formatMetricForPrompt(ref, metric) {
+  const maxScore = metricMaxScore(metric);
+  const options = [...(metric.options || [])]
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+    .map((optionItem) => {
+      const scoreLabel = optionScoreForPrompt(optionItem);
+      const countLabel = optionItem.countsTowardScore === false || scoreLabel === "—"
+        ? ", не враховувати в середньому"
+        : "";
+      return `${optionItem.key}: label="${optionItem.label}", score=${scoreLabel}, color=${optionItem.color}${countLabel}, опис оцінки: ${optionInstructionForPrompt(optionItem)}`;
+    })
+    .join(" | ");
+
+  return [
+    `- metricRef="${ref}" metricKey="${metric.key}" label="${metric.label}"`,
+    metric.group ? `група: ${metric.group}` : "",
+    metric.weight ? `вага: ${metric.weight}` : "",
+    `maxScore=${maxScore === null ? "—" : maxScore}`,
+    `опис метрики: ${metricInstructionForPrompt(metric)}`,
+    `описи оцінок: ${options}`
+  ].filter(Boolean).join("; ");
+}
+
+function findAnalysisCallType(profileOrSettings, callTypeKey) {
+  const callTypes = analysisCallTypes(profileOrSettings);
+  const key = text(callTypeKey);
+  const normalized = key.toLowerCase();
+  return (
+    callTypes.find((callType) => callType.key === key) ||
+    callTypes.find((callType) => text(callType.label).toLowerCase() === normalized) ||
+    callTypes.find((callType) => callType.key === "other") ||
+    callTypes[0] ||
+    {
+      key: "other",
+      label: "Інше",
+      description: "",
+      color: "",
+      metrics: []
+    }
+  );
+}
+
+function formatCallTypeBriefForPrompt(callType) {
+  const description = callTypeDescriptionForPrompt(callType) ||
+    "Корисний дзвінок цього типу.";
+  return `- ${callType.key} / "${callType.label}": ${description}`;
+}
+
+function buildCallTypeClassificationSchema(profileOrSettings) {
+  const callTypes = analysisCallTypes(profileOrSettings);
+  const callTypeKeys = uniqueValues(callTypes.map((callType) => callType.key));
+
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["callType", "confidence", "reason"],
+    properties: {
+      callType: {
+        type: "string",
+        enum: callTypeKeys.length ? callTypeKeys : CALL_TYPES
+      },
+      confidence: {
+        type: "number",
+        description: "Confidence in classification from 0 to 1."
+      },
+      reason: {
+        type: "string",
+        description:
+          "One short Ukrainian sentence explaining the main intent of the call."
+      }
+    }
+  };
+}
+
+function buildCallTypeClassificationSystemPrompt(profileOrSettings) {
+  const callTypes = analysisCallTypes(profileOrSettings);
+
+  return `
+Ти класифікуєш телефонний дзвінок автобусної компанії DUMA / East West Eurolines.
+
+Завдання: обрати рівно один callType з доступного списку. На цьому етапі НЕ оцінюй метрики, НЕ рахуй бали і НЕ роби детальний аналіз якості.
+
+Правила:
+- Відповідай українською.
+- Обирай тип за головним практичним наміром клієнта або дією, яку має зробити оператор.
+- Якщо тем кілька, вибирай ту, яка була основною або потребує найбільшої дії.
+- Якщо транскрипція слабка або тип неочевидний, confidence має бути 0.2-0.5.
+- East West Eurolines / EWE / DUMA - це компанія, не маршрут і не ім'я клієнта.
+
+Доступні типи дзвінків:
+${callTypes.map(formatCallTypeBriefForPrompt).join("\n")}
+`.trim();
+}
+
+function formatMetricForEvaluationPrompt(metric) {
+  const options = [...(metric.options || [])]
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+    .map((optionItem) =>
+      `    - optionKey="${optionItem.key}" label="${optionItem.label}": ${optionInstructionForPrompt(optionItem)}`
+    )
+    .join("\n");
+
+  return [
+    `- metricKey="${metric.key}" label="${metric.label}"`,
+    metric.group ? `  group="${metric.group}"` : "",
+    `  що оцінювати: ${metricInstructionForPrompt(metric)}`,
+    "  варіанти, з яких AI має обрати рівно один:",
+    options
+  ].filter(Boolean).join("\n");
+}
+
+function buildLeanCustomEvaluationSchema(profileOrSettings, callTypeKey) {
+  const callType = findAnalysisCallType(profileOrSettings, callTypeKey);
+  const metrics = sortedEnabled(callType.metrics);
+  const metricKeys = uniqueValues(metrics.map((metric) => text(metric.key)));
+  const optionKeys = uniqueValues(
+    metrics.flatMap((metric) =>
+      (metric.options || []).map((optionItem) => text(optionItem.key))
+    )
+  );
+
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["summary", "metrics"],
+    properties: {
+      summary: {
+        type: "string",
+        description:
+          "One short Ukrainian sentence about what the custom metrics show."
+      },
+      metrics: {
+        type: "array",
+        description:
+          "One selected option for every enabled metric of the selected call type, in configured order.",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "metricKey",
+            "selectedOptionKey",
+            "evidence",
+            "improvement",
+            "confidence"
+          ],
+          properties: {
+            metricKey: {
+              type: "string",
+              enum: metricKeys.length
+                ? metricKeys
+                : OPERATOR_EVALUATION_CRITERIA.map((item) => item.key)
+            },
+            selectedOptionKey: {
+              type: "string",
+              enum: optionKeys.length
+                ? optionKeys
+                : ["excellent", "partial", "missed", "not_applicable"]
+            },
+            evidence: {
+              type: ["string", "null"],
+              description:
+                "Short paraphrased evidence from the call, or null when not applicable."
+            },
+            improvement: {
+              type: ["string", "null"],
+              description:
+                "One concrete improvement for this metric, or null when strong/not applicable."
+            },
+            confidence: {
+              type: "number",
+              description: "Confidence in this metric option from 0 to 1."
+            }
+          }
+        }
+      }
+    }
+  };
+}
+
+function buildCallEvaluationSchema(profileOrSettings, callTypeKey) {
+  const callType = findAnalysisCallType(profileOrSettings, callTypeKey);
+  const schema = cloneSchema(SUMMARY_SCHEMA);
+
+  schema.required = uniqueValues(
+    schema.required
+      .filter((key) => ![
+        "operatorEvaluation",
+        "callType",
+        "callTypeLabel",
+        "callTypeConfidence"
+      ].includes(key))
+      .concat("customEvaluation")
+  );
+  delete schema.properties.operatorEvaluation;
+  delete schema.properties.callType;
+  delete schema.properties.callTypeLabel;
+  delete schema.properties.callTypeConfidence;
+  schema.properties.customEvaluation = buildLeanCustomEvaluationSchema(
+    profileOrSettings,
+    callType.key
+  );
+
+  return schema;
+}
+
+function buildCallEvaluationSystemPrompt(profileOrSettings, callTypeKey) {
+  const callType = findAnalysisCallType(profileOrSettings, callTypeKey);
+  const metrics = sortedEnabled(callType.metrics);
+
+  return `
+${COMPACT_EVALUATION_GUARDRAILS_PROMPT}
+
+Ти аналізуєш транскрипт телефонної розмови автобусної компанії DUMA / East West Eurolines.
+
+Тип дзвінка вже класифіковано на попередньому етапі:
+- callType="${callType.key}"
+- callTypeLabel="${callType.label}"
+- опис: ${compactInstruction(callType.description) || "без додаткового опису"}
+
+Завдання цього етапу:
+- Дати короткий підсумок дзвінка.
+- Заповнити операційні поля: головне питання клієнта, наступна дія, ескалація, ризик втрати.
+- Визначити ролі спікерів.
+- Оцінити тільки enabled metrics для цього callType.
+
+Важливо про токени й локальну логіку:
+- Повертай тільки поля, описані в JSON schema. Усі технічні атрибути варіантів бекенд знайде й порахує локально за selectedOptionKey.
+- У customEvaluation.metrics для кожної метрики поверни тільки metricKey, selectedOptionKey, evidence, improvement, confidence.
+- Для кожної metric обери рівно один optionKey з її списку.
+- Якщо критерій неактуальний для конкретного дзвінка, обери optionKey, який у налаштуваннях описує неактуальність/прочерк, якщо такий є.
+- Для вибору optionKey використовуй саме описи варіантів нижче, а не власну шкалу.
+- Не повертай технічні атрибути варіантів, профілю або типу дзвінка: це бекенд додасть локально.
+
+Кастомні метрики для цього типу:
+${metrics.length
+    ? metrics.map(formatMetricForEvaluationPrompt).join("\n\n")
+    : "- Немає налаштованих метрик; поверни порожній масив metrics."}
+
+Загальні правила:
+- Відповідай українською незалежно від мови розмови.
+- Не вигадуй фактів. Якщо наступна дія або причина не визначена, став null або action = none.
+- Якщо у user input є clientContext, використовуй його лише як допоміжний CRM-контекст, а не як заміну транскрипту.
+- Транскрипт може містити ASR-помилки. Нормалізуй очевидні назви міст і компанії тільки коли це випливає з контексту.
+- Усі текстові поля тримай короткими: 1 речення або null.
+
+Ролі спікерів:
+- У speakers поверни кожен distinct speaker label із transcript. speaker має бути точним label із транскрипту, наприклад speaker_1, speaker_2, A або B.
+- role: operator для працівника DUMA / East West Eurolines; client для клієнта/пасажира/партнерської каси; unknown тільки якщо роль справді неможливо встановити.
+- Оператор часто вітається від імені компанії, каже "чим можу допомогти", бачить бронювання/CRM, дає відповіді й наступні дії.
+- Якщо рівно два speaker labels і один очевидно operator, другий зазвичай client.
+
+Підсумок дзвінка:
+- summary має бути одним коротким реченням до 180 символів.
+- Якщо в розмові немає корисної інформації для картки, summary має прямо сказати це.
+- Тип дзвінка вже визначено, не дублюй його у відповіді.
+
+Операційні поля:
+- operatorNextStep.action:
+  - none: після дзвінка нічого робити не потрібно.
+  - call_back: треба передзвонити клієнту.
+  - send_update: треба надіслати або озвучити оновлення.
+  - check_booking: треба перевірити бронювання/замовлення/квиток.
+  - contact_dispatcher: треба зв'язатися з диспетчером.
+  - contact_driver: треба зв'язатися з водієм.
+  - create_complaint: треба оформити або передати скаргу.
+  - process_refund: треба запустити/перевірити повернення.
+  - other: інша конкретна дія.
+- escalation.needed = true тільки якщо питання треба передати іншій ролі або керівнику.
+- escalation.department: dispatcher, quality, manager, accounting, technical, driver, other або null.
+- churnRisk.level: low, medium, high або unknown.
+- customerQuestions - тільки 1 головне питання клієнта. Якщо питань не було, поверни порожній масив. Обирай type/label із цього списку:
+${CUSTOMER_QUESTION_TYPES.map((type, index) => `  - ${type} / "${CUSTOMER_QUESTION_LABELS[index]}"`).join("\n")}
+
+Додаткові джерела:
+- Основним джерелом є diarizedTranscript.
+- promptedTranscript або originalPromptedTranscript використовуй лише як допоміжний текст для слів, які могли бути розпізнані краще без speaker labels.
+`.trim();
+}
+
+function optionCountsTowardScore(optionItem) {
+  return Boolean(
+    optionItem &&
+      optionItem.countsTowardScore !== false &&
+      optionItem.score !== null &&
+      optionItem.score !== undefined &&
+      Number.isFinite(Number(optionItem.score))
+  );
+}
+
+function optionNumericScore(optionItem) {
+  return optionCountsTowardScore(optionItem)
+    ? Number(optionItem.score)
+    : null;
+}
+
+function roundMetricScore(value) {
+  return Number.isFinite(Number(value))
+    ? Math.round(Number(value) * 10) / 10
+    : null;
+}
+
+function findMetricRawEvaluation(rawMetrics, metricKey) {
+  return (Array.isArray(rawMetrics) ? rawMetrics : []).find(
+    (item) => text(item && item.metricKey) === metricKey
+  ) || null;
+}
+
+function fallbackMissingOption(metric) {
+  const options = [...((metric && metric.options) || [])]
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  return (
+    options.find((optionItem) => optionItem.countsTowardScore === false) ||
+    {
+      key: "not_evaluated",
+      label: "Не оцінено",
+      score: null,
+      color: "#94a3b8",
+      countsTowardScore: false
+    }
+  );
+}
+
+function findSelectedOption(metric, optionKey, hasRawMetric = true) {
+  if (!hasRawMetric) {
+    return fallbackMissingOption(metric);
+  }
+
+  const options = [...((metric && metric.options) || [])]
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  const key = text(optionKey);
+  return (
+    options.find((optionItem) => text(optionItem.key) === key) ||
+    fallbackMissingOption(metric)
+  );
+}
+
+function overallColorFromScore(score) {
+  if (!Number.isFinite(Number(score))) {
+    return null;
+  }
+
+  const value = Number(score);
+  if (value >= 85) {
+    return "#22c55e";
+  }
+  if (value >= 60) {
+    return "#facc15";
+  }
+  if (value >= 40) {
+    return "#fb923c";
+  }
+  return "#ef4444";
+}
+
+function overallLabelFromScore(score) {
+  if (!Number.isFinite(Number(score))) {
+    return "Недостатньо даних";
+  }
+
+  const value = Number(score);
+  if (value >= 85) {
+    return "Відмінно";
+  }
+  if (value >= 70) {
+    return "Добре";
+  }
+  if (value >= 50) {
+    return "Потребує уваги";
+  }
+  return "Критично";
+}
+
+function metricPercent(metricEvaluation) {
+  const score = finiteNumber(metricEvaluation && metricEvaluation.score);
+  const maxScore = finiteNumber(metricEvaluation && metricEvaluation.maxScore);
+  if (score === null || maxScore === null || maxScore <= 0) {
+    return null;
+  }
+
+  return roundMetricScore((score / maxScore) * 100);
+}
+
+function averageMetricConfidence(metrics, fallback = 0.7) {
+  const values = (Array.isArray(metrics) ? metrics : [])
+    .map((metric) => finiteNumber(metric && metric.confidence))
+    .filter((value) => value !== null);
+  if (!values.length) {
+    return fallback;
+  }
+  return roundMetricScore(
+    values.reduce((total, value) => total + value, 0) / values.length
+  );
+}
+
+function enrichCustomEvaluation(rawCustomEvaluation, profileOrSettings, callTypeKey) {
+  const callType = findAnalysisCallType(profileOrSettings, callTypeKey);
+  const rawMetrics = rawCustomEvaluation && rawCustomEvaluation.metrics;
+  const metrics = sortedEnabled(callType.metrics).map((metric) => {
+    const rawMetric = findMetricRawEvaluation(rawMetrics, metric.key);
+    const selectedOption = findSelectedOption(
+      metric,
+      rawMetric && rawMetric.selectedOptionKey,
+      Boolean(rawMetric)
+    );
+    const score = optionNumericScore(selectedOption);
+    const maxScore = metricMaxScore(metric);
+    const countsTowardScore = optionCountsTowardScore(selectedOption);
+
+    return {
+      metricKey: metric.key,
+      metricLabel: metric.label,
+      metricGroup: metric.group || "",
+      selectedOptionKey: selectedOption.key,
+      selectedOptionLabel: selectedOption.label,
+      score,
+      maxScore,
+      color: text(selectedOption.color) || "#94a3b8",
+      countsTowardScore,
+      evidence: rawMetric && rawMetric.evidence !== undefined
+        ? rawMetric.evidence
+        : null,
+      improvement: rawMetric && rawMetric.improvement !== undefined
+        ? rawMetric.improvement
+        : null,
+      confidence: finiteNumber(rawMetric && rawMetric.confidence, 0.65)
+    };
+  });
+
+  let numerator = 0;
+  let denominator = 0;
+  const weightsByMetricKey = new Map(
+    sortedEnabled(callType.metrics).map((metric) => [
+      metric.key,
+      Math.max(0, finiteNumber(metric.weight, 1))
+    ])
+  );
+
+  for (const metric of metrics) {
+    const weight = weightsByMetricKey.get(metric.metricKey) ?? 1;
+    if (
+      metric.countsTowardScore &&
+      metric.score !== null &&
+      Number.isFinite(Number(metric.score)) &&
+      metric.maxScore !== null &&
+      Number(metric.maxScore) > 0 &&
+      weight > 0
+    ) {
+      numerator += Number(metric.score) * weight;
+      denominator += Number(metric.maxScore) * weight;
+    }
+  }
+
+  const overallScore = denominator > 0
+    ? roundMetricScore((numerator / denominator) * 100)
+    : null;
+
+  return {
+    profileVersion:
+      text(rawCustomEvaluation && rawCustomEvaluation.profileVersion) ||
+      profileSchemaVersion(profileOrSettings) ||
+      "unknown",
+    profileRevision:
+      text(rawCustomEvaluation && rawCustomEvaluation.profileRevision) ||
+      profileRevision(profileOrSettings) ||
+      "unknown",
+    matchedCallType: callType.key,
+    overallScore,
+    overallColor: overallColorFromScore(overallScore),
+    summary:
+      text(rawCustomEvaluation && rawCustomEvaluation.summary) ||
+      (overallScore === null
+        ? "Метрики не увійшли в загальну оцінку."
+        : `Оцінка за метриками: ${Math.round(overallScore)}%.`),
+    metrics
+  };
+}
+
+function buildOperatorEvaluationFromCustom(customEvaluation) {
+  const metrics = Array.isArray(customEvaluation && customEvaluation.metrics)
+    ? customEvaluation.metrics
+    : [];
+  const criteria = metrics.map((metric) => {
+    const score = metricPercent(metric);
+    return {
+      key: metric.metricKey,
+      label: metric.metricLabel || metric.metricKey,
+      score,
+      explanation:
+        text(metric.evidence) ||
+        text(metric.selectedOptionLabel) ||
+        "AI обрав відповідний варіант за налаштуваннями метрики.",
+      improvement: text(metric.improvement) || null
+    };
+  });
+  const strengths = metrics
+    .filter((metric) => {
+      const score = metricPercent(metric);
+      return score !== null && score >= 80;
+    })
+    .slice(0, 2)
+    .map((metric) => `${metric.metricLabel}: ${metric.selectedOptionLabel}`);
+  const improvements = metrics
+    .filter((metric) => text(metric.improvement))
+    .slice(0, 2)
+    .map((metric) => metric.improvement);
+
+  return {
+    overallScore: customEvaluation ? customEvaluation.overallScore : null,
+    overallLabel: overallLabelFromScore(customEvaluation && customEvaluation.overallScore),
+    summary:
+      text(customEvaluation && customEvaluation.summary) ||
+      "Оцінка побудована за кастомними метриками.",
+    criteria,
+    strengths,
+    improvements,
+    confidence: averageMetricConfidence(metrics)
+  };
+}
+
+function enrichCallEvaluation(rawSummary, profileOrSettings, callTypeKey, classification = {}) {
+  const callType = findAnalysisCallType(profileOrSettings, callTypeKey);
+  const customEvaluation = enrichCustomEvaluation(
+    rawSummary && rawSummary.customEvaluation,
+    profileOrSettings,
+    callType.key
+  );
+
+  return {
+    ...(rawSummary || {}),
+    callType: callType.key,
+    callTypeLabel: callType.label,
+    callTypeConfidence: finiteNumber(
+      classification && classification.confidence,
+      finiteNumber(rawSummary && rawSummary.callTypeConfidence, 0.7)
+    ),
+    customEvaluation,
+    operatorEvaluation: buildOperatorEvaluationFromCustom(customEvaluation),
+    confidence: finiteNumber(rawSummary && rawSummary.confidence, averageMetricConfidence(customEvaluation.metrics))
+  };
+}
+
+function formatCallTypeForPrompt(callType, metricRefs = []) {
+  return `- ${callType.key} / "${callType.label}" color=${callType.color || "none"}: ${compactInstruction(callType.description)}; metricRefs: ${metricRefs.join(", ")}`;
+}
+
+function formatAnalysisSettingsForPrompt(profileOrSettings) {
+  const callTypes = analysisCallTypes(profileOrSettings);
+  const metricScope = buildMetricPromptScope(callTypes);
+  const schemaVersion = profileSchemaVersion(profileOrSettings) || "unknown";
+  const revision = profileRevision(profileOrSettings) || "unknown";
+
+  return `
+Поточні кастомні AI-налаштування оцінки:
+- schemaVersion: ${schemaVersion}
+- revision: ${revision}
+- Ці налаштування мають пріоритет над базовими правилами нижче.
+- Спочатку обери один callType з переліку. callTypeLabel має точно відповідати label вибраного типу.
+- У customEvaluation поверни matchedCallType, profileVersion="${schemaVersion}", profileRevision="${revision}".
+- Після вибору callType оціни всі enabled metrics саме цього типу, в налаштованому порядку.
+  - У callType є список metricRefs. Для оцінки використовуй саме ці metricRefs і відповідні definitions з бібліотеки нижче.
+  - У відповіді metricKey має бути чистим metricKey із definition, без префікса callType. metricRef потрібен тільки для вибору правильного опису в prompt.
+  - Якщо однаковий metricKey має кілька metricRef у різних callType, використовуй тільки metricRef з вибраного callType і не змішуй описи оцінок між типами.
+  - Для кожної metric обери рівно один option. score, color і countsTowardScore мають точно копіювати вибраний option з налаштувань.
+  - Для вибору option використовуй саме "опис оцінки" з налаштувань Soldly/AI Settings. Не замінюй їх загальними правилами і не оцінюй за власною шкалою.
+  - Якщо option має score=—, поверни score=null, countsTowardScore=false; така metric не входить у загальну статистику і середні оцінки.
+  - maxScore для metric = найбільший numeric score серед її option, де countsTowardScore=true. Не використовуй 5 автоматично. Якщо в metric є тільки 0 і 2, maxScore=2, і вибір score=0 означає 0/2.
+  - overallScore = нормалізований результат 0-100: sum(score * weight) / sum(maxScore * weight) * 100 тільки по metric, де score != null, maxScore > 0 і countsTowardScore=true; якщо таких немає, overallScore=null.
+  - operatorEvaluation залиш для сумісності UI: побудуй його з customEvaluation у шкалі 0-100; для criteria використовуй score/maxScore*100, а для score=null став null.
+
+Типи дзвінків:
+${callTypes.map((callType) => formatCallTypeForPrompt(
+  callType,
+  metricScope.refsByCallTypeKey.get(callType.key) || []
+)).join("\n")}
+
+Бібліотека metric definitions:
+${metricScope.definitions.map((definition) => formatMetricForPrompt(definition.ref, definition.metric)).join("\n")}
+`.trim();
+}
+
+function buildCallSummarySystemPrompt(profileOrSettings) {
+  return `${formatAnalysisSettingsForPrompt(profileOrSettings)}\n\n${CALL_SUMMARY_SYSTEM_PROMPT}`;
+}
+
 module.exports = {
+  buildCallEvaluationSchema,
+  buildCallEvaluationSystemPrompt,
+  buildCallSummarySystemPrompt,
+  buildCallTypeClassificationSchema,
+  buildCallTypeClassificationSystemPrompt,
+  buildSummarySchema,
   CALL_SUMMARY_SYSTEM_PROMPT,
   CALL_TYPE_LABELS,
   CALL_TYPES,
@@ -556,6 +1537,8 @@ module.exports = {
   CUSTOMER_QUESTION_LABELS,
   CUSTOMER_QUESTION_TYPES,
   DOMAIN_TERMS,
+  enrichCallEvaluation,
+  findAnalysisCallType,
   OPERATOR_EVALUATION_CRITERIA,
   SALES_SCRIPT_PROMPT,
   SUMMARY_SCHEMA,

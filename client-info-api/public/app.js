@@ -86,6 +86,7 @@ const elements = {
   clientCard: document.querySelector("#client-card"),
   monitorPage: document.querySelector("#calls-monitor-page"),
   analyticsPage: document.querySelector("#analytics-page"),
+  aiSettingsPage: document.querySelector("#ai-settings-page"),
   callDetailPage: document.querySelector("#call-detail-page"),
   monitorStatus: document.querySelector("#monitor-status"),
   monitorUpdated: document.querySelector("#monitor-updated"),
@@ -113,6 +114,43 @@ const elements = {
   callTypeEmpty: document.querySelector("#call-type-empty"),
   customerQuestionChart: document.querySelector("#customer-question-chart"),
   customerQuestionEmpty: document.querySelector("#customer-question-empty"),
+  aiSettingsStatus: document.querySelector("#ai-settings-status"),
+  aiSettingsMessage: document.querySelector("#ai-settings-message"),
+  aiSettingsTabs: document.querySelector("#ai-settings-tabs"),
+  aiSettingsTabAi: document.querySelector("#ai-settings-tab-ai"),
+  aiSettingsTabExclusions: document.querySelector("#ai-settings-tab-exclusions"),
+  aiSettingsTabBlocked: document.querySelector("#ai-settings-tab-blocked"),
+  aiSettingsListHero: document.querySelector("#ai-settings-list-hero"),
+  aiSettingsDetailHero: document.querySelector("#ai-settings-detail-hero"),
+  aiSettingsListView: document.querySelector("#ai-settings-list-view"),
+  aiSettingsDetailView: document.querySelector("#ai-settings-detail-view"),
+  aiCallTypeCount: document.querySelector("#ai-call-type-count"),
+  aiCallTypeList: document.querySelector("#ai-call-type-list"),
+  aiShowInactive: document.querySelector("#ai-show-inactive"),
+  aiBackToTypes: document.querySelector("#ai-back-to-types"),
+  aiDetailTitle: document.querySelector("#ai-detail-title"),
+  aiDetailDescription: document.querySelector("#ai-detail-description"),
+  aiGeneralSettings: document.querySelector("#ai-general-settings"),
+  aiMetricCount: document.querySelector("#ai-metric-count"),
+  aiMetricList: document.querySelector("#ai-metric-list"),
+  aiAddMetric: document.querySelector("#ai-add-metric"),
+  aiMetricModal: document.querySelector("#ai-metric-modal"),
+  aiMetricModalForm: document.querySelector("#ai-metric-modal-form"),
+  aiMetricModalClose: document.querySelector("#ai-metric-modal-close"),
+  aiMetricCancel: document.querySelector("#ai-metric-cancel"),
+  aiModalMetricLabel: document.querySelector("#ai-modal-metric-label"),
+  aiModalMetricEnabled: document.querySelector("#ai-modal-metric-enabled"),
+  aiModalMetricGroup: document.querySelector("#ai-modal-metric-group"),
+  aiModalMetricDescription: document.querySelector("#ai-modal-metric-description"),
+  aiModalMetricInstructions: document.querySelector("#ai-modal-metric-instructions"),
+  aiModalOptionList: document.querySelector("#ai-modal-option-list"),
+  aiModalAddOption: document.querySelector("#ai-modal-add-option"),
+  aiTypeModal: document.querySelector("#ai-type-modal"),
+  aiTypeModalForm: document.querySelector("#ai-type-modal-form"),
+  aiTypeModalClose: document.querySelector("#ai-type-modal-close"),
+  aiTypeCancel: document.querySelector("#ai-type-cancel"),
+  aiTypeLabel: document.querySelector("#ai-type-label"),
+  aiTypeDescription: document.querySelector("#ai-type-description"),
   monitorSearchForm: document.querySelector("#monitor-search"),
   monitorQuery: document.querySelector("#monitor-query"),
   monitorPageSize: document.querySelector("#monitor-page-size"),
@@ -206,6 +244,37 @@ let detailTicketsPhone = "";
 let detailTicketsLoaded = false;
 let detailTicketsLoading = false;
 let detailTicketsRequestId = 0;
+const aiSettingsState = {
+  settings: null,
+  revision: "",
+  selectedCallTypeKey: "",
+  selectedMetricKey: "",
+  activeTab: "ai",
+  screen: "list",
+  showInactive: false,
+  editingMetricKey: "",
+  editingTypeKey: "",
+  metricDraft: null,
+  typeDraft: null,
+  draggingMetricKey: "",
+  dragOverMetricKey: "",
+  dragOverMetricPosition: "",
+  pendingMetricDrag: null,
+  suppressMetricClickUntil: 0,
+  dirty: false,
+  saving: false
+};
+const AI_SCORE_NONE_VALUE = "__none";
+const AI_COLOR_PALETTE = [
+  "#ef4444", "#f97316", "#f59e0b", "#facc15", "#eab308", "#84cc16", "#22c55e", "#10b981", "#06b6d4",
+  "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#c026d3", "#db2777", "#e11d48",
+  "#dc2626", "#ea580c", "#d97706", "#ca8a04", "#65a30d", "#16a34a", "#059669", "#0891b2",
+  "#0284c7", "#2563eb", "#4f46e5", "#7c3aed", "#9333ea", "#a21caf", "#be185d", "#be123c",
+  "#b91c1c", "#c2410c", "#b45309", "#a16207", "#4d7c0f", "#15803d", "#047857", "#0e7490",
+  "#0c4a6e", "#1d4ed8", "#3730a3", "#6d28d9", "#7e22ce", "#86198f", "#9f1239", "#59666d",
+  "#374151", "#4b5563", "#6b7280", "#94a3b8", "#cbd5e1", "#e5e7eb", "#f3f4f6", "#f8fafc",
+  "#1f2937", "#111827"
+];
 const detailAudioState = {
   url: "",
   peaks: [],
@@ -376,6 +445,1198 @@ function formatPlaybackTime(value) {
 
 function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, Number(value) || 0));
+}
+
+function cloneObject(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function sortedByOrder(items) {
+  return [...(items || [])].sort(
+    (a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)
+  );
+}
+
+function nextOrder(items) {
+  const orders = (items || []).map((item) => Number(item.order) || 0);
+  return (orders.length ? Math.max(...orders) : 0) + 10;
+}
+
+function newAiKey(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function sanitizeHexColor(value, fallback = "#59666d") {
+  const raw = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(raw) ? raw.toLowerCase() : fallback;
+}
+
+function normalizeAiPaletteColor(value, fallback = "#59666d") {
+  const color = sanitizeHexColor(value, "");
+  if (AI_COLOR_PALETTE.includes(color)) {
+    return color;
+  }
+
+  const fallbackColor = sanitizeHexColor(fallback, AI_COLOR_PALETTE[0]);
+  return AI_COLOR_PALETTE.includes(fallbackColor) ? fallbackColor : AI_COLOR_PALETTE[0];
+}
+
+function aiOptionRowByKey(key) {
+  if (!elements.aiModalOptionList) {
+    return null;
+  }
+
+  return [...elements.aiModalOptionList.querySelectorAll("[data-option-key]")]
+    .find((row) => row.dataset.optionKey === key) || null;
+}
+
+function createAiOption(label, score, color, aiInstructions, order) {
+  const normalizedScore = normalizeAiOptionScore(score);
+  return {
+    key: newAiKey("option"),
+    label,
+    score: normalizedScore,
+    color: normalizeAiPaletteColor(color, scoreColor(normalizedScore)),
+    countsTowardScore: normalizedScore !== null,
+    aiInstructions,
+    order
+  };
+}
+
+function createAiMetric() {
+  return {
+    key: newAiKey("metric"),
+    label: "Нова метрика",
+    group: "Ваші метрики",
+    enabled: true,
+    order: 10,
+    weight: 1,
+    type: "ai_option",
+    description: "",
+    aiInstructions: "",
+    options: [
+      createAiOption("Сильне виконання", 5, "#22c55e", "Критерій виконано повністю.", 10),
+      createAiOption("Частково виконано", 3, "#facc15", "Критерій виконано частково.", 20),
+      createAiOption("Не виконано", 0, "#ef4444", "Критерій не виконано.", 30)
+    ]
+  };
+}
+
+const AI_ICON_PATHS = {
+  brain: '<path d="M12 5a3 3 0 0 0-5.94-.6A3 3 0 0 0 4 9a4 4 0 0 0 0 8 3 3 0 0 0 4.5 2.6"></path><path d="M12 5a3 3 0 0 1 5.94-.6A3 3 0 0 1 20 9a4 4 0 0 1 0 8 3 3 0 0 1-4.5 2.6"></path><path d="M12 5v14"></path>',
+  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.08a2 2 0 0 1 1 1.73v.5a2 2 0 0 1-1 1.73l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.73v-.5a2 2 0 0 1 1-1.73l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle>',
+  sparkles: '<path d="m12 3-1.9 5.4L5 10.3l5.1 1.9L12 17.6l1.9-5.4 5.1-1.9-5.1-1.9Z"></path><path d="M5 3v4"></path><path d="M3 5h4"></path><path d="M19 17v4"></path><path d="M17 19h4"></path>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.35 1.9.65 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.3 1.84.52 2.8.65A2 2 0 0 1 22 16.92z"></path>',
+  video: '<path d="m22 8-6 4 6 4V8Z"></path><rect width="14" height="12" x="2" y="6" rx="2" ry="2"></rect>',
+  message: '<path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path>',
+  eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle>',
+  grip: '<circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>',
+  trash: '<path d="M3 6h18"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
+  list: '<path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path>',
+  target: '<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle>',
+  info: '<circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path>',
+  check: '<path d="M20 6 9 17l-5-5"></path>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>',
+  crown: '<path d="m2 5 4 7 6-7 6 7 4-7"></path><path d="M5 14h14"></path><path d="M6 18h12"></path>',
+  layers: '<path d="m12 2 10 5-10 5L2 7Z"></path><path d="m2 17 10 5 10-5"></path><path d="m2 12 10 5 10-5"></path>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path>',
+  ban: '<circle cx="12" cy="12" r="10"></circle><path d="m4.93 4.93 14.14 14.14"></path>',
+  chevronLeft: '<path d="m15 18-6-6 6-6"></path>',
+  chevronRight: '<path d="m9 18 6-6-6-6"></path>',
+  chevronDown: '<path d="m6 9 6 6 6-6"></path>',
+  plus: '<path d="M5 12h14"></path><path d="M12 5v14"></path>',
+  x: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>',
+  link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"></path><path d="M15 7h2a5 5 0 1 1 0 10h-2"></path><line x1="8" x2="16" y1="12" y2="12"></line>'
+};
+
+function aiIcon(name, className = "") {
+  const path = AI_ICON_PATHS[name] || AI_ICON_PATHS.sparkles;
+  return `<svg class="ai-svg ${className}" viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
+}
+
+function hydrateAiStaticIcons(root = document) {
+  for (const node of root.querySelectorAll(".ai-js-icon[data-icon]")) {
+    node.innerHTML = aiIcon(node.dataset.icon);
+  }
+}
+
+function aiSwitchHtml(enabled, action, key, label) {
+  return `
+    <button class="ai-soldly-switch" type="button" data-ai-action="${action}" data-key="${escapeHtml(key)}" data-checked="${enabled !== false}" aria-label="${escapeHtml(label)}" aria-pressed="${enabled !== false}">
+      <span></span>
+    </button>`;
+}
+
+function aiScoreOptionsHtml(value) {
+  const selectedScore = normalizeAiOptionScore(value, null);
+  let html = `<option value="${AI_SCORE_NONE_VALUE}"${selectedScore === null ? " selected" : ""}>—</option>`;
+
+  for (let score = 0; score <= 5; score += 1) {
+    html += `<option value="${score}"${selectedScore === score ? " selected" : ""}>${score}</option>`;
+  }
+
+  return html;
+}
+
+function aiColorPaletteHtml(optionKey, color) {
+  const selectedColor = normalizeAiPaletteColor(color, scoreColor(0));
+  return `
+    <div class="ai-color-palette">
+      <button class="ai-color-swatch" type="button" data-ai-action="toggle-option-palette" data-key="${escapeHtml(optionKey)}" aria-label="Обрати колір варіанту" aria-expanded="false">
+        <span style="background: ${selectedColor}"></span>
+      </button>
+    </div>`;
+}
+
+function aiColorMenuHtml(optionKey, color) {
+  const selectedColor = normalizeAiPaletteColor(color, scoreColor(0));
+  const choices = AI_COLOR_PALETTE.map((paletteColor) => {
+    const active = paletteColor === selectedColor;
+    return `
+      <button class="ai-color-choice${active ? " active" : ""}" type="button" data-ai-action="set-draft-option-color" data-key="${escapeHtml(optionKey)}" data-color="${paletteColor}" aria-label="Колір ${paletteColor}" aria-selected="${active}">
+        <span style="background: ${paletteColor}"></span>
+      </button>`;
+  }).join("");
+
+  return `
+    <div class="ai-color-menu" data-color-menu hidden>
+      ${choices}
+    </div>`;
+}
+
+function normalizeAiOptionScore(value, fallback = 0) {
+  if (value === undefined) {
+    return fallback === null ? null : clampNumber(fallback, 0, 5);
+  }
+  if (value === null) {
+    return null;
+  }
+
+  const raw = String(value).trim().toLowerCase();
+  if (!raw || raw === AI_SCORE_NONE_VALUE || raw === "-" || raw === "—" || raw === "null") {
+    return null;
+  }
+
+  return clampNumber(value, 0, 5);
+}
+
+function scoreColor(score) {
+  if (score === null || score === undefined || score === "") {
+    return "#94a3b8";
+  }
+
+  if (Number(score) >= 4) {
+    return "#84cc16";
+  }
+  if (Number(score) >= 2) {
+    return "#facc15";
+  }
+  return "#ef4444";
+}
+
+function selectedAiCallType() {
+  const callTypes = (aiSettingsState.settings && aiSettingsState.settings.callTypes) || [];
+  return callTypes.find((item) => item.key === aiSettingsState.selectedCallTypeKey) || null;
+}
+
+function findAiMetric(key = aiSettingsState.selectedMetricKey) {
+  const callType = selectedAiCallType();
+  const metrics = (callType && callType.metrics) || [];
+  return metrics.find((item) => item.key === key) || null;
+}
+
+function ensureAiSettingsSelection() {
+  const callTypes = sortedByOrder(
+    (aiSettingsState.settings && aiSettingsState.settings.callTypes) || []
+  );
+  const callType = callTypes.find((item) => item.key === aiSettingsState.selectedCallTypeKey);
+
+  if (!callType) {
+    aiSettingsState.selectedCallTypeKey = "";
+    aiSettingsState.selectedMetricKey = "";
+    aiSettingsState.screen = "list";
+    return;
+  }
+
+  const metrics = sortedByOrder(callType.metrics || []);
+  if (!metrics.some((metric) => metric.key === aiSettingsState.selectedMetricKey)) {
+    aiSettingsState.selectedMetricKey = "";
+  }
+}
+
+function setAiSettingsMessage(message, tone = "neutral") {
+  if (!elements.aiSettingsMessage) {
+    return;
+  }
+
+  elements.aiSettingsMessage.textContent = message || "";
+  elements.aiSettingsMessage.dataset.tone = tone;
+}
+
+function markAiSettingsDirty(message = "") {
+  aiSettingsState.dirty = true;
+  if (message) {
+    setAiSettingsMessage(message, "warning");
+  }
+  updateAiSettingsChrome();
+}
+
+function updateAiSettingsChrome() {
+  const settings = aiSettingsState.settings;
+  const callTypes = (settings && settings.callTypes) || [];
+  const activeTypes = callTypes.filter((item) => item.enabled !== false).length;
+  const metricCount = callTypes.reduce(
+    (total, item) => total + ((item.metrics || []).length),
+    0
+  );
+
+  if (elements.aiSettingsStatus) {
+    elements.aiSettingsStatus.textContent = settings
+      ? `${activeTypes}/${callTypes.length} типів активні · ${metricCount} метрик`
+      : "Налаштування ще не завантажені.";
+  }
+
+  if (elements.aiSettingsPage) {
+    elements.aiSettingsPage.dataset.saving = String(aiSettingsState.saving);
+  }
+}
+
+function renderAiSettingsTabs() {
+  if (!elements.aiSettingsTabs) {
+    return;
+  }
+
+  for (const button of elements.aiSettingsTabs.querySelectorAll("[data-ai-tab]")) {
+    const active = button.dataset.aiTab === aiSettingsState.activeTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  }
+
+  elements.aiSettingsTabAi.classList.toggle("hidden", aiSettingsState.activeTab !== "ai");
+  elements.aiSettingsTabExclusions.classList.toggle("hidden", aiSettingsState.activeTab !== "exclusions");
+  elements.aiSettingsTabBlocked.classList.toggle("hidden", aiSettingsState.activeTab !== "blocked");
+}
+
+function renderAiCallTypeList() {
+  const allCallTypes = sortedByOrder(
+    (aiSettingsState.settings && aiSettingsState.settings.callTypes) || []
+  );
+  const callTypes = aiSettingsState.showInactive
+    ? allCallTypes
+    : allCallTypes.filter((callType) => callType.enabled !== false);
+
+  elements.aiCallTypeList.replaceChildren();
+  elements.aiCallTypeCount.textContent = `${callTypes.length}`;
+  elements.aiShowInactive.dataset.active = String(aiSettingsState.showInactive);
+
+  if (!callTypes.length) {
+    const message = document.createElement("p");
+    message.className = "ai-soldly-empty";
+    message.textContent = aiSettingsState.showInactive
+      ? "Типів аналізу ще немає."
+      : "Активних типів немає. Увімкніть показ неактивних.";
+    elements.aiCallTypeList.append(message);
+    return;
+  }
+
+  for (const callType of callTypes) {
+    const metrics = Array.isArray(callType.metrics) ? callType.metrics : [];
+    const activeMetrics = metrics.filter((item) => item.enabled !== false).length;
+    const row = document.createElement("article");
+    row.className = "ai-type-card";
+    row.innerHTML = `
+      <div class="ai-type-card-main">
+        <span class="ai-grip">${aiIcon("grip")}</span>
+        <button class="ai-type-open" type="button" data-ai-action="select-call-type" data-key="${escapeHtml(callType.key)}">
+          <strong>${escapeHtml(callType.label || callType.key)}</strong>
+          <span>${activeMetrics}/${metrics.length} метрик</span>
+        </button>
+      </div>
+      <div class="ai-type-card-actions">
+        ${aiSwitchHtml(callType.enabled !== false, "toggle-call-type", callType.key, "Увімкнути тип аналізу")}
+        <button class="ai-icon-button-soft" type="button" data-ai-action="duplicate-call-type" data-key="${escapeHtml(callType.key)}" aria-label="Дублювати тип">${aiIcon("copy")}</button>
+        <button class="ai-icon-button-soft" type="button" data-ai-action="delete-call-type" data-key="${escapeHtml(callType.key)}" aria-label="Видалити тип">${aiIcon("trash")}</button>
+      </div>`;
+    elements.aiCallTypeList.append(row);
+  }
+}
+
+function renderAiMetricList() {
+  const callType = selectedAiCallType();
+  const metrics = sortedByOrder((callType && callType.metrics) || []);
+  const activeMetrics = metrics.filter((item) => item.enabled !== false).length;
+  elements.aiMetricList.replaceChildren();
+  elements.aiMetricCount.textContent = `${activeMetrics}/${metrics.length}`;
+
+  if (!metrics.length) {
+    const message = document.createElement("p");
+    message.className = "ai-soldly-empty";
+    message.textContent = "Метрик для цього типу ще немає.";
+    elements.aiMetricList.append(message);
+    return;
+  }
+
+  for (const metric of metrics) {
+    const row = document.createElement("article");
+    row.className = "ai-metric-card";
+    row.dataset.metricKey = metric.key;
+    row.classList.toggle("dragging", metric.key === aiSettingsState.draggingMetricKey);
+    row.innerHTML = `
+      <div class="ai-metric-card-main">
+        <span class="ai-grip" role="button" tabindex="0" aria-label="Змінити порядок метрики" title="Перетягніть, щоб змінити порядок">${aiIcon("grip")}</span>
+        ${aiSwitchHtml(metric.enabled !== false, "toggle-metric", metric.key, "Увімкнути оцінку метрики")}
+        <button class="ai-metric-open" type="button" data-ai-action="edit-metric" data-key="${escapeHtml(metric.key)}">
+          <span class="ai-list-icon">${aiIcon("list")}</span>
+          <strong>${escapeHtml(metric.label || metric.key)}</strong>
+        </button>
+      </div>
+      <div class="ai-metric-actions">
+        <button class="ai-icon-button-soft" type="button" data-ai-action="edit-metric" data-key="${escapeHtml(metric.key)}" aria-label="Редагувати метрику">${aiIcon("settings")}</button>
+        <button class="ai-icon-button-soft" type="button" data-ai-action="delete-metric" data-key="${escapeHtml(metric.key)}" aria-label="Видалити метрику">${aiIcon("trash")}</button>
+      </div>`;
+    elements.aiMetricList.append(row);
+  }
+}
+
+function clearAiMetricDragTargets() {
+  if (!elements.aiMetricList) {
+    return;
+  }
+
+  for (const row of elements.aiMetricList.querySelectorAll(".ai-metric-card")) {
+    row.classList.remove("drag-over-before", "drag-over-after");
+  }
+}
+
+function clearAiMetricDragState() {
+  aiSettingsState.draggingMetricKey = "";
+  aiSettingsState.dragOverMetricKey = "";
+  aiSettingsState.dragOverMetricPosition = "";
+  aiSettingsState.pendingMetricDrag = null;
+  clearAiMetricDragTargets();
+
+  if (!elements.aiMetricList) {
+    return;
+  }
+
+  for (const row of elements.aiMetricList.querySelectorAll(".ai-metric-card")) {
+    row.classList.remove("dragging");
+  }
+}
+
+function markAiMetricDragTarget(row, position) {
+  clearAiMetricDragTargets();
+  row.classList.add(position === "after" ? "drag-over-after" : "drag-over-before");
+  aiSettingsState.dragOverMetricKey = row.dataset.metricKey || "";
+  aiSettingsState.dragOverMetricPosition = position;
+}
+
+function reorderAiMetrics(sourceKey, targetKey, position = "before") {
+  const callType = selectedAiCallType();
+  const metrics = callType && Array.isArray(callType.metrics) ? callType.metrics : [];
+  if (!sourceKey || !targetKey || sourceKey === targetKey || metrics.length < 2) {
+    return false;
+  }
+
+  const ordered = sortedByOrder(metrics);
+  const sourceIndex = ordered.findIndex((metric) => metric.key === sourceKey);
+  const targetIndex = ordered.findIndex((metric) => metric.key === targetKey);
+  if (sourceIndex < 0 || targetIndex < 0) {
+    return false;
+  }
+
+  const [movedMetric] = ordered.splice(sourceIndex, 1);
+  const targetIndexAfterRemoval = ordered.findIndex((metric) => metric.key === targetKey);
+  const insertIndex = targetIndexAfterRemoval + (position === "after" ? 1 : 0);
+  ordered.splice(insertIndex, 0, movedMetric);
+
+  ordered.forEach((metric, index) => {
+    metric.order = (index + 1) * 10;
+  });
+
+  callType.metrics = ordered;
+  aiSettingsState.selectedMetricKey = movedMetric.key;
+  return true;
+}
+
+function aiMetricRowFromPoint(x, y) {
+  const element = document.elementFromPoint(x, y);
+  return element && element.closest ? element.closest("#ai-metric-list .ai-metric-card") : null;
+}
+
+function aiMetricDropPosition(row, clientY) {
+  const rect = row.getBoundingClientRect();
+  return clientY > rect.top + rect.height / 2 ? "after" : "before";
+}
+
+function finishAiMetricReorder(targetRow, position) {
+  const sourceKey = aiSettingsState.draggingMetricKey;
+  const targetKey = targetRow && targetRow.dataset.metricKey ? targetRow.dataset.metricKey : "";
+  const reordered = reorderAiMetrics(sourceKey, targetKey, position);
+  clearAiMetricDragState();
+
+  if (!reordered) {
+    return;
+  }
+
+  markAiSettingsDirty("Порядок метрик оновлено.");
+  renderAiSettings();
+  void saveAiSettings({ silent: true });
+}
+
+const AI_METRIC_DRAG_THRESHOLD = 6;
+
+function removeAiMetricPointerListeners() {
+  document.removeEventListener("pointermove", handleAiMetricPointerMove);
+  document.removeEventListener("pointerup", handleAiMetricPointerUp);
+  document.removeEventListener("pointercancel", handleAiMetricPointerCancel);
+}
+
+function startPendingAiMetricDrag(event) {
+  const pending = aiSettingsState.pendingMetricDrag;
+  if (!pending || aiSettingsState.draggingMetricKey) {
+    return Boolean(aiSettingsState.draggingMetricKey);
+  }
+
+  const distance = Math.hypot(
+    event.clientX - pending.startX,
+    event.clientY - pending.startY
+  );
+  if (distance < AI_METRIC_DRAG_THRESHOLD) {
+    return false;
+  }
+
+  event.preventDefault();
+  aiSettingsState.draggingMetricKey = pending.key;
+  aiSettingsState.suppressMetricClickUntil = Date.now() + 500;
+  pending.row.classList.add("dragging");
+  return true;
+}
+
+function handleAiMetricPointerMove(event) {
+  if (!startPendingAiMetricDrag(event)) {
+    return;
+  }
+
+  const draggingKey = aiSettingsState.draggingMetricKey;
+  if (!draggingKey) {
+    return;
+  }
+
+  const row = aiMetricRowFromPoint(event.clientX, event.clientY);
+  if (!row || row.dataset.metricKey === draggingKey) {
+    clearAiMetricDragTargets();
+    aiSettingsState.dragOverMetricKey = "";
+    aiSettingsState.dragOverMetricPosition = "";
+    return;
+  }
+
+  event.preventDefault();
+  const position = aiMetricDropPosition(row, event.clientY);
+  if (
+    aiSettingsState.dragOverMetricKey !== row.dataset.metricKey ||
+    aiSettingsState.dragOverMetricPosition !== position
+  ) {
+    markAiMetricDragTarget(row, position);
+  }
+}
+
+function handleAiMetricPointerUp(event) {
+  const wasDragging = Boolean(aiSettingsState.draggingMetricKey);
+  removeAiMetricPointerListeners();
+
+  if (!wasDragging) {
+    aiSettingsState.pendingMetricDrag = null;
+    clearAiMetricDragTargets();
+    return;
+  }
+
+  event.preventDefault();
+  aiSettingsState.suppressMetricClickUntil = Date.now() + 500;
+  const row = aiMetricRowFromPoint(event.clientX, event.clientY);
+  const position = row
+    ? aiMetricDropPosition(row, event.clientY)
+    : aiSettingsState.dragOverMetricPosition;
+  finishAiMetricReorder(row, position);
+}
+
+function handleAiMetricPointerCancel() {
+  removeAiMetricPointerListeners();
+  clearAiMetricDragState();
+}
+
+function handleAiMetricPointerDown(event) {
+  const row = event.target.closest("[data-metric-key]");
+  if (!row || (event.button !== undefined && event.button !== 0)) {
+    return;
+  }
+
+  const blockedControl = event.target.closest(
+    ".ai-soldly-switch, .ai-metric-actions, input, textarea, select, a"
+  );
+  if (blockedControl && !event.target.closest(".ai-metric-open")) {
+    return;
+  }
+
+  clearAiMetricDragState();
+  aiSettingsState.pendingMetricDrag = {
+    key: row.dataset.metricKey || "",
+    row,
+    startX: event.clientX,
+    startY: event.clientY
+  };
+  document.addEventListener("pointermove", handleAiMetricPointerMove);
+  document.addEventListener("pointerup", handleAiMetricPointerUp);
+  document.addEventListener("pointercancel", handleAiMetricPointerCancel);
+}
+
+function renderAiDetailView() {
+  const callType = selectedAiCallType();
+  const showDetail = aiSettingsState.screen === "detail" && Boolean(callType);
+  elements.aiSettingsListHero.classList.toggle("hidden", showDetail);
+  elements.aiSettingsDetailHero.classList.toggle("hidden", !showDetail);
+  elements.aiSettingsListView.classList.toggle("hidden", showDetail);
+  elements.aiSettingsDetailView.classList.toggle("hidden", !showDetail);
+
+  if (!showDetail) {
+    return;
+  }
+
+  elements.aiDetailTitle.textContent = callType.label || callType.key;
+  elements.aiDetailDescription.textContent = callType.description || "Опис типу аналізу не заповнений.";
+  renderAiMetricList();
+}
+
+function renderAiSettings() {
+  ensureAiSettingsSelection();
+  renderAiSettingsTabs();
+  renderAiCallTypeList();
+  renderAiDetailView();
+  updateAiSettingsChrome();
+}
+
+function applyAiSettingsPayload(payload, dirty = false) {
+  const selectedCallTypeKey = aiSettingsState.selectedCallTypeKey;
+  const selectedMetricKey = aiSettingsState.selectedMetricKey;
+  const screen = aiSettingsState.screen;
+
+  aiSettingsState.settings = cloneObject((payload && payload.settings) || payload || {});
+  aiSettingsState.revision = payload && payload.revision ? payload.revision : "";
+  aiSettingsState.dirty = dirty;
+  aiSettingsState.selectedCallTypeKey = selectedCallTypeKey;
+  aiSettingsState.selectedMetricKey = selectedMetricKey;
+  aiSettingsState.screen = screen;
+  ensureAiSettingsSelection();
+  renderAiSettings();
+}
+
+async function loadAiSettingsPage(showLoading = true) {
+  clearTimeout(summaryPollTimer);
+  clearTimeout(monitorPollTimer);
+  clearTimeout(detailPollTimer);
+  currentSummaryCallId = "";
+  currentPhone = "";
+
+  if (showLoading) {
+    setState("loading");
+  }
+
+  try {
+    const response = await fetch("/api/ai-analysis-settings", {
+      headers: { Accept: "application/json" }
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося завантажити AI-налаштування");
+    }
+
+    applyAiSettingsPayload(payload, false);
+    setAiSettingsMessage("");
+    setState("aiSettings");
+  } catch (error) {
+    aiSettingsState.settings = { callTypes: [] };
+    aiSettingsState.revision = "";
+    aiSettingsState.dirty = false;
+    aiSettingsState.screen = "list";
+    renderAiSettings();
+    setAiSettingsMessage(error.message, "danger");
+    setState("aiSettings");
+  }
+}
+
+async function saveAiSettings(options = {}) {
+  if (!aiSettingsState.settings || aiSettingsState.saving) {
+    return;
+  }
+
+  const silent = Boolean(options.silent);
+  aiSettingsState.saving = true;
+  updateAiSettingsChrome();
+
+  try {
+    const response = await fetch("/api/ai-analysis-settings", {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ settings: aiSettingsState.settings })
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося зберегти AI-налаштування");
+    }
+
+    applyAiSettingsPayload(payload, false);
+    if (!silent) {
+      setAiSettingsMessage("AI-налаштування оновлено.", "success");
+    }
+  } catch (error) {
+    setAiSettingsMessage(error.message, "danger");
+  } finally {
+    aiSettingsState.saving = false;
+    updateAiSettingsChrome();
+  }
+}
+
+async function resetAiSettings() {
+  if (!window.confirm("Скинути AI-налаштування до дефолтних?")) {
+    return;
+  }
+
+  aiSettingsState.saving = true;
+  updateAiSettingsChrome();
+
+  try {
+    const response = await fetch("/api/ai-analysis-settings/reset", {
+      method: "POST",
+      headers: { Accept: "application/json" }
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося скинути AI-налаштування");
+    }
+
+    aiSettingsState.selectedCallTypeKey = "";
+    aiSettingsState.selectedMetricKey = "";
+    aiSettingsState.screen = "list";
+    applyAiSettingsPayload(payload, false);
+    setAiSettingsMessage("AI-налаштування скинуто.", "success");
+  } catch (error) {
+    setAiSettingsMessage(error.message, "danger");
+  } finally {
+    aiSettingsState.saving = false;
+    updateAiSettingsChrome();
+  }
+}
+
+function addAiCallType(kind = "call") {
+  if (!aiSettingsState.settings) {
+    return;
+  }
+
+  const labels = {
+    call: "Новий дзвінок",
+    meeting: "Новий мітинг",
+    chat: "Новий чат"
+  };
+  const callTypes = aiSettingsState.settings.callTypes || [];
+  const metric = createAiMetric();
+  const callType = {
+    key: newAiKey("call_type"),
+    label: labels[kind] || labels.call,
+    description: "",
+    color: "#59666d",
+    enabled: true,
+    order: nextOrder(callTypes),
+    metrics: [{ ...metric, order: 10 }]
+  };
+
+  aiSettingsState.settings.callTypes = callTypes;
+  callTypes.push(callType);
+  aiSettingsState.selectedCallTypeKey = callType.key;
+  aiSettingsState.selectedMetricKey = "";
+  aiSettingsState.screen = "detail";
+  markAiSettingsDirty("Додано тип аналізу.");
+  renderAiSettings();
+  void saveAiSettings({ silent: true });
+}
+
+function duplicateAiCallType(key) {
+  const callTypes = aiSettingsState.settings && aiSettingsState.settings.callTypes;
+  const source = Array.isArray(callTypes)
+    ? callTypes.find((item) => item.key === key)
+    : null;
+  if (!source) {
+    return;
+  }
+
+  const copy = cloneObject(source);
+  copy.key = newAiKey("call_type");
+  copy.label = `${source.label || "Тип аналізу"} копія`;
+  copy.order = nextOrder(callTypes);
+  copy.metrics = (copy.metrics || []).map((metric, metricIndex) => ({
+    ...metric,
+    key: newAiKey("metric"),
+    order: (metricIndex + 1) * 10,
+    options: (metric.options || []).map((option, optionIndex) => ({
+      ...option,
+      key: newAiKey("option"),
+      order: (optionIndex + 1) * 10
+    }))
+  }));
+
+  callTypes.push(copy);
+  aiSettingsState.selectedCallTypeKey = copy.key;
+  aiSettingsState.screen = "detail";
+  markAiSettingsDirty("Тип аналізу продубльовано.");
+  renderAiSettings();
+  void saveAiSettings({ silent: true });
+}
+
+function addAiMetric() {
+  const callType = selectedAiCallType();
+  if (!callType) {
+    return;
+  }
+
+  callType.metrics = callType.metrics || [];
+  const metric = createAiMetric();
+  metric.order = nextOrder(callType.metrics);
+  callType.metrics.push(metric);
+  aiSettingsState.selectedMetricKey = metric.key;
+  markAiSettingsDirty("Додано метрику.");
+  renderAiSettings();
+  openAiMetricModal(metric.key);
+}
+
+function deleteAiCallType(key) {
+  const callTypes = aiSettingsState.settings && aiSettingsState.settings.callTypes;
+  if (!Array.isArray(callTypes) || callTypes.length <= 1) {
+    setAiSettingsMessage("Має залишитися хоча б один тип аналізу.", "danger");
+    return;
+  }
+
+  const index = callTypes.findIndex((item) => item.key === key);
+  if (index < 0 || !window.confirm("Видалити цей тип аналізу?")) {
+    return;
+  }
+
+  callTypes.splice(index, 1);
+  aiSettingsState.selectedCallTypeKey = "";
+  aiSettingsState.selectedMetricKey = "";
+  aiSettingsState.screen = "list";
+  markAiSettingsDirty("Тип аналізу видалено.");
+  renderAiSettings();
+  void saveAiSettings({ silent: true });
+}
+
+function deleteAiMetric(key) {
+  const callType = selectedAiCallType();
+  const metrics = callType && callType.metrics;
+  if (!Array.isArray(metrics) || metrics.length <= 1) {
+    setAiSettingsMessage("Має залишитися хоча б одна метрика.", "danger");
+    return;
+  }
+
+  const index = metrics.findIndex((item) => item.key === key);
+  if (index < 0 || !window.confirm("Видалити цю метрику?")) {
+    return;
+  }
+
+  metrics.splice(index, 1);
+  aiSettingsState.selectedMetricKey = "";
+  markAiSettingsDirty("Метрику видалено.");
+  renderAiSettings();
+  void saveAiSettings({ silent: true });
+}
+
+function toggleAiCallType(key) {
+  const callTypes = (aiSettingsState.settings && aiSettingsState.settings.callTypes) || [];
+  const callType = callTypes.find((item) => item.key === key);
+  if (!callType) {
+    return;
+  }
+
+  callType.enabled = callType.enabled === false;
+  markAiSettingsDirty();
+  renderAiSettings();
+  void saveAiSettings({ silent: true });
+}
+
+function toggleAiMetric(key) {
+  const metric = findAiMetric(key);
+  if (!metric) {
+    return;
+  }
+
+  metric.enabled = metric.enabled === false;
+  markAiSettingsDirty();
+  renderAiSettings();
+  void saveAiSettings({ silent: true });
+}
+
+function showAiDialog(dialog) {
+  if (!dialog) {
+    return;
+  }
+  if (typeof dialog.showModal === "function") {
+    dialog.showModal();
+  } else {
+    dialog.setAttribute("open", "");
+  }
+}
+
+function closeAiDialog(dialog) {
+  if (!dialog) {
+    return;
+  }
+  if (typeof dialog.close === "function") {
+    dialog.close();
+  } else {
+    dialog.removeAttribute("open");
+  }
+}
+
+function openAiTypeModal() {
+  const callType = selectedAiCallType();
+  if (!callType) {
+    return;
+  }
+
+  aiSettingsState.editingTypeKey = callType.key;
+  aiSettingsState.typeDraft = cloneObject(callType);
+  elements.aiTypeLabel.value = callType.label || "";
+  elements.aiTypeDescription.value = callType.description || "";
+  showAiDialog(elements.aiTypeModal);
+  elements.aiTypeLabel.focus();
+}
+
+function saveAiTypeModal(event) {
+  event.preventDefault();
+  const callType = selectedAiCallType();
+  if (!callType || callType.key !== aiSettingsState.editingTypeKey) {
+    return;
+  }
+
+  callType.label = elements.aiTypeLabel.value.trim() || callType.label || "Тип аналізу";
+  callType.description = elements.aiTypeDescription.value.trim();
+  aiSettingsState.typeDraft = null;
+  aiSettingsState.editingTypeKey = "";
+  closeAiDialog(elements.aiTypeModal);
+  markAiSettingsDirty("Загальні налаштування оновлено.");
+  renderAiSettings();
+  void saveAiSettings();
+}
+
+function renderAiModalOptionList() {
+  const draft = aiSettingsState.metricDraft;
+  const options = sortedByOrder((draft && draft.options) || []);
+  elements.aiModalOptionList.replaceChildren();
+
+  if (!options.length) {
+    const message = document.createElement("p");
+    message.className = "ai-soldly-empty";
+    message.textContent = "Варіантів відповіді ще немає.";
+    elements.aiModalOptionList.append(message);
+    return;
+  }
+
+  for (let index = 0; index < options.length; index += 1) {
+    const option = options[index];
+    const score = option.countsTowardScore === false
+      ? null
+      : normalizeAiOptionScore(option.score);
+    const color = normalizeAiPaletteColor(option.color, scoreColor(score));
+    const row = document.createElement("article");
+    row.className = "ai-modal-option-row";
+    row.classList.toggle("ai-modal-option-row-muted", score === null);
+    row.dataset.optionKey = option.key;
+    row.innerHTML = `
+      <span class="ai-option-number">${index + 1}.</span>
+      <input class="ai-modal-option-label" type="text" maxlength="20" value="${escapeHtml(option.label || "")}" data-ai-option-field="label" aria-label="Назва варіанту">
+      <select class="ai-modal-score" data-ai-option-field="score" aria-label="Оцінка варіанту">${aiScoreOptionsHtml(score)}</select>
+      ${aiColorPaletteHtml(option.key, color)}
+      <button class="ai-icon-button-soft" type="button" data-ai-action="delete-draft-option" data-key="${escapeHtml(option.key)}" aria-label="Видалити варіант">${aiIcon("trash")}</button>
+      ${aiColorMenuHtml(option.key, color)}
+      <textarea class="ai-modal-option-criteria" rows="2" placeholder="Критерії вибору цього варіанту..." data-ai-option-field="aiInstructions">${escapeHtml(option.aiInstructions || "")}</textarea>`;
+    elements.aiModalOptionList.append(row);
+  }
+}
+
+function openAiMetricModal(key) {
+  const metric = findAiMetric(key);
+  if (!metric) {
+    return;
+  }
+
+  aiSettingsState.selectedMetricKey = metric.key;
+  aiSettingsState.editingMetricKey = metric.key;
+  aiSettingsState.metricDraft = cloneObject(metric);
+  elements.aiModalMetricLabel.value = metric.label || "";
+  elements.aiModalMetricEnabled.checked = metric.enabled !== false;
+  elements.aiModalMetricGroup.value = metric.group || "";
+  elements.aiModalMetricDescription.value = metric.description || "";
+  elements.aiModalMetricInstructions.value = metric.aiInstructions || "";
+  renderAiModalOptionList();
+  showAiDialog(elements.aiMetricModal);
+  elements.aiModalMetricLabel.focus();
+}
+
+function addAiDraftOption() {
+  const draft = aiSettingsState.metricDraft;
+  if (!draft) {
+    return;
+  }
+
+  draft.options = draft.options || [];
+  draft.options.push(createAiOption(
+    "Новий варіант",
+    0,
+    scoreColor(0),
+    "",
+    nextOrder(draft.options)
+  ));
+  renderAiModalOptionList();
+}
+
+function deleteAiDraftOption(key) {
+  const draft = aiSettingsState.metricDraft;
+  const options = draft && draft.options;
+  if (!Array.isArray(options) || options.length <= 1) {
+    setAiSettingsMessage("Має залишитися хоча б один варіант відповіді.", "danger");
+    return;
+  }
+
+  const index = options.findIndex((item) => item.key === key);
+  if (index >= 0) {
+    options.splice(index, 1);
+    renderAiModalOptionList();
+  }
+}
+
+function closeAiColorPalettes(exceptRow = null) {
+  if (!elements.aiModalOptionList) {
+    return;
+  }
+
+  for (const row of elements.aiModalOptionList.querySelectorAll("[data-option-key]")) {
+    if (exceptRow && row === exceptRow) {
+      continue;
+    }
+
+    row.classList.remove("ai-color-row-open");
+    const menu = row.querySelector("[data-color-menu]");
+    const button = row.querySelector(".ai-color-swatch");
+    if (menu) {
+      menu.hidden = true;
+    }
+    if (button) {
+      button.setAttribute("aria-expanded", "false");
+    }
+  }
+}
+
+function toggleAiDraftOptionPalette(key) {
+  const row = aiOptionRowByKey(key);
+  if (!row) {
+    return;
+  }
+
+  const menu = row.querySelector("[data-color-menu]");
+  const button = row.querySelector(".ai-color-swatch");
+  if (!menu || !button) {
+    return;
+  }
+
+  const willOpen = menu.hidden;
+  closeAiColorPalettes(row);
+  menu.hidden = !willOpen;
+  row.classList.toggle("ai-color-row-open", willOpen);
+  button.setAttribute("aria-expanded", String(willOpen));
+}
+
+function setAiDraftOptionColor(key, color) {
+  const row = aiOptionRowByKey(key);
+  if (!row) {
+    return;
+  }
+
+  updateAiDraftOption(row, "color", color);
+  closeAiColorPalettes();
+}
+
+function updateAiDraftOption(row, field, value) {
+  const draft = aiSettingsState.metricDraft;
+  const option = draft && (draft.options || []).find(
+    (item) => item.key === row.dataset.optionKey
+  );
+  if (!option) {
+    return;
+  }
+
+  option[field] = field === "color"
+    ? normalizeAiPaletteColor(value, scoreColor(option.score))
+    : value;
+  if (field === "score") {
+    option.countsTowardScore = value !== null;
+    row.classList.toggle("ai-modal-option-row-muted", value === null);
+  }
+  if (field === "score" && !option.color) {
+    option.color = scoreColor(value);
+  }
+  if (field === "color") {
+    const swatch = row.querySelector(".ai-color-swatch span");
+    const color = normalizeAiPaletteColor(value, scoreColor(option.score));
+    if (swatch) {
+      swatch.style.background = color;
+    }
+    for (const choice of row.querySelectorAll(".ai-color-choice")) {
+      const active = choice.dataset.color === color;
+      choice.classList.toggle("active", active);
+      choice.setAttribute("aria-selected", String(active));
+    }
+  }
+}
+
+function handleAiModalOptionInput(event) {
+  const row = event.target.closest("[data-option-key]");
+  const field = event.target.dataset.aiOptionField;
+  if (!row || !field) {
+    return;
+  }
+
+  const value = field === "score" ? normalizeAiOptionScore(event.target.value) : event.target.value;
+  updateAiDraftOption(row, field, value);
+}
+
+function saveAiMetricModal(event) {
+  event.preventDefault();
+  const callType = selectedAiCallType();
+  const metric = findAiMetric(aiSettingsState.editingMetricKey);
+  const draft = aiSettingsState.metricDraft;
+  if (!callType || !metric || !draft) {
+    return;
+  }
+
+  const options = sortedByOrder(draft.options || []).map((option, index) => {
+    const score = normalizeAiOptionScore(option.score);
+    return {
+      ...option,
+      label: String(option.label || "").trim() || `Варіант ${index + 1}`,
+      score,
+      color: normalizeAiPaletteColor(option.color, scoreColor(score)),
+      countsTowardScore: score !== null && option.countsTowardScore !== false,
+      aiInstructions: String(option.aiInstructions || "").trim(),
+      order: (index + 1) * 10
+    };
+  });
+
+  metric.label = elements.aiModalMetricLabel.value.trim() || metric.label || "Метрика";
+  metric.type = "ai_option";
+  metric.enabled = elements.aiModalMetricEnabled.checked;
+  metric.group = elements.aiModalMetricGroup.value.trim();
+  metric.description = elements.aiModalMetricDescription.value.trim();
+  metric.aiInstructions = elements.aiModalMetricInstructions.value.trim();
+  metric.options = options.length
+    ? options
+    : [createAiOption("Новий варіант", 0, scoreColor(0), "", 10)];
+
+  aiSettingsState.metricDraft = null;
+  aiSettingsState.editingMetricKey = "";
+  closeAiDialog(elements.aiMetricModal);
+  markAiSettingsDirty("Метрику оновлено.");
+  renderAiSettings();
+  void saveAiSettings();
+}
+
+function closeAiMetricModal() {
+  closeAiColorPalettes();
+  aiSettingsState.metricDraft = null;
+  aiSettingsState.editingMetricKey = "";
+  closeAiDialog(elements.aiMetricModal);
+}
+
+function closeAiTypeModal() {
+  aiSettingsState.typeDraft = null;
+  aiSettingsState.editingTypeKey = "";
+  closeAiDialog(elements.aiTypeModal);
+}
+
+function handleAiSettingsTabClick(event) {
+  const tab = event.target.closest("[data-ai-tab]");
+  if (!tab) {
+    return;
+  }
+
+  aiSettingsState.activeTab = tab.dataset.aiTab || "ai";
+  renderAiSettings();
+}
+
+function handleAiSettingsClick(event) {
+  if (Date.now() < aiSettingsState.suppressMetricClickUntil) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+
+  if (!event.target.closest(".ai-color-palette") && !event.target.closest(".ai-color-menu")) {
+    closeAiColorPalettes();
+  }
+
+  const actionButton = event.target.closest("[data-ai-action]");
+  if (!actionButton) {
+    return;
+  }
+
+  const { aiAction, key, kind, color } = actionButton.dataset;
+  if (aiAction === "create-call-type") {
+    addAiCallType(kind);
+  } else if (aiAction === "toggle-show-inactive") {
+    aiSettingsState.showInactive = !aiSettingsState.showInactive;
+    renderAiSettings();
+  } else if (aiAction === "select-call-type") {
+    aiSettingsState.selectedCallTypeKey = key;
+    aiSettingsState.selectedMetricKey = "";
+    aiSettingsState.screen = "detail";
+    renderAiSettings();
+  } else if (aiAction === "back-to-types") {
+    aiSettingsState.screen = "list";
+    aiSettingsState.selectedCallTypeKey = "";
+    aiSettingsState.selectedMetricKey = "";
+    renderAiSettings();
+  } else if (aiAction === "open-type-settings") {
+    openAiTypeModal();
+  } else if (aiAction === "toggle-call-type") {
+    toggleAiCallType(key);
+  } else if (aiAction === "duplicate-call-type") {
+    duplicateAiCallType(key);
+  } else if (aiAction === "delete-call-type") {
+    deleteAiCallType(key);
+  } else if (aiAction === "add-metric") {
+    addAiMetric();
+  } else if (aiAction === "toggle-metric") {
+    toggleAiMetric(key);
+  } else if (aiAction === "edit-metric") {
+    openAiMetricModal(key);
+  } else if (aiAction === "delete-metric") {
+    deleteAiMetric(key);
+  } else if (aiAction === "additional-toggle") {
+    const pressed = actionButton.getAttribute("aria-pressed") === "true";
+    actionButton.setAttribute("aria-pressed", String(!pressed));
+    actionButton.dataset.checked = String(!pressed);
+  } else if (aiAction === "delete-draft-option") {
+    deleteAiDraftOption(key);
+  } else if (aiAction === "toggle-option-palette") {
+    toggleAiDraftOptionPalette(key);
+  } else if (aiAction === "set-draft-option-color") {
+    setAiDraftOptionColor(key, color);
+  }
 }
 
 function detailAudioDuration() {
@@ -1026,6 +2287,7 @@ function setState(state) {
   elements.clientCard.classList.toggle("hidden", state !== "card");
   elements.monitorPage.classList.toggle("hidden", state !== "monitor");
   elements.analyticsPage.classList.toggle("hidden", state !== "analytics");
+  elements.aiSettingsPage.classList.toggle("hidden", state !== "aiSettings");
   elements.callDetailPage.classList.toggle("hidden", state !== "detail");
 
   const titles = {
@@ -1034,6 +2296,7 @@ function setState(state) {
     card: "Картка клієнта",
     monitor: "Дзвінки",
     analytics: "AI-аналітика",
+    aiSettings: "AI-налаштування",
     detail: "Деталі дзвінка"
   };
   elements.pageTitle.textContent = titles[state] || "Картка клієнта";
@@ -1047,6 +2310,7 @@ function setState(state) {
       "active",
       ((state === "monitor" || state === "detail") && view === "calls-monitor") ||
         (state === "analytics" && view === "call-analytics") ||
+        (state === "aiSettings" && view === "ai-settings") ||
         (["empty", "loading", "card"].includes(state) && view === "client-card")
     );
   }
@@ -2153,6 +3417,188 @@ function formatScore(score) {
   return Number.isFinite(Number(score)) ? `${Math.round(Number(score))}%` : "—";
 }
 
+function formatMetricNumber(value) {
+  if (!Number.isFinite(Number(value))) {
+    return "—";
+  }
+
+  const numberValue = Number(value);
+  return Number.isInteger(numberValue)
+    ? String(numberValue)
+    : String(Math.round(numberValue * 10) / 10);
+}
+
+function metricPointScore(metric) {
+  if (
+    !metric ||
+    metric.countsTowardScore === false ||
+    metric.score === null ||
+    metric.score === undefined ||
+    !Number.isFinite(Number(metric.score))
+  ) {
+    return "—";
+  }
+
+  if (Number.isFinite(Number(metric.maxScore)) && Number(metric.maxScore) > 0) {
+    return `${formatMetricNumber(metric.score)}/${formatMetricNumber(metric.maxScore)}`;
+  }
+
+  return formatMetricNumber(metric.score);
+}
+
+function metricPercentScore(metric) {
+  if (
+    !metric ||
+    metric.score === null ||
+    metric.score === undefined ||
+    !Number.isFinite(Number(metric.score)) ||
+    !Number.isFinite(Number(metric.maxScore)) ||
+    Number(metric.maxScore) <= 0
+  ) {
+    return null;
+  }
+
+  return (Number(metric.score) / Number(metric.maxScore)) * 100;
+}
+
+function metricScoreLevel(metric) {
+  const percent = metricPercentScore(metric);
+  if (!Number.isFinite(Number(percent))) {
+    return "empty";
+  }
+  return scoreLevel(percent);
+}
+
+function safeMetricColor(value, fallback = "#94a3b8") {
+  const color = String(value || "").trim();
+  return /^#[0-9a-f]{3,8}$/i.test(color) ? color : fallback;
+}
+
+function customEvaluationTotals(metrics) {
+  return (Array.isArray(metrics) ? metrics : []).reduce(
+    (result, metric) => {
+      const score = Number(metric && metric.score);
+      const maxScore = Number(metric && metric.maxScore);
+      if (
+        metric &&
+        metric.countsTowardScore !== false &&
+        metric.score !== null &&
+        metric.score !== undefined &&
+        Number.isFinite(score) &&
+        Number.isFinite(maxScore) &&
+        maxScore > 0
+      ) {
+        result.score += score;
+        result.maxScore += maxScore;
+        result.scored += 1;
+      }
+      result.total += 1;
+      return result;
+    },
+    { score: 0, maxScore: 0, scored: 0, total: 0 }
+  );
+}
+
+function customEvaluationGroups(metrics) {
+  const groups = [];
+  const byKey = new Map();
+
+  for (const metric of Array.isArray(metrics) ? metrics : []) {
+    const label = String(metric && metric.metricGroup || "").trim() || "Ваші метрики";
+    if (!byKey.has(label)) {
+      const group = {
+        label,
+        metrics: []
+      };
+      byKey.set(label, group);
+      groups.push(group);
+    }
+    byKey.get(label).metrics.push(metric);
+  }
+
+  return groups;
+}
+
+function createQualityMetricElement(metric) {
+  const item = document.createElement("article");
+  item.className = `quality-item quality-metric-item quality-${metricScoreLevel(metric)}`;
+  item.style.setProperty("--metric-color", safeMetricColor(metric.color));
+
+  const header = document.createElement("div");
+  header.className = "quality-metric-header";
+
+  const titleWrap = document.createElement("div");
+  titleWrap.className = "quality-metric-title";
+  const swatch = document.createElement("span");
+  swatch.className = "quality-metric-swatch";
+  swatch.setAttribute("aria-hidden", "true");
+  const label = document.createElement("strong");
+  label.textContent = metric.metricLabel || metric.metricKey || "Метрика";
+  const option = document.createElement("small");
+  option.className = "quality-metric-option";
+  option.textContent = metric.selectedOptionLabel || "Варіант не вибрано";
+  titleWrap.append(swatch, label, option);
+
+  const score = document.createElement("span");
+  score.className = "quality-score-pill";
+  score.textContent = metricPointScore(metric);
+
+  header.append(titleWrap, score);
+  item.append(header);
+
+  if (metric.evidence) {
+    const evidence = document.createElement("p");
+    evidence.textContent = metric.evidence;
+    item.append(evidence);
+  }
+
+  if (metric.improvement) {
+    const improvement = document.createElement("small");
+    improvement.className = "quality-improvement";
+    improvement.textContent = `Порада: ${metric.improvement}`;
+    item.append(improvement);
+  }
+
+  return item;
+}
+
+function appendQualityMetricGroup(container, group) {
+  const metrics = Array.isArray(group && group.metrics) ? group.metrics : [];
+  if (!container || !metrics.length) {
+    return;
+  }
+
+  const totals = customEvaluationTotals(metrics);
+  const section = document.createElement("section");
+  section.className = "quality-metric-group";
+
+  const header = document.createElement("header");
+  header.className = "quality-group-header";
+  const title = document.createElement("div");
+  const label = document.createElement("strong");
+  const count = document.createElement("small");
+  const score = document.createElement("span");
+  label.textContent = group.label || "Ваші метрики";
+  count.textContent = totals.total
+    ? `${totals.scored}/${totals.total} оцінюються`
+    : "Немає метрик";
+  score.className = "quality-score-pill quality-group-score";
+  score.textContent = totals.maxScore > 0
+    ? `${formatMetricNumber(totals.score)}/${formatMetricNumber(totals.maxScore)}`
+    : "—";
+  title.append(label, count);
+  header.append(title, score);
+  section.append(header);
+
+  const list = document.createElement("div");
+  list.className = "quality-group-list";
+  for (const metric of metrics) {
+    list.append(createQualityMetricElement(metric));
+  }
+  section.append(list);
+  container.append(section);
+}
+
 function appendQualityMetric(container, label, value, isWide = false) {
   if (!container || value === null || value === undefined || value === "") {
     return;
@@ -2160,6 +3606,9 @@ function appendQualityMetric(container, label, value, isWide = false) {
 
   const item = document.createElement("div");
   item.className = isWide ? "quality-context-item quality-context-wide" : "quality-context-item";
+  if (["Бали", "Враховано", "Впевненість"].includes(String(label))) {
+    item.classList.add("quality-context-score");
+  }
   const caption = document.createElement("span");
   const text = document.createElement("strong");
   caption.textContent = label;
@@ -2197,13 +3646,88 @@ function appendQualityNoteGroup(title, values) {
   elements.detailQualityNotes.append(group);
 }
 
+function renderCustomCallQuality(summary) {
+  const customEvaluation = summary && summary.customEvaluation;
+  const metrics = Array.isArray(customEvaluation && customEvaluation.metrics)
+    ? customEvaluation.metrics
+    : [];
+  const totals = customEvaluationTotals(metrics);
+  const overallScore = customEvaluation && customEvaluation.overallScore;
+  const overallLevel = Number.isFinite(Number(overallScore))
+    ? scoreLevel(overallScore)
+    : "empty";
+
+  elements.detailQualityScore.textContent = formatScore(overallScore);
+  elements.detailQualityScore.className = `quality-score quality-${overallLevel}`;
+  elements.detailQualitySummary.textContent =
+    (customEvaluation && customEvaluation.summary) ||
+    "Оцінка побудована за інструкціями метрик.";
+
+  if (elements.detailQualityContext) {
+    appendQualityMetric(
+      elements.detailQualityContext,
+      "Тип дзвінка",
+      summary.callTypeLabel || summary.callType || "—",
+      true
+    );
+    appendQualityMetric(
+      elements.detailQualityContext,
+      "Враховано",
+      totals.total ? `${totals.scored}/${totals.total}` : "—"
+    );
+    appendQualityMetric(
+      elements.detailQualityContext,
+      "Бали",
+      totals.maxScore > 0
+        ? `${formatMetricNumber(totals.score)}/${formatMetricNumber(totals.maxScore)}`
+        : "—"
+    );
+    appendQualityMetric(
+      elements.detailQualityContext,
+      "Впевненість",
+      typeof summary.confidence === "number"
+        ? `${Math.round(summary.confidence * 100)}%`
+        : ""
+    );
+  }
+
+  for (const group of customEvaluationGroups(metrics)) {
+    appendQualityMetricGroup(elements.detailQualityCriteria, group);
+  }
+
+  const strengths = metrics
+    .filter((metric) => {
+      const percent = metricPercentScore(metric);
+      return percent !== null && percent >= 80;
+    })
+    .slice(0, 2)
+    .map((metric) => `${metric.metricLabel}: ${metric.selectedOptionLabel}`);
+  const improvements = metrics
+    .filter((metric) => metric && metric.improvement)
+    .slice(0, 2)
+    .map((metric) => metric.improvement);
+
+  appendQualityNoteGroup("Що добре", strengths);
+  appendQualityNoteGroup("Що покращити", improvements);
+}
+
 function renderCallQuality(summary) {
+  const customEvaluation = summary && summary.customEvaluation;
   const evaluation = summary && summary.operatorEvaluation;
   elements.detailQualityCriteria.replaceChildren();
   if (elements.detailQualityContext) {
     elements.detailQualityContext.replaceChildren();
   }
   elements.detailQualityNotes.replaceChildren();
+
+  if (
+    customEvaluation &&
+    Array.isArray(customEvaluation.metrics) &&
+    customEvaluation.metrics.length
+  ) {
+    renderCustomCallQuality(summary);
+    return;
+  }
 
   if (!evaluation) {
     elements.detailQualityScore.textContent = "—";
@@ -2273,14 +3797,235 @@ function segmentTimestamp(seconds) {
   return `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
-function speakerRoles(summary) {
-  const roles = new Map();
-  for (const speaker of (summary && summary.speakers) || []) {
-    if (speaker && speaker.speaker) {
-      roles.set(String(speaker.speaker), speaker.role || "unknown");
+function normalizeSpeakerRole(value) {
+  const role = String(value || "").trim().toLowerCase();
+  if (role === "operator" || role === "manager" || role === "agent" || role.includes("оператор")) {
+    return "operator";
+  }
+  if (
+    role === "client" ||
+    role === "customer" ||
+    role === "passenger" ||
+    role.includes("клієн") ||
+    role.includes("клиент")
+  ) {
+    return "client";
+  }
+  return "unknown";
+}
+
+function speakerAliasKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function speakerOrdinal(value) {
+  const key = speakerAliasKey(value);
+  const numbered = key.match(/(?:^|_)speaker_(\d+)$/) || key.match(/^speaker_(\d+)$/);
+  if (numbered) {
+    return Number(numbered[1]);
+  }
+
+  if (/^\d+$/.test(key)) {
+    return Number(key);
+  }
+
+  if (/^[a-z]$/.test(key)) {
+    return key.charCodeAt(0) - 96;
+  }
+
+  return 0;
+}
+
+function transcriptSpeakers(segments) {
+  const speakers = [];
+  const seen = new Set();
+
+  for (const segment of segments || []) {
+    const speaker = String(segment && segment.speaker ? segment.speaker : "").trim();
+    if (!speaker || seen.has(speaker)) {
+      continue;
+    }
+    seen.add(speaker);
+    speakers.push(speaker);
+  }
+
+  return speakers;
+}
+
+function findTranscriptSpeaker(summarySpeaker, transcriptSpeakerList, usedSpeakers) {
+  const summaryKey = speakerAliasKey(summarySpeaker);
+  if (!summaryKey) {
+    return "";
+  }
+
+  for (const speaker of transcriptSpeakerList) {
+    if (!usedSpeakers.has(speaker) && speakerAliasKey(speaker) === summaryKey) {
+      return speaker;
     }
   }
+
+  const ordinal = speakerOrdinal(summarySpeaker);
+  if (ordinal > 0 && ordinal <= transcriptSpeakerList.length) {
+    const speaker = transcriptSpeakerList[ordinal - 1];
+    return usedSpeakers.has(speaker) ? "" : speaker;
+  }
+
+  return "";
+}
+
+function scoreSpeakerTextForRole(value) {
+  const textValue = String(value || "").toLowerCase();
+  const scores = { operator: 0, client: 0 };
+
+  if (/(east\s*west|іст\s*вест|ewe|duma|eurolines|євролайн|евролайн)/i.test(textValue)) {
+    scores.operator += 4;
+  }
+  if (/(чим|чем)\s+можу?.*(допомогти|помочь)|слухаю вас|слушаю вас/i.test(textValue)) {
+    scores.operator += 5;
+  }
+  if (/(мене звати|меня зовут)/i.test(textValue)) {
+    scores.operator += 2;
+  }
+  if (
+    /(зараз|сейчас).*(гляну|перевірю|проверю|скажу)|хвилинк|минутк|у вас (бронь|куплен|оплачен)|ми вам (надсилали|надішлемо)|ми посилками не займаємося|скажіть номер квитка/i.test(textValue)
+  ) {
+    scores.operator += 2;
+  }
+  if (/\bпрошу\b|дякую, до побачення|гарного (дня|вечора)/i.test(textValue)) {
+    scores.operator += 1;
+  }
+
+  if (
+    /(підкажіть|скажіть, будь ласка|скажите, пожалуйста|у вас на сайті|а у вас|телефоную стосовно|я (купив|купила|бронював|бронювала|подав|подала|хочу|маю)|мені (треба|потрібно|прийшов)|чи можна|скільки коштує)/i.test(textValue)
+  ) {
+    scores.client += 3;
+  }
+  if (/(добре, дякую|дякую вам|гарного (дня|вечора)|до побачення)/i.test(textValue)) {
+    scores.client += 1;
+  }
+
+  return scores;
+}
+
+function inferredSpeakerRoles(segments, explicitRoles) {
+  const speakers = transcriptSpeakers(segments);
+  const roles = new Map(explicitRoles);
+  const roleScores = new Map(
+    speakers.map((speaker) => [speaker, { operator: 0, client: 0 }])
+  );
+
+  (segments || []).forEach((segment, index) => {
+    const speaker = String(segment && segment.speaker ? segment.speaker : "").trim();
+    if (!speaker || !roleScores.has(speaker)) {
+      return;
+    }
+
+    const scores = scoreSpeakerTextForRole(segment.text);
+    const weight = index < 8 ? 1 : 0.55;
+    const current = roleScores.get(speaker);
+    current.operator += scores.operator * weight;
+    current.client += scores.client * weight;
+  });
+
+  const roleOf = (speaker) => roles.get(speaker) || "unknown";
+  const setMissing = (speaker, role) => {
+    if (speaker && roleOf(speaker) === "unknown") {
+      roles.set(speaker, role);
+    }
+  };
+
+  if (speakers.length === 2) {
+    const [first, second] = speakers;
+    if (roleOf(first) === "operator" && roleOf(second) === "unknown") {
+      roles.set(second, "client");
+      return roles;
+    }
+    if (roleOf(second) === "operator" && roleOf(first) === "unknown") {
+      roles.set(first, "client");
+      return roles;
+    }
+    if (roleOf(first) === "client" && roleOf(second) === "unknown") {
+      roles.set(second, "operator");
+      return roles;
+    }
+    if (roleOf(second) === "client" && roleOf(first) === "unknown") {
+      roles.set(first, "operator");
+      return roles;
+    }
+
+    const ranked = speakers
+      .map((speaker) => {
+        const scores = roleScores.get(speaker) || { operator: 0, client: 0 };
+        return {
+          speaker,
+          operator: scores.operator,
+          client: scores.client,
+          operatorDiff: scores.operator - scores.client,
+          clientDiff: scores.client - scores.operator
+        };
+      })
+      .sort((a, b) => b.operatorDiff - a.operatorDiff);
+
+    const operatorCandidate = ranked[0];
+    const otherSpeaker = speakers.find((speaker) => speaker !== operatorCandidate.speaker);
+    if (operatorCandidate.operator >= 5 && operatorCandidate.operatorDiff >= 3) {
+      setMissing(operatorCandidate.speaker, "operator");
+      setMissing(otherSpeaker, "client");
+      return roles;
+    }
+
+    const clientCandidate = ranked
+      .slice()
+      .sort((a, b) => b.clientDiff - a.clientDiff)[0];
+    const likelyOperator = speakers.find((speaker) => speaker !== clientCandidate.speaker);
+    if (clientCandidate.client >= 4 && clientCandidate.clientDiff >= 3) {
+      setMissing(clientCandidate.speaker, "client");
+      setMissing(likelyOperator, "operator");
+    }
+
+    return roles;
+  }
+
+  for (const speaker of speakers) {
+    const scores = roleScores.get(speaker) || { operator: 0, client: 0 };
+    if (scores.operator >= 5 && scores.operator - scores.client >= 3) {
+      setMissing(speaker, "operator");
+    } else if (scores.client >= 4 && scores.client - scores.operator >= 3) {
+      setMissing(speaker, "client");
+    }
+  }
+
   return roles;
+}
+
+function speakerRoles(summary, segments = []) {
+  const transcriptSpeakerList = transcriptSpeakers(segments);
+  const roles = new Map();
+  const usedSpeakers = new Set();
+
+  for (const speaker of (summary && summary.speakers) || []) {
+    const role = normalizeSpeakerRole(speaker && speaker.role);
+    if (!speaker || !speaker.speaker || role === "unknown") {
+      continue;
+    }
+
+    const transcriptSpeaker = findTranscriptSpeaker(
+      speaker.speaker,
+      transcriptSpeakerList,
+      usedSpeakers
+    );
+    if (transcriptSpeaker) {
+      roles.set(transcriptSpeaker, role);
+      usedSpeakers.add(transcriptSpeaker);
+    } else {
+      roles.set(String(speaker.speaker), role);
+    }
+  }
+
+  return inferredSpeakerRoles(segments, roles);
 }
 
 function speakerLabel(speaker, role) {
@@ -2293,19 +4038,65 @@ function speakerLabel(speaker, role) {
   return `Співрозмовник ${speaker || ""}`.trim();
 }
 
+function transcriptSpeakerMeta(segments) {
+  const speakers = transcriptSpeakers(segments);
+  const meta = new Map();
+
+  speakers.forEach((speaker, index) => {
+    meta.set(speaker, {
+      index,
+      extraIndex: index + 1,
+      colorIndex: (index % 6) + 1,
+      total: speakers.length
+    });
+  });
+
+  return meta;
+}
+
+function transcriptSpeakerDisplay(speaker, role, speakerMeta) {
+  if (role === "client" || role === "operator") {
+    return {
+      label: speakerLabel(speaker, role),
+      className: `transcript-item transcript-${role}`,
+      color: ""
+    };
+  }
+
+  const meta = speakerMeta.get(String(speaker || "").trim());
+  if (meta && meta.total > 2) {
+    return {
+      label: `Додатковий голос ${meta.extraIndex}`,
+      className: "transcript-item transcript-extra",
+      color: `var(--audio-extra-${meta.colorIndex})`
+    };
+  }
+
+  return {
+    label: speakerLabel(speaker, role),
+    className: "transcript-item transcript-unknown",
+    color: ""
+  };
+}
+
 function renderTranscript(ai) {
   elements.detailTranscript.replaceChildren();
   const transcript = ai && ai.transcript;
   const segments = Array.isArray(transcript && transcript.segments)
     ? transcript.segments
     : [];
-  const roles = speakerRoles(ai && ai.summary);
+  const roles = speakerRoles(ai && ai.summary, segments);
+  const speakerMeta = transcriptSpeakerMeta(segments);
 
   if (segments.length) {
     for (const segment of segments) {
       const role = roles.get(String(segment.speaker)) || "unknown";
+      const display = transcriptSpeakerDisplay(segment.speaker, role, speakerMeta);
       const item = document.createElement("article");
-      item.className = `transcript-item transcript-${role}`;
+      item.className = display.className;
+      if (display.color) {
+        item.style.setProperty("--transcript-speaker-color", display.color);
+      }
 
       const play = document.createElement("button");
       play.className = "transcript-play";
@@ -2325,7 +4116,8 @@ function renderTranscript(ai) {
 
       const header = document.createElement("header");
       const speaker = document.createElement("strong");
-      speaker.textContent = speakerLabel(segment.speaker, role);
+      speaker.textContent = display.label;
+      speaker.title = String(segment.speaker || "");
       const time = document.createElement("span");
       time.textContent = segmentTimestamp(segment.start);
       header.append(speaker, time);
@@ -2391,7 +4183,7 @@ function renderCallDetail(call) {
 
   currentDetailCallId = id;
   detailAudioState.segments = transcriptSegments;
-  detailAudioState.roles = speakerRoles(summary);
+  detailAudioState.roles = speakerRoles(summary, transcriptSegments);
   elements.detailPhone.textContent = formatCallPhone(call.externalNumber);
   elements.detailDate.textContent = formatDateTime(call.startedAt);
   elements.detailOperator.textContent = operatorLabel(call);
@@ -2845,6 +4637,35 @@ elements.monitorAnalyticsPeriod.addEventListener("change", () => {
   loadAnalyticsPage(false);
 });
 
+hydrateAiStaticIcons();
+
+if (elements.aiSettingsTabs) {
+  elements.aiSettingsTabs.addEventListener("click", handleAiSettingsTabClick);
+}
+elements.aiSettingsPage.addEventListener("click", handleAiSettingsClick);
+elements.aiMetricList.addEventListener("pointerdown", handleAiMetricPointerDown);
+elements.aiMetricModalForm.addEventListener("submit", saveAiMetricModal);
+elements.aiTypeModalForm.addEventListener("submit", saveAiTypeModal);
+elements.aiModalAddOption.addEventListener("click", addAiDraftOption);
+elements.aiModalOptionList.addEventListener("input", handleAiModalOptionInput);
+elements.aiModalOptionList.addEventListener("change", handleAiModalOptionInput);
+elements.aiMetricModalClose.addEventListener("click", closeAiMetricModal);
+elements.aiMetricCancel.addEventListener("click", closeAiMetricModal);
+elements.aiTypeModalClose.addEventListener("click", closeAiTypeModal);
+elements.aiTypeCancel.addEventListener("click", closeAiTypeModal);
+
+elements.aiMetricModal.addEventListener("click", (event) => {
+  if (event.target === elements.aiMetricModal) {
+    closeAiMetricModal();
+  }
+});
+
+elements.aiTypeModal.addEventListener("click", (event) => {
+  if (event.target === elements.aiTypeModal) {
+    closeAiTypeModal();
+  }
+});
+
 elements.monitorPageSize.addEventListener("change", () => {
   monitorPageSize = Number(elements.monitorPageSize.value) || 10;
   monitorPage = 1;
@@ -2936,6 +4757,8 @@ if (callDetailMatch) {
   loadMonitor();
 } else if (window.location.pathname === "/call-analytics") {
   loadAnalyticsPage();
+} else if (window.location.pathname === "/ai-settings") {
+  loadAiSettingsPage();
 } else if (initialPhone) {
   loadClient(initialPhone);
 } else {

@@ -131,7 +131,7 @@ TRANSCRIPTION_PROCESSING_STALE_MS=600000
 SONIOX_ENABLED=
 SONIOX_API_KEY=...
 SONIOX_BASE_URL=https://api.soniox.com/v1
-SONIOX_MODEL=stt-async-v4
+SONIOX_MODEL=stt-async-v5
 SONIOX_LANGUAGE_HINTS=uk,ru,en
 SONIOX_LANGUAGE_HINTS_STRICT=false
 SONIOX_ENABLE_SPEAKER_DIARIZATION=true
@@ -173,7 +173,7 @@ Pipeline:
 
 ```text
 Binotel call-record -> audio download -> optional FFmpeg cleanup
-                                      -> Soniox stt-async-v4
+                                      -> Soniox stt-async-v5
                                          (speaker diarization + language identification)
                                       -> gpt-5.4-nano summary
 ```
@@ -271,6 +271,33 @@ Accuracy notes:
 AI summaries are stored locally in `data/call-summaries.json`. The application
 does not write summaries, transcripts, or recordings to PostgreSQL.
 
+## Custom AI analysis settings
+
+AI call evaluation settings are stored locally in:
+
+```text
+data/ai-analysis-settings.json
+```
+
+The file is created from built-in defaults on first use and is excluded from
+Git. It contains call types, per-call-type metrics, AI instructions, and answer
+options with scores from `0` to `5` plus display colors. PostgreSQL is not used
+for these settings.
+
+Backend endpoints:
+
+```text
+GET  /api/ai-analysis-settings
+PUT  /api/ai-analysis-settings
+POST /api/ai-analysis-settings/reset
+```
+
+`PUT /api/ai-analysis-settings` replaces the whole settings document. Send
+either the settings object directly or `{ "settings": ... }`. The server returns
+a short `revision`; call summaries store this revision in `analysisProfile`, so
+changing the rubric invalidates cached AI summaries even when
+`OPENAI_SUMMARY_VERSION` is not bumped.
+
 ## Endpoints
 
 ```text
@@ -280,6 +307,9 @@ GET  /api/client-card?phone=380671112233
 GET  /api/client-tickets?phone=380671112233
 GET  /api/call-summary?phone=380671112233
 GET  /api/call-summary?callId=123456789.123
+GET  /api/ai-analysis-settings
+PUT  /api/ai-analysis-settings
+POST /api/ai-analysis-settings/reset
 POST /api/client-notes
 GET  /client?phone=380671112233
 ```

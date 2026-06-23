@@ -42,6 +42,7 @@ client-info-api\.env
 client-info-api\data\binotel-calls.json
 client-info-api\data\call-summaries.json
 client-info-api\data\client-notes.json
+client-info-api\data\ai-analysis-settings.json
 client-info-api\data\recording-cache.json
 client-info-api\data\recordings\
 client-info-api\node_modules\
@@ -159,6 +160,7 @@ The server stores runtime data in:
 client-info-api\data\client-notes.json
 client-info-api\data\binotel-calls.json
 client-info-api\data\call-summaries.json
+client-info-api\data\ai-analysis-settings.json
 client-info-api\data\recording-cache.json
 client-info-api\data\recordings\
 ```
@@ -239,6 +241,21 @@ calls looked more promising, and cost is lower for this workload.
 AI analysis is cached in `client-info-api\data\call-summaries.json`. If prompts
 or output schema change, bump `OPENAI_SUMMARY_VERSION` so old cached summaries
 do not mix with new logic.
+
+Custom AI call evaluation settings are stored in
+`client-info-api\data\ai-analysis-settings.json`. The file is created from
+defaults on first use and contains call types, per-type metrics, AI
+instructions, and 0-5 score/color options. API:
+
+```text
+GET  /api/ai-analysis-settings
+PUT  /api/ai-analysis-settings
+POST /api/ai-analysis-settings/reset
+```
+
+Each settings document has a generated `revision`; summary cache entries store
+it in `analysisProfile`, so changing the rubric invalidates old AI analysis
+even if `OPENAI_SUMMARY_VERSION` is not changed.
 
 The project logs token usage and recording duration for cost tracking.
 
@@ -510,4 +527,3 @@ Likely next work areas:
 5. Keep Binotel requests cached/rate-limited.
 6. Keep runtime data and recordings out of Git.
 7. Keep MicroSIP focused on opening the browser client card by phone number.
-
