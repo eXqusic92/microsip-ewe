@@ -400,16 +400,16 @@ class BinotelMonitorService {
       1,
       Number(
         this.callSummaryService.config &&
-        this.callSummaryService.config.openai &&
-        this.callSummaryService.config.openai.callMaxAttempts
+        this.callSummaryService.config.transcription &&
+        this.callSummaryService.config.transcription.callMaxAttempts
       ) || 5
     );
     const processingStaleMillis = Math.max(
       30000,
       Number(
         this.callSummaryService.config &&
-        this.callSummaryService.config.openai &&
-        this.callSummaryService.config.openai.processingStaleMillis
+        this.callSummaryService.config.transcription &&
+        this.callSummaryService.config.transcription.processingStaleMillis
       ) || 10 * 60 * 1000
     );
     const result = await this.store.list({

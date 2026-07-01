@@ -35,21 +35,23 @@ function nowIso() {
 }
 
 class RecordingCache {
-  constructor(config, binotelClient, metadataStore = null) {
+  constructor(config, binotelClient, metadataStore) {
+    if (!metadataStore) {
+      throw new Error(
+        "Recording cache metadata store is required; JSON fallback has been removed"
+      );
+    }
+
     this.config = config;
     this.binotelClient = binotelClient;
     this.metadataStore = metadataStore;
-    this.filename = config.binotelRecordingCacheFile;
     this.recordingsDir = config.binotelRecordingsDir;
     this.ttlMillis = config.binotelMonitor.recordingCacheTtlMillis;
-    this.maxAudioBytes = config.openai.maxAudioBytes || 25 * 1024 * 1024;
+    this.maxAudioBytes =
+      (config.transcription && config.transcription.maxAudioBytes) ||
+      25 * 1024 * 1024;
     this.loaded = false;
-    this.writeQueue = Promise.resolve();
     this.inFlight = new Map();
-    this.data = {
-      version: 1,
-      recordings: {}
-    };
   }
 
   async load() {
@@ -58,40 +60,11 @@ class RecordingCache {
     }
 
     await fs.mkdir(this.recordingsDir, { recursive: true });
-    if (this.metadataStore) {
-      this.loaded = true;
-      return;
-    }
-
-    await fs.mkdir(path.dirname(this.filename), { recursive: true });
-
-    try {
-      const content = await fs.readFile(this.filename, "utf8");
-      const parsed = JSON.parse(content);
-
-      if (!parsed || parsed.version !== 1 || typeof parsed.recordings !== "object") {
-        throw new Error("unsupported recording cache format");
-      }
-
-      this.data = parsed;
-    } catch (error) {
-      if (error.code !== "ENOENT") {
-        throw error;
-      }
-
-      await this.persist();
-    }
-
     this.loaded = true;
   }
 
   async metadata(callId) {
-    if (this.metadataStore) {
-      return this.metadataStore.metadata(callId);
-    }
-
-    await this.load();
-    return this.data.recordings[String(callId)] || null;
+    return this.metadataStore.metadata(callId);
   }
 
   async hasFresh(callId) {
@@ -136,7 +109,7 @@ class RecordingCache {
   async readCached(callId) {
     await this.load();
 
-    const entry = this.data.recordings[callId];
+    const entry = await this.metadataStore.metadata(callId);
     if (!entry || !entry.filePath || new Date(entry.expiresAt || 0).getTime() <= Date.now()) {
       return null;
     }
@@ -151,12 +124,7 @@ class RecordingCache {
         cachedAt: entry.cachedAt || null
       };
     } catch {
-      if (this.metadataStore) {
-        await this.metadataStore.delete(callId);
-      } else {
-        delete this.data.recordings[callId];
-        await this.persist();
-      }
+      await this.metadataStore.delete(callId);
       return null;
     }
   }
@@ -204,13 +172,7 @@ class RecordingCache {
       expiresAt
     };
 
-    if (this.metadataStore) {
-      await this.metadataStore.upsert(entry);
-    } else {
-      await this.load();
-      this.data.recordings[callId] = entry;
-      await this.persist();
-    }
+    await this.metadataStore.upsert(entry);
 
     return {
       bytes,
@@ -222,52 +184,13 @@ class RecordingCache {
   }
 
   async purgeExpired() {
-    if (this.metadataStore) {
-      const expired = await this.metadataStore.expired(new Date());
-      for (const entry of expired) {
-        if (entry.filePath) {
-          await fs.unlink(entry.filePath).catch(() => {});
-        }
-        await this.metadataStore.delete(entry.callId);
-      }
-      return;
-    }
-
-    await this.load();
-
-    const now = Date.now();
-    let changed = false;
-
-    for (const [callId, entry] of Object.entries(this.data.recordings)) {
-      const expiresAt = new Date(entry.expiresAt || 0).getTime();
-      if (!expiresAt || expiresAt > now) {
-        continue;
-      }
-
+    const expired = await this.metadataStore.expired(new Date());
+    for (const entry of expired) {
       if (entry.filePath) {
         await fs.unlink(entry.filePath).catch(() => {});
       }
-
-      delete this.data.recordings[callId];
-      changed = true;
+      await this.metadataStore.delete(entry.callId);
     }
-
-    if (changed) {
-      await this.persist();
-    }
-  }
-
-  async persist() {
-    const content = `${JSON.stringify(this.data, null, 2)}\n`;
-
-    this.writeQueue = this.writeQueue.then(async () => {
-      await fs.mkdir(path.dirname(this.filename), { recursive: true });
-      const temporaryFile = `${this.filename}.${process.pid}.tmp`;
-      await fs.writeFile(temporaryFile, content, "utf8");
-      await fs.rename(temporaryFile, this.filename);
-    });
-
-    return this.writeQueue;
   }
 }
 

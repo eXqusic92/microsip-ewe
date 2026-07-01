@@ -3,12 +3,9 @@
 const { Pool } = require("pg");
 
 const { BinotelClient } = require("./binotel-client");
-const { AiAnalysisSettingsStore } = require("./ai-analysis-settings");
 const BookingRules = require("./booking-rules");
 const { CallSummaryService } = require("./call-summary-service");
-const { CallSummaryStore } = require("./call-summary-store");
 const { createDemoCard } = require("./demo-data");
-const { LocalNotesStore } = require("./local-notes-store");
 const { OpenAiClient } = require("./openai-client");
 const { lookupVariants, normalizePhone, phoneDigits } = require("./phone");
 const { createTranscriptionClient } = require("./transcription-client");
@@ -840,27 +837,27 @@ class AutoClientStore {
   }
 }
 
-function createClientStore(config, appStateDatabase = null) {
-  const notesStore =
-    (appStateDatabase && appStateDatabase.notesStore) ||
-    new LocalNotesStore(
-      config.localDataFile,
-      config.noteAuthor
+function createClientStore(config, appStateDatabase) {
+  if (
+    !appStateDatabase ||
+    !appStateDatabase.notesStore ||
+    !appStateDatabase.aiAnalysisSettingsStore ||
+    !appStateDatabase.callSummaryStore
+  ) {
+    throw new Error(
+      "Writable app-state PostgreSQL stores are required; JSON fallback has been removed"
     );
+  }
+
+  const notesStore = appStateDatabase.notesStore;
   const binotelClient = new BinotelClient(config);
   const openAiClient = new OpenAiClient(config);
-  const aiAnalysisSettingsStore =
-    (appStateDatabase && appStateDatabase.aiAnalysisSettingsStore) ||
-    new AiAnalysisSettingsStore(
-      config.aiAnalysisSettingsFile
-    );
+  const aiAnalysisSettingsStore = appStateDatabase.aiAnalysisSettingsStore;
   openAiClient.setAnalysisSettingsProvider(() =>
     aiAnalysisSettingsStore.getProfile()
   );
-  const transcriptionClient = createTranscriptionClient(config, openAiClient);
-  const callSummaryStore =
-    (appStateDatabase && appStateDatabase.callSummaryStore) ||
-    new CallSummaryStore(config.callSummariesFile);
+  const transcriptionClient = createTranscriptionClient(config);
+  const callSummaryStore = appStateDatabase.callSummaryStore;
   const callSummaryService = new CallSummaryService(
     config,
     binotelClient,

@@ -51,8 +51,26 @@ function nowIso() {
 
 function createAppStatePool(config) {
   const db = config && config.appStateDatabase;
-  if (!db || !db.enabled || !db.password) {
-    return null;
+  if (!db) {
+    throw new Error("APP_STATE_DB_* configuration is required");
+  }
+  if (!db.enabled) {
+    throw new Error(
+      "APP_STATE_DB_ENABLED must be true; JSON app-state fallback has been removed"
+    );
+  }
+
+  const missing = [];
+  if (!text(db.host)) missing.push("APP_STATE_DB_HOST");
+  if (!Number.isFinite(Number(db.port))) missing.push("APP_STATE_DB_PORT");
+  if (!text(db.database)) missing.push("APP_STATE_DB_NAME");
+  if (!text(db.user)) missing.push("APP_STATE_DB_USER");
+  if (!text(db.password)) missing.push("APP_STATE_DB_PASSWORD");
+
+  if (missing.length) {
+    throw new Error(
+      `APP_STATE_DB_* configuration is incomplete: ${missing.join(", ")}`
+    );
   }
 
   return new Pool({
@@ -1309,9 +1327,6 @@ class PostgresRecordingCacheStore {
 
 function createAppStateDatabase(config) {
   const pool = createAppStatePool(config);
-  if (!pool) {
-    return null;
-  }
 
   return {
     pool,

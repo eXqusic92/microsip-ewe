@@ -146,46 +146,6 @@ function combineUsage(steps) {
   };
 }
 
-function transcriptSegments(transcription) {
-  const segments = Array.isArray(transcription.segments)
-    ? transcription.segments
-    : [];
-
-  return segments
-    .map((segment, index) => ({
-      speaker: text(segment.speaker) || `speaker_${index + 1}`,
-      start: Number.isFinite(Number(segment.start)) ? Number(segment.start) : null,
-      end: Number.isFinite(Number(segment.end)) ? Number(segment.end) : null,
-      text: text(segment.text)
-    }))
-    .filter((segment) => segment.text);
-}
-
-function formatTimestamp(seconds) {
-  if (!Number.isFinite(Number(seconds))) {
-    return "";
-  }
-
-  const total = Math.max(0, Math.round(Number(seconds)));
-  const minutes = Math.floor(total / 60);
-  const rest = total % 60;
-  return `${minutes}:${String(rest).padStart(2, "0")}`;
-}
-
-function buildTranscriptText(segments, fallbackText) {
-  if (!segments.length) {
-    return text(fallbackText);
-  }
-
-  return segments
-    .map((segment) => {
-      const time = formatTimestamp(segment.start);
-      const prefix = [time, segment.speaker].filter(Boolean).join(" ");
-      return `${prefix}: ${segment.text}`;
-    })
-    .join("\n");
-}
-
 function compactSecondaryTranscript(value, primaryText, maxChars = 4000) {
   const normalized = text(value);
   if (!normalized || normalized === text(primaryText)) {
@@ -324,66 +284,6 @@ function providedAnalysisCallType(call, analysisProfile) {
   return null;
 }
 
-function textStats(value, segments = []) {
-  const combined = text(
-    [
-      value,
-      ...segments.map((segment) => segment.text)
-    ].filter(Boolean).join(" ")
-  );
-  const words = combined.match(/[\p{L}\p{N}]+/gu) || [];
-
-  return {
-    chars: combined.length,
-    words: words.length,
-    segments: segments.filter((segment) => text(segment.text)).length,
-    hasPlaceholder:
-      /\b(no speech|inaudible|unintelligible|silence|music|noise)\b/i.test(combined) ||
-      /нерозбір|неразбор|тишин|музик|шум/i.test(combined)
-  };
-}
-
-function qualityIssue(stats, config, durationSec = 0, options = {}) {
-  const requireSegments = options.requireSegments !== false;
-
-  if (!stats.chars || !stats.words) {
-    return "empty_transcript";
-  }
-
-  if (requireSegments && !stats.segments) {
-    return "empty_segments";
-  }
-
-  if (stats.hasPlaceholder && stats.words < (config.transcriptionFallbackMinWords || 20) * 2) {
-    return "placeholder_transcript";
-  }
-
-  if (
-    Number.isFinite(Number(durationSec)) &&
-    Number(durationSec) > 0 &&
-    Number(durationSec) < (config.transcriptionFallbackMinDurationSec || 25)
-  ) {
-    return "";
-  }
-
-  if (stats.words < (config.transcriptionFallbackMinWords || 20)) {
-    return "few_words";
-  }
-
-  if (stats.chars < (config.transcriptionFallbackMinChars || 80)) {
-    return "few_chars";
-  }
-
-  if (
-    requireSegments &&
-    stats.segments < (config.transcriptionFallbackMinSegments || 2)
-  ) {
-    return "few_segments";
-  }
-
-  return "";
-}
-
 class OpenAiClient {
   constructor(config) {
     this.config = config.openai || {};
@@ -501,114 +401,6 @@ class OpenAiClient {
         clearTimeout(timeout);
       }
     }
-  }
-
-  async promptedTranscription(audio) {
-    const form = new FormData();
-    form.append("file", new Blob([audio.bytes], { type: audio.contentType }), audio.filename);
-    form.append("model", this.config.transcriptionSecondModel || "gpt-4o-transcribe");
-    form.append("response_format", "json");
-    form.append("temperature", String(this.config.transcriptionTemperature ?? 0));
-    form.append("prompt", AiPrompts.TRANSCRIPTION_DOMAIN_PROMPT);
-    if (this.config.transcriptionLanguage) {
-      form.append("language", this.config.transcriptionLanguage);
-    }
-
-    const transcription = await this.request("audio/transcriptions", {
-      method: "POST",
-      body: form
-    });
-
-    return text(transcription.text);
-  }
-
-  async transcribeAudio(audio, options = {}) {
-    if (!this.enabled) {
-      throw new Error("OPENAI_API_KEY не налаштований");
-    }
-
-    if (audio.bytes.length > (this.config.maxAudioBytes || 25 * 1024 * 1024)) {
-      throw new Error("Запис розмови завеликий для OpenAI transcription API");
-    }
-
-    const form = new FormData();
-    form.append("file", new Blob([audio.bytes], { type: audio.contentType }), audio.filename);
-    form.append("model", this.config.transcriptionModel || "gpt-4o-transcribe-diarize");
-    form.append("response_format", "diarized_json");
-    form.append("chunking_strategy", "auto");
-    form.append("temperature", String(this.config.transcriptionTemperature ?? 0));
-    if (this.config.transcriptionLanguage) {
-      form.append("language", this.config.transcriptionLanguage);
-    }
-
-    const transcription = await this.request("audio/transcriptions", {
-      method: "POST",
-      body: form
-    });
-    const segments = transcriptSegments(transcription);
-    const initialStats = textStats(transcription.text, segments);
-    const initialQualityIssue = qualityIssue(
-      initialStats,
-      this.config,
-      options.callDurationSec
-    );
-    const useFallbackPass = Boolean(
-      this.config.transcriptionFallbackPass && initialQualityIssue
-    );
-    let promptedText = "";
-    let originalPromptedText = "";
-    let promptedModel = "";
-    let promptedQualityIssue = "";
-    let originalPassReason = "";
-
-    if (this.config.transcriptionSecondPass || useFallbackPass) {
-      promptedModel = this.config.transcriptionSecondModel || "gpt-4o-transcribe";
-      promptedText = await this.promptedTranscription(audio);
-      promptedQualityIssue = qualityIssue(
-        textStats(promptedText),
-        this.config,
-        options.callDurationSec,
-        { requireSegments: false }
-      );
-    }
-
-    const useOriginalFallback = Boolean(
-      useFallbackPass &&
-        this.config.transcriptionFallbackOriginalPass &&
-        (!promptedText || promptedQualityIssue)
-    );
-
-    if (
-      options.originalAudio &&
-      (this.config.transcriptionOriginalPass || useOriginalFallback)
-    ) {
-      promptedModel = this.config.transcriptionSecondModel || "gpt-4o-transcribe";
-      originalPromptedText = await this.promptedTranscription(options.originalAudio);
-      originalPassReason = this.config.transcriptionOriginalPass
-        ? "forced"
-        : promptedQualityIssue || initialQualityIssue;
-    }
-
-    return {
-      provider: "openai",
-      text: buildTranscriptText(segments, transcription.text),
-      segments,
-      rawText: text(transcription.text),
-      promptedText,
-      originalPromptedText,
-      model: this.config.transcriptionModel || "gpt-4o-transcribe-diarize",
-      promptedModel,
-      language: this.config.transcriptionLanguage || "auto",
-      temperature: this.config.transcriptionTemperature ?? 0,
-      quality: {
-        initial: initialStats,
-        initialIssue: initialQualityIssue,
-        fallbackPassUsed: useFallbackPass,
-        promptedIssue: promptedQualityIssue,
-        originalPassUsed: Boolean(originalPromptedText),
-        originalPassReason
-      }
-    };
   }
 
   async classifyTranscript({ call, transcript, analysisProfile }) {
@@ -814,6 +606,5 @@ class OpenAiClient {
 
 module.exports = {
   DOMAIN_TERMS: AiPrompts.DOMAIN_TERMS,
-  OpenAiClient,
-  TRANSCRIPTION_DOMAIN_PROMPT: AiPrompts.TRANSCRIPTION_DOMAIN_PROMPT
+  OpenAiClient
 };

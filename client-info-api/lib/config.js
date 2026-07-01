@@ -57,11 +57,6 @@ function parseNonNegativeNumber(value, fallback) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function parseTemperature(value, fallback) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : fallback;
-}
-
 function parseCsv(value, fallback = []) {
   if (value === undefined || value === "") {
     return fallback;
@@ -101,22 +96,14 @@ const binotelSecret = process.env.BINOTEL_SECRET || "";
 const openAiKey = process.env.OPENAI_API_KEY || "";
 const sonioxKey = process.env.SONIOX_API_KEY || "";
 const appStateDbPassword = process.env.APP_STATE_DB_PASSWORD || "";
-const transcriptionProvider = String(
-  process.env.TRANSCRIPTION_PROVIDER || "openai"
-).trim().toLowerCase();
 const transcriptionAudioPreprocessing = parseBoolean(
-  process.env.TRANSCRIPTION_AUDIO_PREPROCESSING === undefined
-    ? process.env.OPENAI_AUDIO_PREPROCESSING
-    : process.env.TRANSCRIPTION_AUDIO_PREPROCESSING,
+  process.env.TRANSCRIPTION_AUDIO_PREPROCESSING,
   true
 );
 const transcriptionAudioPreprocessingProfile =
-  process.env.TRANSCRIPTION_AUDIO_PREPROCESSING_PROFILE ||
-  process.env.OPENAI_AUDIO_PREPROCESSING_PROFILE ||
-  "light";
+  process.env.TRANSCRIPTION_AUDIO_PREPROCESSING_PROFILE || "light";
 const transcriptionMaxAudioBytes = parsePositiveNumber(
-  process.env.TRANSCRIPTION_MAX_AUDIO_BYTES ||
-    process.env.OPENAI_MAX_AUDIO_BYTES,
+  process.env.TRANSCRIPTION_MAX_AUDIO_BYTES,
   25 * 1024 * 1024
 );
 
@@ -128,31 +115,6 @@ module.exports = {
     `http://${host === "0.0.0.0" ? "127.0.0.1" : host}:${port}`,
   demoMode,
   noteAuthor: process.env.NOTE_AUTHOR || "Оператор",
-  localDataFile: path.resolve(
-    __dirname,
-    "..",
-    process.env.LOCAL_DATA_FILE || "data/client-notes.json"
-  ),
-  callSummariesFile: path.resolve(
-    __dirname,
-    "..",
-    process.env.CALL_SUMMARIES_FILE || "data/call-summaries.json"
-  ),
-  aiAnalysisSettingsFile: path.resolve(
-    __dirname,
-    "..",
-    process.env.AI_ANALYSIS_SETTINGS_FILE || "data/ai-analysis-settings.json"
-  ),
-  binotelCallsFile: path.resolve(
-    __dirname,
-    "..",
-    process.env.BINOTEL_CALLS_FILE || "data/binotel-calls.json"
-  ),
-  binotelRecordingCacheFile: path.resolve(
-    __dirname,
-    "..",
-    process.env.BINOTEL_RECORDING_CACHE_FILE || "data/recording-cache.json"
-  ),
   binotelRecordingsDir: path.resolve(
     __dirname,
     "..",
@@ -275,7 +237,7 @@ module.exports = {
     )
   },
   transcription: {
-    provider: transcriptionProvider,
+    provider: "soniox",
     audioPreprocessing: transcriptionAudioPreprocessing,
     audioPreprocessingProfile: transcriptionAudioPreprocessingProfile,
     ffmpegPath: process.env.FFMPEG_PATH || "ffmpeg",
@@ -285,13 +247,11 @@ module.exports = {
     ),
     maxAudioBytes: transcriptionMaxAudioBytes,
     callMaxAttempts: parsePositiveNumber(
-      process.env.TRANSCRIPTION_CALL_MAX_ATTEMPTS ||
-        process.env.OPENAI_CALL_MAX_ATTEMPTS,
+      process.env.TRANSCRIPTION_CALL_MAX_ATTEMPTS,
       5
     ),
     processingStaleMillis: parsePositiveNumber(
-      process.env.TRANSCRIPTION_PROCESSING_STALE_MS ||
-        process.env.OPENAI_PROCESSING_STALE_MS,
+      process.env.TRANSCRIPTION_PROCESSING_STALE_MS,
       10 * 60 * 1000
     )
   },
@@ -344,57 +304,9 @@ module.exports = {
     enabled: parseBoolean(process.env.OPENAI_ENABLED, Boolean(openAiKey)),
     apiKey: openAiKey,
     baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
-    transcriptionModel:
-      process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-transcribe-diarize",
-    transcriptionLanguage:
-      process.env.OPENAI_TRANSCRIPTION_LANGUAGE === undefined
-        ? "uk"
-        : process.env.OPENAI_TRANSCRIPTION_LANGUAGE,
-    transcriptionTemperature: parseTemperature(
-      process.env.OPENAI_TRANSCRIPTION_TEMPERATURE,
-      0
-    ),
-    transcriptionSecondPass: parseBoolean(
-      process.env.OPENAI_TRANSCRIPTION_SECOND_PASS,
-      false
-    ),
-    transcriptionOriginalPass: parseBoolean(
-      process.env.OPENAI_TRANSCRIPTION_ORIGINAL_PASS,
-      false
-    ),
-    transcriptionFallbackPass: parseBoolean(
-      process.env.OPENAI_TRANSCRIPTION_FALLBACK_PASS,
-      true
-    ),
-    transcriptionFallbackOriginalPass: parseBoolean(
-      process.env.OPENAI_TRANSCRIPTION_FALLBACK_ORIGINAL_PASS,
-      true
-    ),
-    transcriptionFallbackMinWords: parsePositiveNumber(
-      process.env.OPENAI_TRANSCRIPTION_FALLBACK_MIN_WORDS,
-      20
-    ),
-    transcriptionFallbackMinChars: parsePositiveNumber(
-      process.env.OPENAI_TRANSCRIPTION_FALLBACK_MIN_CHARS,
-      80
-    ),
-    transcriptionFallbackMinSegments: parsePositiveNumber(
-      process.env.OPENAI_TRANSCRIPTION_FALLBACK_MIN_SEGMENTS,
-      2
-    ),
-    transcriptionFallbackMinDurationSec: parsePositiveNumber(
-      process.env.OPENAI_TRANSCRIPTION_FALLBACK_MIN_DURATION_SEC,
-      25
-    ),
-    transcriptionSecondModel:
-      process.env.OPENAI_TRANSCRIPTION_SECOND_MODEL || "gpt-4o-transcribe",
     summaryModel: process.env.OPENAI_SUMMARY_MODEL || "gpt-5.4-nano",
     summaryVersion:
       process.env.OPENAI_SUMMARY_VERSION || "20260608-call-script-rubric-1",
-    audioPreprocessing: transcriptionAudioPreprocessing,
-    audioPreprocessingProfile: transcriptionAudioPreprocessingProfile,
-    ffmpegPath: process.env.FFMPEG_PATH || "ffmpeg",
-    ffmpegTimeoutMillis: parsePositiveNumber(process.env.FFMPEG_TIMEOUT_MS, 120000),
     timeoutMillis: parsePositiveNumber(process.env.OPENAI_TIMEOUT_MS, 300000),
     maxRetries: parseNonNegativeNumber(process.env.OPENAI_MAX_RETRIES, 3),
     retryInitialMillis: parsePositiveNumber(
@@ -404,17 +316,6 @@ module.exports = {
     retryMaxMillis: parsePositiveNumber(
       process.env.OPENAI_RETRY_MAX_MS,
       15000
-    ),
-    callMaxAttempts: parsePositiveNumber(
-      process.env.TRANSCRIPTION_CALL_MAX_ATTEMPTS ||
-        process.env.OPENAI_CALL_MAX_ATTEMPTS,
-      5
-    ),
-    maxAudioBytes: transcriptionMaxAudioBytes,
-    processingStaleMillis: parsePositiveNumber(
-      process.env.TRANSCRIPTION_PROCESSING_STALE_MS ||
-        process.env.OPENAI_PROCESSING_STALE_MS,
-      10 * 60 * 1000
     )
   }
 };

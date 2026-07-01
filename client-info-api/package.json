@@ -5,7 +5,7 @@
   "description": "DUMA customer card for incoming MicroSIP calls.",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check lib/config.js && node --check lib/phone.js && node --check lib/booking-rules.js && node --check lib/app-state-db.js && node --check lib/binotel-client.js && node --check lib/binotel-monitor-store.js && node --check lib/binotel-monitor-service.js && node --check lib/recording-cache.js && node --check lib/ai-analysis-settings.js && node --check lib/ai-prompts.js && node --check lib/openai-client.js && node --check lib/soniox-client.js && node --check lib/transcription-client.js && node --check lib/call-summary-store.js && node --check lib/call-summary-service.js && node --check lib/demo-data.js && node --check lib/local-notes-store.js && node --check lib/client-store.js && node --check scripts/migrate-local-data-to-db.js && node --check public/app.js"
+    "check": "node --check server.js && node --check lib/config.js && node --check lib/phone.js && node --check lib/booking-rules.js && node --check lib/app-state-db.js && node --check lib/binotel-client.js && node --check lib/binotel-monitor-service.js && node --check lib/recording-cache.js && node --check lib/ai-analysis-settings.js && node --check lib/ai-prompts.js && node --check lib/openai-client.js && node --check lib/soniox-client.js && node --check lib/transcription-client.js && node --check lib/call-summary-service.js && node --check lib/demo-data.js && node --check lib/client-store.js && node --check public/app.js"
   },
   "dependencies": {
     "pg": "^8.16.3"

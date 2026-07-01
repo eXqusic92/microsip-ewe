@@ -24,7 +24,7 @@ function isFreshProcessing(entry, staleMillis) {
 }
 
 function configuredTranscriptionProvider(config) {
-  return text(config.transcription && config.transcription.provider) || "openai";
+  return text(config.transcription && config.transcription.provider) || "soniox";
 }
 
 function storedTranscriptionProvider(entry) {

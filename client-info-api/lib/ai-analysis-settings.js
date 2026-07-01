@@ -1,8 +1,6 @@
 "use strict";
 
 const crypto = require("crypto");
-const fs = require("fs/promises");
-const path = require("path");
 
 const SETTINGS_VERSION = 1;
 const DEFAULT_SCHEMA_VERSION = "20260608-ai-analysis-settings-2";
@@ -793,89 +791,7 @@ function enabledMetrics(callType) {
     .sort((a, b) => finiteNumber(a.order) - finiteNumber(b.order));
 }
 
-class AiAnalysisSettingsStore {
-  constructor(filename) {
-    this.filename = filename;
-    this.loaded = false;
-    this.settings = createDefaultAiAnalysisSettings();
-    this.writeQueue = Promise.resolve();
-  }
-
-  async load() {
-    if (this.loaded) {
-      return;
-    }
-
-    await fs.mkdir(path.dirname(this.filename), { recursive: true });
-
-    try {
-      const content = await fs.readFile(this.filename, "utf8");
-      this.settings = normalizeAiAnalysisSettings(JSON.parse(content));
-    } catch (error) {
-      if (error.code !== "ENOENT") {
-        throw error;
-      }
-
-      await this.persist();
-    }
-
-    this.loaded = true;
-  }
-
-  async get() {
-    await this.load();
-    return clone(this.settings);
-  }
-
-  async getProfile() {
-    const settings = await this.get();
-    return {
-      settings,
-      schemaVersion: settings.schemaVersion,
-      revision: settingsRevision(settings),
-      semanticRevision: settingsSemanticRevision(settings),
-      scoringRevision: settingsScoringRevision(settings)
-    };
-  }
-
-  async getPublicSettings() {
-    const profile = await this.getProfile();
-    return {
-      ok: true,
-      ...profile
-    };
-  }
-
-  async update(value) {
-    await this.load();
-    this.settings = normalizeAiAnalysisSettings(value);
-    await this.persist();
-    return this.getPublicSettings();
-  }
-
-  async reset() {
-    await this.load();
-    this.settings = createDefaultAiAnalysisSettings();
-    await this.persist();
-    return this.getPublicSettings();
-  }
-
-  async persist() {
-    const content = `${JSON.stringify(this.settings, null, 2)}\n`;
-
-    this.writeQueue = this.writeQueue.then(async () => {
-      await fs.mkdir(path.dirname(this.filename), { recursive: true });
-      const temporaryFile = `${this.filename}.${process.pid}.tmp`;
-      await fs.writeFile(temporaryFile, content, "utf8");
-      await fs.rename(temporaryFile, this.filename);
-    });
-
-    return this.writeQueue;
-  }
-}
-
 module.exports = {
-  AiAnalysisSettingsStore,
   createDefaultAiAnalysisSettings,
   enabledCallTypes,
   enabledMetrics,

@@ -9,7 +9,6 @@ const config = require("./lib/config");
 const { createAppStateDatabase } = require("./lib/app-state-db");
 const { createClientStore } = require("./lib/client-store");
 const { normalizePhone } = require("./lib/phone");
-const { BinotelMonitorStore } = require("./lib/binotel-monitor-store");
 const { BinotelMonitorService } = require("./lib/binotel-monitor-service");
 const { RecordingCache } = require("./lib/recording-cache");
 
@@ -19,16 +18,12 @@ const store = createClientStore(config, appStateDatabase);
 const recordingCache = new RecordingCache(
   config,
   store.binotelClient,
-  appStateDatabase && appStateDatabase.recordingCacheStore
+  appStateDatabase.recordingCacheStore
 );
 if (store.callSummaryService && typeof store.callSummaryService.setRecordingCache === "function") {
   store.callSummaryService.setRecordingCache(recordingCache);
 }
-const binotelMonitorStore =
-  (appStateDatabase && appStateDatabase.binotelMonitorStore) ||
-  new BinotelMonitorStore(config.binotelCallsFile, {
-    maxCalls: config.binotelMonitor.maxStoredCalls
-  });
+const binotelMonitorStore = appStateDatabase.binotelMonitorStore;
 const binotelMonitor = new BinotelMonitorService(
   config,
   store.binotelClient,
