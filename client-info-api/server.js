@@ -6,6 +6,7 @@ const path = require("path");
 const { URL } = require("url");
 
 const config = require("./lib/config");
+const { AuthService } = require("./lib/auth");
 const { createAppStateDatabase } = require("./lib/app-state-db");
 const { createClientStore } = require("./lib/client-store");
 const { normalizePhone } = require("./lib/phone");
@@ -14,6 +15,7 @@ const { RecordingCache } = require("./lib/recording-cache");
 
 const publicDir = path.join(__dirname, "public");
 const appStateDatabase = createAppStateDatabase(config);
+const authService = new AuthService(config, appStateDatabase.pool, sendJson);
 const store = createClientStore(config, appStateDatabase);
 const recordingCache = new RecordingCache(
   config,
@@ -196,6 +198,35 @@ function redirect(res, location) {
   res.end();
 }
 
+function safeNextPath(requestUrl) {
+  const next = `${requestUrl.pathname}${requestUrl.search || ""}`;
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/client-card";
+}
+
+function loginRedirect(res, requestUrl) {
+  redirect(res, `/login?next=${encodeURIComponent(safeNextPath(requestUrl))}`);
+}
+
+function safeLoginTarget(value) {
+  const target = String(value || "").trim();
+  if (!target || !target.startsWith("/") || target.startsWith("//")) {
+    return "/client-card";
+  }
+  if (target.startsWith("/login")) {
+    return "/client-card";
+  }
+  return target;
+}
+
+async function requirePageAuth(req, res, requestUrl) {
+  const auth = await authService.getRequestAuth(req);
+  if (!auth) {
+    loginRedirect(res, requestUrl);
+    return null;
+  }
+  return auth;
+}
+
 async function handleRequest(req, res) {
   const requestUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
@@ -204,33 +235,30 @@ async function handleRequest(req, res) {
     return;
   }
 
-  if (req.method === "GET" && requestUrl.pathname === "/") {
-    redirect(res, "/client-card");
+  if (req.method === "POST" && requestUrl.pathname === "/api/auth/login") {
+    try {
+      await authService.handleLogin(req, res, readJsonBody);
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : 500;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: statusCode === 400 ? error.message : "login_failed"
+      });
+    }
     return;
   }
 
-  if (req.method === "GET" && requestUrl.pathname === "/client-card") {
-    sendFile(res, "index.html");
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/calls-monitor") {
-    sendFile(res, "index.html");
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/call-analytics") {
-    sendFile(res, "index.html");
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/ai-settings") {
-    sendFile(res, "index.html");
-    return;
-  }
-
-  if (req.method === "GET" && /^\/calls\/[^/]+$/.test(requestUrl.pathname)) {
-    sendFile(res, "index.html");
+  if (req.method === "GET" && requestUrl.pathname === "/login") {
+    const auth = await authService.getRequestAuth(req);
+    if (auth) {
+      redirect(res, safeLoginTarget(requestUrl.searchParams.get("next")));
+      return;
+    }
+    sendFile(res, "login.html");
     return;
   }
 
@@ -239,8 +267,8 @@ async function handleRequest(req, res) {
     return;
   }
 
-  if (req.method === "GET" && requestUrl.pathname === "/app.js") {
-    sendFile(res, "app.js");
+  if (req.method === "GET" && requestUrl.pathname === "/login.js") {
+    sendFile(res, "login.js");
     return;
   }
 
@@ -252,6 +280,82 @@ async function handleRequest(req, res) {
   if (req.method === "GET" && requestUrl.pathname === "/duma-logo.svg") {
     sendFile(res, "duma-logo.svg");
     return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/") {
+    if (!(await requirePageAuth(req, res, requestUrl))) {
+      return;
+    }
+    redirect(res, "/client-card");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/client-card") {
+    if (!(await requirePageAuth(req, res, requestUrl))) {
+      return;
+    }
+    sendFile(res, "index.html");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/calls-monitor") {
+    if (!(await requirePageAuth(req, res, requestUrl))) {
+      return;
+    }
+    sendFile(res, "index.html");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/call-analytics") {
+    if (!(await requirePageAuth(req, res, requestUrl))) {
+      return;
+    }
+    sendFile(res, "index.html");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/ai-settings") {
+    if (!(await requirePageAuth(req, res, requestUrl))) {
+      return;
+    }
+    sendFile(res, "index.html");
+    return;
+  }
+
+  if (req.method === "GET" && /^\/calls\/[^/]+$/.test(requestUrl.pathname)) {
+    if (!(await requirePageAuth(req, res, requestUrl))) {
+      return;
+    }
+    sendFile(res, "index.html");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/app.js") {
+    if (!(await requirePageAuth(req, res, requestUrl))) {
+      return;
+    }
+    sendFile(res, "app.js");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/auth/me") {
+    await authService.handleMe(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/api/auth/logout") {
+    await authService.handleLogout(req, res);
+    return;
+  }
+
+  if (
+    requestUrl.pathname.startsWith("/api/") ||
+    requestUrl.pathname === "/client"
+  ) {
+    const auth = await authService.requireAuth(req, res);
+    if (!auth) {
+      return;
+    }
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/api/client-card") {
@@ -556,12 +660,20 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(config.port, config.host, () => {
-  console.log(`client-info-api listening on http://${config.host}:${config.port}`);
-  console.log(`client card: ${config.publicBaseUrl}/client-card?phone=380671112233`);
-  console.log(`calls monitor: ${config.publicBaseUrl}/calls-monitor`);
-  console.log(`data mode: ${store.mode}`);
-  binotelMonitor.start();
+async function start() {
+  await authService.ensureReady();
+  server.listen(config.port, config.host, () => {
+    console.log(`client-info-api listening on http://${config.host}:${config.port}`);
+    console.log(`client card: ${config.publicBaseUrl}/client-card?phone=380671112233`);
+    console.log(`calls monitor: ${config.publicBaseUrl}/calls-monitor`);
+    console.log(`data mode: ${store.mode}`);
+    binotelMonitor.start();
+  });
+}
+
+start().catch((error) => {
+  console.error(error);
+  process.exit(1);
 });
 
 function shutdown() {

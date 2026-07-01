@@ -55,15 +55,40 @@ APP_STATE_DB_PASSWORD=...
 APP_STATE_DB_SSL=false
 ```
 
-This app-state database stores AI settings, AI summaries/transcripts, Binotel
-monitor state, local notes, and recording-cache metadata.
+This app-state database stores users, auth sessions, AI settings, AI
+summaries/transcripts, Binotel monitor state, local notes, and recording-cache
+metadata.
 
-Apply the app-state schema from `db/001_app_state.sql` with `psql` or another
-PostgreSQL client before starting the server. Then verify the code:
+Apply the app-state SQL files from `db/` with `psql` or another PostgreSQL
+client before starting the server. Existing databases created before auth need
+`db/002_auth.sql`. Then verify the code:
 
 ```bash
 npm run check
 ```
+
+## Authentication
+
+All application pages, API endpoints, audio recordings, and the MicroSIP
+compatibility endpoint require an authenticated session. Only `/login`,
+`/api/auth/login`, static assets needed by the login page, and `/health` are
+public.
+
+Configure auth in `.env`:
+
+```text
+AUTH_SESSION_SECRET=long-random-secret
+AUTH_SEED_ADMINS=admin:change-me-password
+AUTH_SESSION_TTL_MS=28800000
+AUTH_COOKIE_SECURE=false
+AUTH_PBKDF2_ITERATIONS=210000
+AUTH_MIN_PASSWORD_LENGTH=8
+```
+
+`AUTH_SEED_ADMINS` is used only when the `users` table is empty. Passwords are
+stored as PBKDF2 hashes. Sessions use signed HttpOnly cookies and CSRF tokens
+for non-GET requests. Set `AUTH_COOKIE_SECURE=true` when serving only over
+HTTPS.
 
 Ticket history is read from `public.ticket`, not from `report_*` tables. The
 card uses the same ticket status rules as `ewe_web`:

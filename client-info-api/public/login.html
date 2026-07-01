@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <script>
+      (() => {
+        let savedTheme = null;
+        try {
+          savedTheme = localStorage.getItem("ewe-ticket-theme");
+        } catch {}
+        const theme =
+          savedTheme === "light" || savedTheme === "dark"
+            ? savedTheme
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <title>Вхід | DUMA Client Info</title>
+    <link rel="icon" href="/duma-logo.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css?v=20260701-auth">
+    <script src="/login.js?v=20260701-auth" defer></script>
+  </head>
+  <body class="login-body">
+    <main class="login-page">
+      <section class="login-card" aria-label="Авторизація">
+        <div class="login-card-top">
+          <a class="login-brand" href="/client-card" aria-label="DUMA">
+            <img src="/duma-logo.svg" alt="DUMA">
+          </a>
+          <button class="theme-toggle login-theme-toggle" id="theme-toggle" type="button" aria-label="Перемкнути тему">
+            <span class="theme-toggle-track" aria-hidden="true"><span></span></span>
+            <span id="theme-toggle-label">Темна тема</span>
+          </button>
+        </div>
+
+        <p class="section-label">Client Info API</p>
+        <h1>Вхід у систему</h1>
+        <p class="login-muted">Авторизуйтесь, щоб відкрити картку клієнта, монітор дзвінків і AI-аналітику.</p>
+
+        <form class="login-form" id="login-form">
+          <label>
+            <span>Логін</span>
+            <input id="login-username" name="username" type="text" autocomplete="username" required autofocus>
+          </label>
+          <label>
+            <span>Пароль</span>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <button class="primary-button" type="submit">Увійти</button>
+          <p class="form-message" id="login-message" role="alert"></p>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

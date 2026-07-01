@@ -164,6 +164,25 @@ module.exports = {
     ),
     applicationName: "client-info-api-app-state"
   },
+  auth: {
+    seedAdmins: process.env.AUTH_SEED_ADMINS || "",
+    sessionSecret: process.env.AUTH_SESSION_SECRET || "",
+    sessionCookieName: process.env.AUTH_SESSION_COOKIE_NAME || "client_info_sid",
+    csrfHeaderName: "x-csrf-token",
+    sessionTtlMillis: parsePositiveNumber(
+      process.env.AUTH_SESSION_TTL_MS,
+      8 * 60 * 60 * 1000
+    ),
+    cookieSecure: parseBoolean(process.env.AUTH_COOKIE_SECURE, false),
+    pbkdf2Iterations: parsePositiveNumber(
+      process.env.AUTH_PBKDF2_ITERATIONS,
+      210000
+    ),
+    minPasswordLength: parsePositiveNumber(
+      process.env.AUTH_MIN_PASSWORD_LENGTH,
+      8
+    )
+  },
   binotel: {
     enabled: parseBoolean(
       process.env.BINOTEL_ENABLED,

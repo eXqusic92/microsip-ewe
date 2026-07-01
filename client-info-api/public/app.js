@@ -80,6 +80,8 @@ const elements = {
   phoneInput: document.querySelector("#phone-input"),
   themeToggle: document.querySelector("#theme-toggle"),
   themeToggleLabel: document.querySelector("#theme-toggle-label"),
+  authUserName: document.querySelector("#auth-user-name"),
+  logoutButton: document.querySelector("#logout-button"),
   pageTitle: document.querySelector("#page-title"),
   emptyState: document.querySelector("#empty-state"),
   loadingState: document.querySelector("#loading-state"),
@@ -301,6 +303,60 @@ const detailAudioState = {
   visualAnchorTime: 0,
   visualAnchorAt: 0
 };
+const authState = {
+  csrfToken: "",
+  user: null
+};
+
+function loginUrl() {
+  const next = `${window.location.pathname}${window.location.search || ""}`;
+  return `/login?next=${encodeURIComponent(next || "/client-card")}`;
+}
+
+function isUnsafeMethod(method) {
+  return !["GET", "HEAD", "OPTIONS"].includes(String(method || "GET").toUpperCase());
+}
+
+async function apiFetch(input, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (!headers.has("Accept")) {
+    headers.set("Accept", "application/json");
+  }
+  if (isUnsafeMethod(options.method) && authState.csrfToken) {
+    headers.set("x-csrf-token", authState.csrfToken);
+  }
+
+  const response = await fetch(input, {
+    ...options,
+    headers
+  });
+
+  if (response.status === 401) {
+    window.location.href = loginUrl();
+  }
+
+  return response;
+}
+
+function renderAuthUser() {
+  if (!elements.authUserName) {
+    return;
+  }
+  const user = authState.user || {};
+  elements.authUserName.textContent = user.name || user.username || "Користувач";
+  elements.authUserName.title = user.username || "";
+}
+
+async function loadAuthSession() {
+  const response = await apiFetch("/api/auth/me");
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || "unauthorized");
+  }
+  authState.csrfToken = payload.csrfToken || "";
+  authState.user = payload.user || null;
+  renderAuthUser();
+}
 
 function currentTheme() {
   return document.body.dataset.theme === "dark" ? "dark" : "light";
@@ -1044,7 +1100,7 @@ async function loadAiSettingsPage(showLoading = true) {
   }
 
   try {
-    const response = await fetch("/api/ai-analysis-settings", {
+    const response = await apiFetch("/api/ai-analysis-settings", {
       headers: { Accept: "application/json" }
     });
     const payload = await response.json();
@@ -1077,7 +1133,7 @@ async function saveAiSettings(options = {}) {
   updateAiSettingsChrome();
 
   try {
-    const response = await fetch("/api/ai-analysis-settings", {
+    const response = await apiFetch("/api/ai-analysis-settings", {
       method: "PUT",
       headers: {
         Accept: "application/json",
@@ -1112,7 +1168,7 @@ async function resetAiSettings() {
   updateAiSettingsChrome();
 
   try {
-    const response = await fetch("/api/ai-analysis-settings/reset", {
+    const response = await apiFetch("/api/ai-analysis-settings/reset", {
       method: "POST",
       headers: { Accept: "application/json" }
     });
@@ -2498,7 +2554,7 @@ async function loadDetailTickets(phone) {
   );
 
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `/api/client-tickets?phone=${encodeURIComponent(cleaned)}`,
       { headers: { Accept: "application/json" } }
     );
@@ -2797,7 +2853,7 @@ function scheduleSummaryPoll() {
       const query = currentSummaryCallId
         ? `callId=${encodeURIComponent(currentSummaryCallId)}`
         : `phone=${encodeURIComponent(currentPhone)}`;
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/call-summary?${query}`,
         { headers: { Accept: "application/json" } }
       );
@@ -2881,7 +2937,7 @@ async function loadClient(phone) {
   setState("loading");
 
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `/api/client-card?phone=${encodeURIComponent(cleaned)}`,
       { headers: { Accept: "application/json" } }
     );
@@ -3068,7 +3124,7 @@ async function loadMonitorAnalytics(query = "") {
   const period = elements.monitorAnalyticsPeriod
     ? elements.monitorAnalyticsPeriod.value
     : "30";
-  const response = await fetch(
+  const response = await apiFetch(
     `/api/binotel-monitor/analytics?period=${encodeURIComponent(period)}&q=${encodeURIComponent(query)}`,
     { headers: { Accept: "application/json" } }
   );
@@ -4350,7 +4406,7 @@ async function loadCallDetail(callIdValue, showLoading = true, preservePlayback 
   }
 
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `/api/binotel-monitor/call?callId=${encodeURIComponent(id)}`,
       { headers: { Accept: "application/json" } }
     );
@@ -4399,7 +4455,7 @@ async function reanalyzeCurrentCall() {
   clearTimeout(detailPollTimer);
 
   try {
-    const response = await fetch("/api/binotel-monitor/call/reanalyze", {
+    const response = await apiFetch("/api/binotel-monitor/call/reanalyze", {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -4455,8 +4511,8 @@ async function loadMonitor(showLoading = true, preservePlayback = false) {
     monitorPageSize = limit;
     const offset = Math.max(0, (Math.max(1, monitorPage) - 1) * limit);
     const [statusResponse, callsResponse] = await Promise.all([
-      fetch("/api/binotel-monitor/status", { headers: { Accept: "application/json" } }),
-      fetch(
+      apiFetch("/api/binotel-monitor/status", { headers: { Accept: "application/json" } }),
+      apiFetch(
         `/api/binotel-monitor/calls?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}&q=${encodeURIComponent(query)}`,
         { headers: { Accept: "application/json" } }
       )
@@ -4695,6 +4751,18 @@ elements.themeToggle.addEventListener("click", () => {
   setTheme(currentTheme() === "dark" ? "light" : "dark");
 });
 
+elements.logoutButton?.addEventListener("click", async () => {
+  elements.logoutButton.disabled = true;
+  try {
+    await apiFetch("/api/auth/logout", {
+      method: "POST",
+      headers: { Accept: "application/json" }
+    });
+  } finally {
+    window.location.href = "/login";
+  }
+});
+
 elements.ticketsModalClose.addEventListener("click", closeTicketsModal);
 
 elements.ticketsModal.addEventListener("click", (event) => {
@@ -4722,7 +4790,7 @@ elements.noteForm.addEventListener("submit", async (event) => {
   elements.noteMessage.textContent = "Зберігаємо…";
 
   try {
-    const response = await fetch("/api/client-notes", {
+    const response = await apiFetch("/api/client-notes", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -4751,16 +4819,27 @@ const initialPhone = new URLSearchParams(window.location.search).get("phone");
 const callDetailMatch = window.location.pathname.match(/^\/calls\/([^/]+)$/);
 document.body.dataset.theme = document.documentElement.dataset.theme || "light";
 updateThemeControl();
-if (callDetailMatch) {
-  loadCallDetail(decodeURIComponent(callDetailMatch[1]));
-} else if (window.location.pathname === "/calls-monitor") {
-  loadMonitor();
-} else if (window.location.pathname === "/call-analytics") {
-  loadAnalyticsPage();
-} else if (window.location.pathname === "/ai-settings") {
-  loadAiSettingsPage();
-} else if (initialPhone) {
-  loadClient(initialPhone);
-} else {
-  setState("empty");
+
+async function boot() {
+  try {
+    await loadAuthSession();
+  } catch {
+    return;
+  }
+
+  if (callDetailMatch) {
+    loadCallDetail(decodeURIComponent(callDetailMatch[1]));
+  } else if (window.location.pathname === "/calls-monitor") {
+    loadMonitor();
+  } else if (window.location.pathname === "/call-analytics") {
+    loadAnalyticsPage();
+  } else if (window.location.pathname === "/ai-settings") {
+    loadAiSettingsPage();
+  } else if (initialPhone) {
+    loadClient(initialPhone);
+  } else {
+    setState("empty");
+  }
 }
+
+boot();
