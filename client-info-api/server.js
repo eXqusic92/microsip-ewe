@@ -227,6 +227,18 @@ async function requirePageAuth(req, res, requestUrl) {
   return auth;
 }
 
+async function requirePageAdmin(req, res, requestUrl) {
+  const auth = await requirePageAuth(req, res, requestUrl);
+  if (!auth) {
+    return null;
+  }
+  if ((auth.user && auth.user.role) !== "admin") {
+    redirect(res, "/client-card");
+    return null;
+  }
+  return auth;
+}
+
 async function handleRequest(req, res) {
   const requestUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
@@ -322,6 +334,14 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/admin") {
+    if (!(await requirePageAdmin(req, res, requestUrl))) {
+      return;
+    }
+    sendFile(res, "index.html");
+    return;
+  }
+
   if (req.method === "GET" && /^\/calls\/[^/]+$/.test(requestUrl.pathname)) {
     if (!(await requirePageAuth(req, res, requestUrl))) {
       return;
@@ -345,6 +365,26 @@ async function handleRequest(req, res) {
 
   if (req.method === "POST" && requestUrl.pathname === "/api/auth/logout") {
     await authService.handleLogout(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/api/auth/change-password") {
+    await authService.handleChangePassword(req, res, readJsonBody);
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/admin/users") {
+    await authService.handleAdminUsers(req, res, readJsonBody);
+    return;
+  }
+
+  if (/^\/api\/admin\/users\/[^/]+$/.test(requestUrl.pathname)) {
+    await authService.handleAdminUser(
+      req,
+      res,
+      readJsonBody,
+      decodeURIComponent(requestUrl.pathname.split("/").pop() || "")
+    );
     return;
   }
 

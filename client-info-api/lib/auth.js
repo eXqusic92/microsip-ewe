@@ -39,6 +39,13 @@ function safeUser(user) {
   };
 }
 
+function requestError(message, error = "invalid_request", statusCode = 400) {
+  const problem = new Error(message);
+  problem.publicError = error;
+  problem.statusCode = statusCode;
+  return problem;
+}
+
 function parseSeedAdmins(value) {
   return String(value || "")
     .split(",")
@@ -229,6 +236,183 @@ class AuthService {
     return mapUser(result.rows[0]);
   }
 
+  async listUsers() {
+    const result = await this.pool.query(
+      `
+        SELECT id, username, name, role, created_at, updated_at
+        FROM users
+        ORDER BY created_at ASC, username ASC
+      `
+    );
+    return result.rows.map(mapUser);
+  }
+
+  validateUserPayload(payload = {}, { requirePassword = false } = {}) {
+    const username = normalizeUsername(payload.username);
+    if (!isValidUsername(username)) {
+      throw requestError(
+        "Логін має бути 3-32 символи: латиниця, цифри, крапка, дефіс або підкреслення.",
+        "invalid_username"
+      );
+    }
+
+    const role = text(payload.role || "user").toLowerCase();
+    if (!["admin", "user"].includes(role)) {
+      throw requestError("Некоректна роль користувача.", "invalid_role");
+    }
+
+    const password = String(payload.password || "");
+    if (requirePassword || password) {
+      this.validatePassword(password);
+    }
+
+    return {
+      username,
+      name: text(payload.name, username) || username,
+      role,
+      password
+    };
+  }
+
+  validatePassword(password) {
+    if (String(password || "").length < this.minPasswordLength) {
+      throw requestError(
+        `Пароль має бути не коротшим за ${this.minPasswordLength} символів.`,
+        "password_too_short"
+      );
+    }
+  }
+
+  async adminCount(client = this.pool) {
+    const result = await client.query(
+      "SELECT count(*)::int AS count FROM users WHERE role = 'admin'"
+    );
+    return Number(result.rows[0] && result.rows[0].count) || 0;
+  }
+
+  async createManagedUser(payload) {
+    const user = this.validateUserPayload(payload, { requirePassword: true });
+    const current = nowIso();
+    const passwordHash = hashPassword(user.password, this.pbkdf2Iterations);
+
+    try {
+      const result = await this.pool.query(
+        `
+          INSERT INTO users (
+            id, username, name, role, password_hash, permissions, created_at, updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, '[]'::jsonb, $6, $6)
+          RETURNING *
+        `,
+        [
+          crypto.randomUUID(),
+          user.username,
+          user.name,
+          user.role,
+          passwordHash,
+          current
+        ]
+      );
+      return mapUser(result.rows[0]);
+    } catch (error) {
+      if (error && error.code === "23505") {
+        throw requestError("Користувач з таким логіном вже існує.", "username_taken", 409);
+      }
+      throw error;
+    }
+  }
+
+  async updateManagedUser(userId, payload) {
+    const user = this.validateUserPayload(payload, { requirePassword: false });
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const existingResult = await client.query(
+        "SELECT * FROM users WHERE id = $1 FOR UPDATE",
+        [text(userId)]
+      );
+      const existing = mapUser(existingResult.rows[0]);
+      if (!existing) {
+        throw requestError("Користувача не знайдено.", "user_not_found", 404);
+      }
+
+      if (
+        existing.role === "admin" &&
+        user.role !== "admin" &&
+        (await this.adminCount(client)) <= 1
+      ) {
+        throw requestError(
+          "Не можна прибрати роль адміністратора в останнього адміністратора.",
+          "last_admin_required",
+          409
+        );
+      }
+
+      const passwordHash = user.password
+        ? hashPassword(user.password, this.pbkdf2Iterations)
+        : existing.password;
+      const result = await client.query(
+        `
+          UPDATE users
+          SET username = $2,
+              name = $3,
+              role = $4,
+              password_hash = $5,
+              updated_at = now()
+          WHERE id = $1
+          RETURNING *
+        `,
+        [existing.id, user.username, user.name, user.role, passwordHash]
+      );
+      await client.query("COMMIT");
+      return mapUser(result.rows[0]);
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      if (error && error.code === "23505") {
+        throw requestError("Користувач з таким логіном вже існує.", "username_taken", 409);
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteManagedUser(userId, actorUserId) {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const existingResult = await client.query(
+        "SELECT * FROM users WHERE id = $1 FOR UPDATE",
+        [text(userId)]
+      );
+      const existing = mapUser(existingResult.rows[0]);
+      if (!existing) {
+        throw requestError("Користувача не знайдено.", "user_not_found", 404);
+      }
+      if (existing.id === text(actorUserId)) {
+        throw requestError("Не можна видалити власний обліковий запис.", "cannot_delete_self", 409);
+      }
+      if (existing.role === "admin" && (await this.adminCount(client)) <= 1) {
+        throw requestError(
+          "Не можна видалити останнього адміністратора.",
+          "last_admin_required",
+          409
+        );
+      }
+
+      await client.query("DELETE FROM users WHERE id = $1", [existing.id]);
+      await client.query("COMMIT");
+      return existing;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async readUserByUsername(username) {
     const result = await this.pool.query(
       `
@@ -389,6 +573,20 @@ class AuthService {
     ]);
   }
 
+  async deleteSessionsForUser(userId, { exceptSessionId = "" } = {}) {
+    if (exceptSessionId) {
+      await this.pool.query(
+        "DELETE FROM user_sessions WHERE user_id = $1 AND id <> $2",
+        [text(userId), text(exceptSessionId)]
+      );
+      return;
+    }
+
+    await this.pool.query("DELETE FROM user_sessions WHERE user_id = $1", [
+      text(userId)
+    ]);
+  }
+
   async cleanupExpiredSessions() {
     await this.pool.query("DELETE FROM user_sessions WHERE expires_at <= now()");
   }
@@ -451,6 +649,42 @@ class AuthService {
     return auth;
   }
 
+  async requireAdmin(request, response) {
+    const auth = await this.requireAuth(request, response);
+    if (!auth) {
+      return null;
+    }
+
+    if ((auth.user && auth.user.role) !== "admin") {
+      this.sendJson(response, 403, {
+        ok: false,
+        error: "admin_required"
+      });
+      return null;
+    }
+
+    return auth;
+  }
+
+  sendHandlerError(response, error, fallback = "request_failed") {
+    const parseError = ["invalid_json", "request_body_too_large"].includes(
+      error && error.message
+    );
+    const statusCode = parseError ? 400 : Number(error && error.statusCode) || 500;
+    this.sendJson(response, statusCode, {
+      ok: false,
+      error: parseError ? error.message : (error && error.publicError) || fallback,
+      message:
+        parseError
+          ? "Некоректний запит."
+          : statusCode >= 500
+            ? "Не вдалося виконати запит."
+            : error && error.message
+              ? error.message
+              : fallback
+    });
+  }
+
   async handleLogin(request, response, readJsonBody) {
     if (request.method !== "POST") {
       response.writeHead(405, { Allow: "POST" });
@@ -501,6 +735,131 @@ class AuthService {
       user: safeUser(auth.user),
       csrfToken: auth.session.csrfToken
     });
+  }
+
+  async handleChangePassword(request, response, readJsonBody) {
+    if (request.method !== "POST") {
+      response.writeHead(405, { Allow: "POST" });
+      response.end("Method not allowed");
+      return;
+    }
+
+    const auth = await this.requireAuth(request, response);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      const payload = await readJsonBody(request, 32 * 1024);
+      const currentPassword = String(payload.currentPassword || "");
+      const newPassword = String(payload.newPassword || "");
+      this.validatePassword(newPassword);
+
+      const user = await this.readUserById(auth.user.id);
+      if (!user || !verifyPassword(currentPassword, user.password)) {
+        throw requestError("Поточний пароль вказано неправильно.", "invalid_current_password");
+      }
+
+      const passwordHash = hashPassword(newPassword, this.pbkdf2Iterations);
+      const result = await this.pool.query(
+        `
+          UPDATE users
+          SET password_hash = $2,
+              updated_at = now()
+          WHERE id = $1
+          RETURNING *
+        `,
+        [auth.user.id, passwordHash]
+      );
+      await this.deleteSessionsForUser(auth.user.id, {
+        exceptSessionId: auth.sessionId
+      });
+      this.sendJson(response, 200, {
+        ok: true,
+        user: safeUser(mapUser(result.rows[0]))
+      });
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : Number(error.statusCode) || 500;
+      if (statusCode === 400 && !error.publicError) {
+        this.sendJson(response, statusCode, {
+          ok: false,
+          error: error.message,
+          message: "Некоректний запит."
+        });
+        return;
+      }
+      this.sendHandlerError(response, error, "change_password_failed");
+    }
+  }
+
+  async handleAdminUsers(request, response, readJsonBody) {
+    const auth = await this.requireAdmin(request, response);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      if (request.method === "GET") {
+        const users = await this.listUsers();
+        this.sendJson(response, 200, {
+          ok: true,
+          users: users.map(safeUser)
+        });
+        return;
+      }
+
+      if (request.method === "POST") {
+        const payload = await readJsonBody(request, 32 * 1024);
+        const user = await this.createManagedUser(payload);
+        this.sendJson(response, 201, {
+          ok: true,
+          user: safeUser(user)
+        });
+        return;
+      }
+
+      response.writeHead(405, { Allow: "GET, POST" });
+      response.end("Method not allowed");
+    } catch (error) {
+      this.sendHandlerError(response, error, "users_request_failed");
+    }
+  }
+
+  async handleAdminUser(request, response, readJsonBody, userId) {
+    const auth = await this.requireAdmin(request, response);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      if (request.method === "PUT") {
+        const payload = await readJsonBody(request, 32 * 1024);
+        const user = await this.updateManagedUser(userId, payload);
+        this.sendJson(response, 200, {
+          ok: true,
+          user: safeUser(user)
+        });
+        return;
+      }
+
+      if (request.method === "DELETE") {
+        const user = await this.deleteManagedUser(userId, auth.user.id);
+        this.sendJson(response, 200, {
+          ok: true,
+          user: safeUser(user)
+        });
+        return;
+      }
+
+      response.writeHead(405, { Allow: "PUT, DELETE" });
+      response.end("Method not allowed");
+    } catch (error) {
+      this.sendHandlerError(response, error, "user_request_failed");
+    }
   }
 }
 

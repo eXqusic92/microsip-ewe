@@ -133,7 +133,7 @@ a {
 .app-header {
   position: relative;
   z-index: 10;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -436,6 +436,181 @@ select:disabled {
   white-space: nowrap;
 }
 
+.profile-menu {
+  position: relative;
+  z-index: 20;
+  flex: 0 0 auto;
+}
+
+.profile-menu-trigger {
+  position: relative;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--ink);
+  padding: 0;
+  box-shadow: 0 6px 16px rgba(31, 48, 58, 0.08);
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.profile-menu-trigger:hover,
+.profile-menu.is-open .profile-menu-trigger {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(227, 6, 19, 0.14);
+}
+
+.profile-menu-trigger svg,
+.profile-menu-item svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.profile-menu-trigger svg {
+  width: 21px;
+  height: 21px;
+}
+
+.profile-menu-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 150;
+  display: grid;
+  width: 270px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 8px;
+  box-shadow: 0 18px 48px rgba(31, 48, 58, 0.2);
+  transform-origin: top right;
+  animation: profile-menu-in 0.16s ease-out;
+}
+
+.profile-menu-popover[hidden] {
+  display: none;
+}
+
+@keyframes profile-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.profile-menu-summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.profile-menu-avatar {
+  display: grid;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-soft));
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.profile-menu-identity {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.profile-menu-identity strong,
+.profile-menu-identity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-menu-identity strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.profile-menu-identity small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.profile-menu-divider {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--line);
+}
+
+.profile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  text-align: left;
+  text-decoration: none;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
+}
+
+.profile-menu-item:hover,
+.profile-menu-item:focus-visible {
+  background: var(--panel-soft);
+  color: var(--accent);
+  outline: 0;
+}
+
+.profile-menu-item.is-danger {
+  color: var(--danger);
+}
+
+.profile-menu-item.is-danger:hover,
+.profile-menu-item.is-danger:focus-visible {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.profile-menu-item svg {
+  flex: 0 0 19px;
+  width: 19px;
+  height: 19px;
+}
+
 .detail-reanalyze-button {
   white-space: nowrap;
 }
@@ -724,6 +899,307 @@ body[data-theme="dark"] .login-form input:focus {
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+.admin-page {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-hero,
+.admin-panel {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.admin-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 24px;
+}
+
+.admin-hero h1,
+.admin-hero p {
+  margin: 0;
+}
+
+.admin-hero h1 {
+  font-family:
+    "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
+  font-size: 30px;
+}
+
+.admin-hero p:not(.section-label) {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.admin-add-user {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.admin-tabs {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  padding: 4px;
+}
+
+.admin-tabs button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-tabs button.active {
+  background: var(--brand);
+  color: #ffffff;
+}
+
+.admin-panel {
+  display: grid;
+  gap: 16px;
+  padding: 22px 24px 24px;
+}
+
+.admin-users-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-user-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 1fr) 120px auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-soft);
+  padding: 14px 16px;
+}
+
+.admin-user-main,
+.admin-user-meta {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.admin-user-main strong,
+.admin-user-meta strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-main span,
+.admin-user-meta span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-role-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  color: var(--accent);
+  padding: 0 11px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.admin-role-pill.is-admin {
+  border-color: color-mix(in srgb, var(--brand) 32%, var(--line));
+  background: color-mix(in srgb, var(--brand) 10%, var(--panel));
+  color: var(--brand);
+}
+
+.admin-user-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.admin-icon-button:hover,
+.admin-icon-button:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: 0;
+}
+
+.admin-icon-button.is-danger {
+  color: var(--danger);
+}
+
+.admin-icon-button.is-danger:hover,
+.admin-icon-button.is-danger:focus-visible {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--panel));
+}
+
+.admin-empty {
+  margin: 0;
+  border: 1px dashed var(--line-strong);
+  border-radius: 9px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  padding: 18px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.account-dialog {
+  width: min(560px, calc(100% - 28px));
+  max-height: min(88vh, 720px);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+}
+
+.account-dialog::backdrop {
+  background: rgba(6, 12, 16, 0.72);
+  backdrop-filter: blur(5px);
+}
+
+.account-dialog form {
+  display: grid;
+  max-height: min(88vh, 720px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.35);
+}
+
+.account-dialog-head,
+.account-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.account-dialog-head {
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent 50%),
+    var(--panel);
+}
+
+.account-dialog-head h2,
+.account-dialog-head p {
+  margin: 0;
+}
+
+.account-dialog-head h2 {
+  font-family:
+    "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
+  font-size: 22px;
+}
+
+.account-dialog-body {
+  display: grid;
+  gap: 14px;
+  overflow: auto;
+  padding: 20px;
+}
+
+.account-dialog-body label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.account-dialog-body label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.account-dialog-body input,
+.account-dialog-body select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.account-dialog-body input:focus,
+.account-dialog-body select:focus {
+  border-color: var(--accent);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.12);
+}
+
+.account-dialog-footer {
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.account-dialog-footer .primary-button,
+.account-dialog-footer .secondary-button {
+  flex: 1;
+}
+
+.account-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.user-dialog {
+  width: min(720px, calc(100% - 28px));
 }
 
 .client-card {
@@ -4732,6 +5208,15 @@ body[data-theme="dark"] .detail-panel {
     flex: 1;
   }
 
+  .admin-user-card {
+    grid-template-columns: minmax(180px, 1fr) minmax(160px, 1fr) auto;
+  }
+
+  .admin-user-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
   .ai-settings-layout {
     grid-template-columns: minmax(240px, 0.75fr) minmax(0, 1.25fr);
   }
@@ -4935,6 +5420,11 @@ body[data-theme="dark"] .detail-panel {
     flex: 1 1 100%;
   }
 
+  .profile-menu-popover {
+    right: 0;
+    width: min(270px, calc(100vw - 24px));
+  }
+
   .auth-user {
     width: 100%;
     justify-content: space-between;
@@ -4946,6 +5436,36 @@ body[data-theme="dark"] .detail-panel {
 
   .phone-search button {
     padding: 0 12px;
+  }
+
+  .admin-hero,
+  .admin-panel {
+    padding: 18px;
+  }
+
+  .admin-hero,
+  .account-dialog-head,
+  .account-dialog-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-add-user,
+  .account-dialog-footer .primary-button,
+  .account-dialog-footer .secondary-button {
+    width: 100%;
+  }
+
+  .admin-user-card {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-actions {
+    flex-wrap: wrap;
+  }
+
+  .account-form-grid {
+    grid-template-columns: 1fr;
   }
 
   .monitor-status-grid {

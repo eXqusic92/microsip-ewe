@@ -62,9 +62,58 @@
           <span id="theme-toggle-label">Темна тема</span>
         </button>
 
-        <div class="auth-user" aria-label="Поточний користувач">
-          <span class="auth-user-name" id="auth-user-name">Користувач</span>
-          <button class="secondary-action logout-button" id="logout-button" type="button">Вийти</button>
+        <div class="profile-menu" id="profile-menu">
+          <button
+            class="profile-menu-trigger"
+            id="profile-menu-trigger"
+            type="button"
+            aria-label="Відкрити меню профілю"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 21a8 8 0 0 0-16 0"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </button>
+          <div class="profile-menu-popover" id="profile-menu-popover" role="menu" hidden>
+            <div class="profile-menu-summary">
+              <span class="profile-menu-avatar" id="profile-menu-initial" aria-hidden="true">К</span>
+              <span class="profile-menu-identity">
+                <strong id="profile-menu-name">Користувач</strong>
+                <small id="profile-menu-role">Користувач</small>
+              </span>
+            </div>
+            <div class="profile-menu-divider" data-profile-admin-only hidden></div>
+            <a class="profile-menu-item" href="/admin" role="menuitem" data-profile-admin-only hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 21h18"></path>
+                <path d="M5 21V7l8-4v18"></path>
+                <path d="M19 21V11l-6-4"></path>
+                <path d="M9 9v.01"></path>
+                <path d="M9 13v.01"></path>
+                <path d="M9 17v.01"></path>
+              </svg>
+              <span>Адмінка</span>
+            </a>
+            <div class="profile-menu-divider"></div>
+            <button class="profile-menu-item" id="change-password-button" type="button" role="menuitem">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="7.5" cy="15.5" r="3.5"></circle>
+                <path d="m10 13 8.5-8.5 2 2L19 8l1.5 1.5-2 2L17 10l-5 5"></path>
+              </svg>
+              <span>Змінити пароль</span>
+            </button>
+            <div class="profile-menu-divider"></div>
+            <button class="profile-menu-item is-danger" id="logout-button" type="button" role="menuitem">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 17l5-5-5-5"></path>
+                <path d="M15 12H3"></path>
+                <path d="M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"></path>
+              </svg>
+              <span>Вийти</span>
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -507,6 +556,35 @@
         </dialog>
       </section>
 
+      <section class="admin-page hidden" id="admin-page" aria-live="polite">
+        <div class="admin-hero">
+          <div>
+            <p class="section-label">Адмінка</p>
+            <h1>Користувачі</h1>
+            <p>Облікові записи для доступу до Client Info API.</p>
+          </div>
+          <button class="primary-button admin-add-user" id="admin-add-user" type="button">
+            Додати користувача
+          </button>
+        </div>
+
+        <div class="admin-tabs" aria-label="Розділи адмінки">
+          <button class="active" type="button">Користувачі</button>
+        </div>
+
+        <section class="admin-panel">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Доступ</p>
+              <h2>Список користувачів</h2>
+            </div>
+            <span class="muted" id="admin-user-count">—</span>
+          </div>
+          <p class="form-message" id="admin-users-message" aria-live="polite"></p>
+          <div class="admin-users-list" id="admin-users-list"></div>
+        </section>
+      </section>
+
       <section class="call-detail-page hidden" id="call-detail-page" aria-live="polite">
         <a class="detail-back-link" href="/calls-monitor">
           <span aria-hidden="true">←</span>
@@ -624,6 +702,82 @@
         </section>
       </section>
     </main>
+
+    <dialog class="account-dialog" id="change-password-modal" aria-labelledby="change-password-title">
+      <form id="change-password-form" method="dialog">
+        <header class="account-dialog-head">
+          <div>
+            <p class="section-label">Профіль</p>
+            <h2 id="change-password-title">Змінити пароль</h2>
+          </div>
+          <button class="modal-close" id="change-password-close" type="button" aria-label="Закрити">
+            ×
+          </button>
+        </header>
+        <div class="account-dialog-body">
+          <label>
+            <span>Поточний пароль</span>
+            <input id="change-password-current" type="password" autocomplete="current-password" required>
+          </label>
+          <label>
+            <span>Новий пароль</span>
+            <input id="change-password-new" type="password" autocomplete="new-password" required>
+          </label>
+          <label>
+            <span>Повторіть новий пароль</span>
+            <input id="change-password-confirm" type="password" autocomplete="new-password" required>
+          </label>
+          <p class="form-message" id="change-password-message" aria-live="polite"></p>
+        </div>
+        <footer class="account-dialog-footer">
+          <button class="secondary-button" id="change-password-cancel" type="button">Скасувати</button>
+          <button class="primary-button" id="change-password-submit" type="submit">Оновити пароль</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="account-dialog user-dialog" id="admin-user-modal" aria-labelledby="admin-user-modal-title">
+      <form id="admin-user-form" method="dialog">
+        <header class="account-dialog-head">
+          <div>
+            <p class="section-label">Користувач</p>
+            <h2 id="admin-user-modal-title">Додати користувача</h2>
+          </div>
+          <button class="modal-close" id="admin-user-close" type="button" aria-label="Закрити">
+            ×
+          </button>
+        </header>
+        <div class="account-dialog-body">
+          <input id="admin-user-id" type="hidden">
+          <div class="account-form-grid">
+            <label>
+              <span>Логін</span>
+              <input id="admin-user-username" type="text" autocomplete="username" required>
+            </label>
+            <label>
+              <span>Ім’я</span>
+              <input id="admin-user-name" type="text" autocomplete="name">
+            </label>
+            <label>
+              <span>Роль</span>
+              <select id="admin-user-role">
+                <option value="user">Користувач</option>
+                <option value="admin">Адміністратор</option>
+              </select>
+            </label>
+            <label>
+              <span id="admin-user-password-label">Пароль</span>
+              <input id="admin-user-password" type="password" autocomplete="new-password">
+            </label>
+          </div>
+          <p class="form-message" id="admin-user-message" aria-live="polite"></p>
+        </div>
+        <footer class="account-dialog-footer">
+          <button class="secondary-button" id="admin-user-cancel" type="button">Скасувати</button>
+          <button class="primary-button" id="admin-user-submit" type="submit">Зберегти</button>
+        </footer>
+      </form>
+    </dialog>
 
     <dialog class="tickets-modal" id="tickets-modal" aria-labelledby="tickets-modal-title">
       <div class="tickets-modal-panel">

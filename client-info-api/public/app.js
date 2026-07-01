@@ -80,8 +80,24 @@ const elements = {
   phoneInput: document.querySelector("#phone-input"),
   themeToggle: document.querySelector("#theme-toggle"),
   themeToggleLabel: document.querySelector("#theme-toggle-label"),
-  authUserName: document.querySelector("#auth-user-name"),
+  profileMenu: document.querySelector("#profile-menu"),
+  profileMenuTrigger: document.querySelector("#profile-menu-trigger"),
+  profileMenuPopover: document.querySelector("#profile-menu-popover"),
+  profileMenuInitial: document.querySelector("#profile-menu-initial"),
+  profileMenuName: document.querySelector("#profile-menu-name"),
+  profileMenuRole: document.querySelector("#profile-menu-role"),
+  profileAdminOnly: document.querySelectorAll("[data-profile-admin-only]"),
+  changePasswordButton: document.querySelector("#change-password-button"),
   logoutButton: document.querySelector("#logout-button"),
+  changePasswordModal: document.querySelector("#change-password-modal"),
+  changePasswordForm: document.querySelector("#change-password-form"),
+  changePasswordClose: document.querySelector("#change-password-close"),
+  changePasswordCancel: document.querySelector("#change-password-cancel"),
+  changePasswordSubmit: document.querySelector("#change-password-submit"),
+  changePasswordCurrent: document.querySelector("#change-password-current"),
+  changePasswordNew: document.querySelector("#change-password-new"),
+  changePasswordConfirm: document.querySelector("#change-password-confirm"),
+  changePasswordMessage: document.querySelector("#change-password-message"),
   pageTitle: document.querySelector("#page-title"),
   emptyState: document.querySelector("#empty-state"),
   loadingState: document.querySelector("#loading-state"),
@@ -89,6 +105,24 @@ const elements = {
   monitorPage: document.querySelector("#calls-monitor-page"),
   analyticsPage: document.querySelector("#analytics-page"),
   aiSettingsPage: document.querySelector("#ai-settings-page"),
+  adminPage: document.querySelector("#admin-page"),
+  adminAddUser: document.querySelector("#admin-add-user"),
+  adminUserCount: document.querySelector("#admin-user-count"),
+  adminUsersMessage: document.querySelector("#admin-users-message"),
+  adminUsersList: document.querySelector("#admin-users-list"),
+  adminUserModal: document.querySelector("#admin-user-modal"),
+  adminUserForm: document.querySelector("#admin-user-form"),
+  adminUserModalTitle: document.querySelector("#admin-user-modal-title"),
+  adminUserClose: document.querySelector("#admin-user-close"),
+  adminUserCancel: document.querySelector("#admin-user-cancel"),
+  adminUserSubmit: document.querySelector("#admin-user-submit"),
+  adminUserId: document.querySelector("#admin-user-id"),
+  adminUserUsername: document.querySelector("#admin-user-username"),
+  adminUserName: document.querySelector("#admin-user-name"),
+  adminUserRole: document.querySelector("#admin-user-role"),
+  adminUserPassword: document.querySelector("#admin-user-password"),
+  adminUserPasswordLabel: document.querySelector("#admin-user-password-label"),
+  adminUserMessage: document.querySelector("#admin-user-message"),
   callDetailPage: document.querySelector("#call-detail-page"),
   monitorStatus: document.querySelector("#monitor-status"),
   monitorUpdated: document.querySelector("#monitor-updated"),
@@ -307,6 +341,11 @@ const authState = {
   csrfToken: "",
   user: null
 };
+const adminState = {
+  users: [],
+  loading: false,
+  editingUserId: ""
+};
 
 function loginUrl() {
   const next = `${window.location.pathname}${window.location.search || ""}`;
@@ -315,6 +354,32 @@ function loginUrl() {
 
 function isUnsafeMethod(method) {
   return !["GET", "HEAD", "OPTIONS"].includes(String(method || "GET").toUpperCase());
+}
+
+function isAdminUser(user = authState.user) {
+  return Boolean(user && user.role === "admin");
+}
+
+function userRoleLabel(role) {
+  return role === "admin" ? "Адміністратор" : "Користувач";
+}
+
+function userInitial(user = authState.user) {
+  const source = String((user && (user.name || user.username)) || "Користувач").trim();
+  return (source[0] || "К").toUpperCase();
+}
+
+function formatUsersCount(count) {
+  const value = Number(count) || 0;
+  const mod10 = value % 10;
+  const mod100 = value % 100;
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${value} користувач`;
+  }
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${value} користувачі`;
+  }
+  return `${value} користувачів`;
 }
 
 async function apiFetch(input, options = {}) {
@@ -338,13 +403,31 @@ async function apiFetch(input, options = {}) {
   return response;
 }
 
-function renderAuthUser() {
-  if (!elements.authUserName) {
+async function readJsonResponse(response, fallbackMessage) {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.message || payload.error || fallbackMessage);
+  }
+  return payload;
+}
+
+function renderProfileMenu() {
+  if (!elements.profileMenuName) {
     return;
   }
   const user = authState.user || {};
-  elements.authUserName.textContent = user.name || user.username || "Користувач";
-  elements.authUserName.title = user.username || "";
+  const displayName = user.name || user.username || "Користувач";
+  elements.profileMenuName.textContent = displayName;
+  elements.profileMenuName.title = user.username || displayName;
+  if (elements.profileMenuInitial) {
+    elements.profileMenuInitial.textContent = userInitial(user);
+  }
+  if (elements.profileMenuRole) {
+    elements.profileMenuRole.textContent = userRoleLabel(user.role);
+  }
+  for (const node of elements.profileAdminOnly || []) {
+    node.hidden = !isAdminUser(user);
+  }
 }
 
 async function loadAuthSession() {
@@ -355,7 +438,7 @@ async function loadAuthSession() {
   }
   authState.csrfToken = payload.csrfToken || "";
   authState.user = payload.user || null;
-  renderAuthUser();
+  renderProfileMenu();
 }
 
 function currentTheme() {
@@ -1624,6 +1707,258 @@ function closeAiTypeModal() {
   closeAiDialog(elements.aiTypeModal);
 }
 
+function setProfileMenuOpen(open) {
+  if (!elements.profileMenu || !elements.profileMenuPopover || !elements.profileMenuTrigger) {
+    return;
+  }
+  elements.profileMenu.classList.toggle("is-open", open);
+  elements.profileMenuPopover.hidden = !open;
+  elements.profileMenuTrigger.setAttribute("aria-expanded", String(open));
+}
+
+function toggleProfileMenu() {
+  setProfileMenuOpen(!(elements.profileMenu && elements.profileMenu.classList.contains("is-open")));
+}
+
+function setMessage(element, message = "", tone = "") {
+  if (!element) {
+    return;
+  }
+  element.textContent = message;
+  if (tone) {
+    element.dataset.tone = tone;
+  } else {
+    delete element.dataset.tone;
+  }
+}
+
+function openChangePasswordModal() {
+  setProfileMenuOpen(false);
+  elements.changePasswordForm?.reset();
+  setMessage(elements.changePasswordMessage, "");
+  showAiDialog(elements.changePasswordModal);
+  elements.changePasswordCurrent?.focus();
+}
+
+function closeChangePasswordModal() {
+  closeAiDialog(elements.changePasswordModal);
+}
+
+async function handleChangePasswordSubmit(event) {
+  event.preventDefault();
+  const currentPassword = elements.changePasswordCurrent?.value || "";
+  const newPassword = elements.changePasswordNew?.value || "";
+  const confirmPassword = elements.changePasswordConfirm?.value || "";
+
+  if (newPassword !== confirmPassword) {
+    setMessage(elements.changePasswordMessage, "Новий пароль і повтор не збігаються.");
+    elements.changePasswordConfirm?.focus();
+    return;
+  }
+
+  elements.changePasswordSubmit.disabled = true;
+  setMessage(elements.changePasswordMessage, "Оновлюємо пароль...", "neutral");
+
+  try {
+    const response = await apiFetch("/api/auth/change-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        currentPassword,
+        newPassword
+      })
+    });
+    await readJsonResponse(response, "Не вдалося змінити пароль.");
+    elements.changePasswordForm?.reset();
+    setMessage(elements.changePasswordMessage, "Пароль оновлено.", "success");
+  } catch (error) {
+    setMessage(elements.changePasswordMessage, error.message || "Не вдалося змінити пароль.");
+  } finally {
+    elements.changePasswordSubmit.disabled = false;
+  }
+}
+
+function adminUserById(id) {
+  return adminState.users.find((user) => user.id === id) || null;
+}
+
+function renderAdminUsers() {
+  if (!elements.adminUsersList) {
+    return;
+  }
+
+  const users = adminState.users;
+  elements.adminUserCount.textContent = adminState.loading
+    ? "Завантаження..."
+    : formatUsersCount(users.length);
+  elements.adminUsersList.replaceChildren();
+
+  if (adminState.loading) {
+    const message = document.createElement("p");
+    message.className = "admin-empty";
+    message.textContent = "Завантажуємо користувачів...";
+    elements.adminUsersList.append(message);
+    return;
+  }
+
+  if (!users.length) {
+    const message = document.createElement("p");
+    message.className = "admin-empty";
+    message.textContent = "Користувачів ще немає.";
+    elements.adminUsersList.append(message);
+    return;
+  }
+
+  for (const user of users) {
+    const isSelf = authState.user && authState.user.id === user.id;
+    const row = document.createElement("article");
+    row.className = "admin-user-card";
+    row.dataset.userId = user.id;
+    row.innerHTML = `
+      <div class="admin-user-main">
+        <strong>${escapeHtml(user.name || user.username)}</strong>
+        <span>${escapeHtml(user.username || "")}${isSelf ? " · ви" : ""}</span>
+      </div>
+      <div class="admin-user-meta">
+        <strong>${escapeHtml(formatDateTime(user.createdAt))}</strong>
+        <span>Створено</span>
+      </div>
+      <span class="admin-role-pill ${user.role === "admin" ? "is-admin" : ""}">
+        ${escapeHtml(userRoleLabel(user.role))}
+      </span>
+      <div class="admin-user-actions">
+        <button class="admin-icon-button" type="button" data-admin-action="edit-user" data-user-id="${escapeHtml(user.id)}">Редагувати</button>
+        <button class="admin-icon-button is-danger" type="button" data-admin-action="delete-user" data-user-id="${escapeHtml(user.id)}"${isSelf ? " disabled" : ""}>Видалити</button>
+      </div>
+    `;
+    elements.adminUsersList.append(row);
+  }
+}
+
+async function loadAdminUsers() {
+  if (!isAdminUser()) {
+    window.location.href = "/client-card";
+    return;
+  }
+
+  setState("admin");
+  adminState.loading = true;
+  setMessage(elements.adminUsersMessage, "", "neutral");
+  renderAdminUsers();
+
+  try {
+    const response = await apiFetch("/api/admin/users");
+    const payload = await readJsonResponse(response, "Не вдалося завантажити користувачів.");
+    adminState.users = Array.isArray(payload.users) ? payload.users : [];
+    setMessage(elements.adminUsersMessage, "", "neutral");
+  } catch (error) {
+    setMessage(elements.adminUsersMessage, error.message || "Не вдалося завантажити користувачів.");
+  } finally {
+    adminState.loading = false;
+    renderAdminUsers();
+  }
+}
+
+function openAdminUserModal(user = null) {
+  adminState.editingUserId = user ? user.id : "";
+  elements.adminUserForm?.reset();
+  setMessage(elements.adminUserMessage, "");
+  elements.adminUserId.value = user ? user.id : "";
+  elements.adminUserUsername.value = user ? user.username || "" : "";
+  elements.adminUserName.value = user ? user.name || "" : "";
+  elements.adminUserRole.value = user && user.role === "admin" ? "admin" : "user";
+  elements.adminUserPassword.value = "";
+  elements.adminUserPassword.required = !user;
+  elements.adminUserPasswordLabel.textContent = user ? "Новий пароль" : "Пароль";
+  elements.adminUserPassword.placeholder = user
+    ? "Залиште пустим, якщо пароль не змінюється"
+    : "";
+  elements.adminUserModalTitle.textContent = user ? "Редагувати користувача" : "Додати користувача";
+  elements.adminUserSubmit.textContent = user ? "Оновити" : "Створити";
+  showAiDialog(elements.adminUserModal);
+  elements.adminUserUsername?.focus();
+}
+
+function closeAdminUserModal() {
+  adminState.editingUserId = "";
+  closeAiDialog(elements.adminUserModal);
+}
+
+async function handleAdminUserSubmit(event) {
+  event.preventDefault();
+  const userId = elements.adminUserId.value.trim();
+  const password = elements.adminUserPassword.value;
+  const payload = {
+    username: elements.adminUserUsername.value,
+    name: elements.adminUserName.value,
+    role: elements.adminUserRole.value
+  };
+  if (!userId || password) {
+    payload.password = password;
+  }
+
+  elements.adminUserSubmit.disabled = true;
+  setMessage(elements.adminUserMessage, userId ? "Оновлюємо користувача..." : "Створюємо користувача...", "neutral");
+
+  try {
+    const response = await apiFetch(
+      userId ? `/api/admin/users/${encodeURIComponent(userId)}` : "/api/admin/users",
+      {
+        method: userId ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+    await readJsonResponse(response, "Не вдалося зберегти користувача.");
+    closeAdminUserModal();
+    await loadAdminUsers();
+  } catch (error) {
+    setMessage(elements.adminUserMessage, error.message || "Не вдалося зберегти користувача.");
+  } finally {
+    elements.adminUserSubmit.disabled = false;
+  }
+}
+
+async function deleteAdminUser(userId) {
+  const user = adminUserById(userId);
+  if (!user) {
+    return;
+  }
+
+  const confirmed = window.confirm(`Видалити користувача ${user.name || user.username}?`);
+  if (!confirmed) {
+    return;
+  }
+
+  setMessage(elements.adminUsersMessage, "Видаляємо користувача...", "neutral");
+  try {
+    const response = await apiFetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+      method: "DELETE"
+    });
+    await readJsonResponse(response, "Не вдалося видалити користувача.");
+    await loadAdminUsers();
+  } catch (error) {
+    setMessage(elements.adminUsersMessage, error.message || "Не вдалося видалити користувача.");
+  }
+}
+
+function handleAdminUsersClick(event) {
+  const button = event.target.closest("[data-admin-action]");
+  if (!button) {
+    return;
+  }
+  const userId = button.dataset.userId || "";
+  if (button.dataset.adminAction === "edit-user") {
+    openAdminUserModal(adminUserById(userId));
+  } else if (button.dataset.adminAction === "delete-user") {
+    void deleteAdminUser(userId);
+  }
+}
+
 function handleAiSettingsTabClick(event) {
   const tab = event.target.closest("[data-ai-tab]");
   if (!tab) {
@@ -2344,6 +2679,7 @@ function setState(state) {
   elements.monitorPage.classList.toggle("hidden", state !== "monitor");
   elements.analyticsPage.classList.toggle("hidden", state !== "analytics");
   elements.aiSettingsPage.classList.toggle("hidden", state !== "aiSettings");
+  elements.adminPage.classList.toggle("hidden", state !== "admin");
   elements.callDetailPage.classList.toggle("hidden", state !== "detail");
 
   const titles = {
@@ -2353,6 +2689,7 @@ function setState(state) {
     monitor: "Дзвінки",
     analytics: "AI-аналітика",
     aiSettings: "AI-налаштування",
+    admin: "Адмінка",
     detail: "Деталі дзвінка"
   };
   elements.pageTitle.textContent = titles[state] || "Картка клієнта";
@@ -2367,6 +2704,7 @@ function setState(state) {
       ((state === "monitor" || state === "detail") && view === "calls-monitor") ||
         (state === "analytics" && view === "call-analytics") ||
         (state === "aiSettings" && view === "ai-settings") ||
+        (state === "admin" && view === "admin") ||
         (["empty", "loading", "card"].includes(state) && view === "client-card")
     );
   }
@@ -4751,6 +5089,54 @@ elements.themeToggle.addEventListener("click", () => {
   setTheme(currentTheme() === "dark" ? "light" : "dark");
 });
 
+elements.profileMenuTrigger?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleProfileMenu();
+});
+
+elements.profileMenuPopover?.addEventListener("click", (event) => {
+  if (event.target.closest("a")) {
+    setProfileMenuOpen(false);
+    return;
+  }
+  event.stopPropagation();
+});
+
+document.addEventListener("click", (event) => {
+  if (elements.profileMenu && !elements.profileMenu.contains(event.target)) {
+    setProfileMenuOpen(false);
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    setProfileMenuOpen(false);
+    closeChangePasswordModal();
+    closeAdminUserModal();
+  }
+});
+
+elements.changePasswordButton?.addEventListener("click", openChangePasswordModal);
+elements.changePasswordForm?.addEventListener("submit", handleChangePasswordSubmit);
+elements.changePasswordClose?.addEventListener("click", closeChangePasswordModal);
+elements.changePasswordCancel?.addEventListener("click", closeChangePasswordModal);
+elements.changePasswordModal?.addEventListener("click", (event) => {
+  if (event.target === elements.changePasswordModal) {
+    closeChangePasswordModal();
+  }
+});
+
+elements.adminAddUser?.addEventListener("click", () => openAdminUserModal());
+elements.adminUsersList?.addEventListener("click", handleAdminUsersClick);
+elements.adminUserForm?.addEventListener("submit", handleAdminUserSubmit);
+elements.adminUserClose?.addEventListener("click", closeAdminUserModal);
+elements.adminUserCancel?.addEventListener("click", closeAdminUserModal);
+elements.adminUserModal?.addEventListener("click", (event) => {
+  if (event.target === elements.adminUserModal) {
+    closeAdminUserModal();
+  }
+});
+
 elements.logoutButton?.addEventListener("click", async () => {
   elements.logoutButton.disabled = true;
   try {
@@ -4835,6 +5221,8 @@ async function boot() {
     loadAnalyticsPage();
   } else if (window.location.pathname === "/ai-settings") {
     loadAiSettingsPage();
+  } else if (window.location.pathname === "/admin") {
+    loadAdminUsers();
   } else if (initialPhone) {
     loadClient(initialPhone);
   } else {
