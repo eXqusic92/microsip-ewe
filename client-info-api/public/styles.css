@@ -279,6 +279,7 @@ body[data-theme="dark"] .app-header::after {
   }
 
   .header-actions {
+    align-self: flex-end;
     flex-basis: 600px;
   }
 }
@@ -5233,6 +5234,7 @@ body[data-theme="dark"] .detail-panel {
   }
 
   .header-actions {
+    align-self: auto;
     justify-content: flex-start;
     width: 100%;
   }
