@@ -247,13 +247,16 @@ body[data-theme="dark"] .app-header::after {
   justify-content: flex-end;
   gap: 12px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
 }
 
 .phone-search {
   display: flex;
   align-items: center;
-  width: min(500px, 52vw);
+  flex: 1 1 280px;
+  width: min(500px, 42vw);
+  max-width: 500px;
+  min-width: 0;
   min-height: 38px;
   border: 1px solid var(--field-border);
   background: var(--field);
@@ -319,9 +322,11 @@ body[data-theme="dark"] .app-header::after {
 }
 
 .phone-search button {
+  flex: 0 0 auto;
   align-self: stretch;
   margin: -1px;
   border-radius: 0 7px 7px 0;
+  white-space: nowrap;
 }
 
 .phone-search button:hover,
@@ -393,19 +398,24 @@ select:disabled {
 .auth-user {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 8px;
-  min-width: 0;
   min-height: 38px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--panel-soft);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .auth-user-name {
+  display: inline-flex;
+  align-items: center;
   overflow: hidden;
-  max-width: 150px;
-  padding-left: 8px;
+  max-width: 140px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-soft);
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
@@ -413,11 +423,17 @@ select:disabled {
   white-space: nowrap;
 }
 
+.auth-user-name:empty {
+  display: none;
+}
+
 .logout-button {
-  min-height: 30px;
-  padding: 0 10px;
-  border-radius: 6px;
-  font-size: 12px;
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .detail-reanalyze-button {
@@ -432,7 +448,10 @@ body[data-theme="dark"] .primary-button {
 .theme-toggle {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
+  justify-content: center;
   gap: 9px;
+  min-width: 126px;
   min-height: 38px;
   padding: 0 12px;
   border: 1px solid var(--field-border);
@@ -441,6 +460,7 @@ body[data-theme="dark"] .primary-button {
   color: var(--ink);
   font-size: 13px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .theme-toggle:hover {
@@ -454,6 +474,7 @@ body[data-theme="dark"] .primary-button {
 
 .theme-toggle-track {
   position: relative;
+  flex: 0 0 auto;
   width: 34px;
   height: 18px;
   border-radius: 999px;
@@ -5109,6 +5130,7 @@ body[data-theme="dark"] .detail-panel {
   .theme-toggle {
     flex: 0 0 auto;
     justify-content: center;
+    min-width: 46px;
     min-height: 38px;
     padding-inline: 5px;
   }
