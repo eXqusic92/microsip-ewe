@@ -925,6 +925,10 @@ function monitorAnalyticsRow(row) {
           attempts: integer(row.summary_attempts, 0),
           terminalFailure: Boolean(row.terminal_failure),
           usage,
+          models: {
+            summary: text(row.summary_model),
+            transcription: text(row.transcription_model)
+          },
           callDurationSec: integer(row.call_duration_sec, row.bill_sec)
         }
       : null
@@ -1361,6 +1365,8 @@ class PostgresBinotelMonitorStore {
           summaries.terminal_failure,
           summaries.call_type AS summary_call_type,
           summaries.call_type_label AS summary_call_type_label,
+          summaries.summary_model,
+          summaries.transcription_model,
           summaries.summary_payload,
           usage.scope AS usage_scope,
           usage.input_tokens,

@@ -3430,10 +3430,29 @@ function renderCallTypeAnalytics(payload) {
   elements.analyticsTokensCaption.textContent =
     `cached: ${formatNumber(openAiSummary.cachedInputTokens || 0)} · usage: ${usage.usageCapturedCalls || 0}`;
   elements.analyticsCost.textContent = formatUsd(usage.estimatedTotalCostUsd || 0);
-  elements.analyticsCostCaption.textContent =
-    typeof transcription.estimatedCostUsd !== "number"
-      ? `OpenAI summary: ${formatUsd(openAiSummary.estimatedCostUsd || 0)}`
-      : `Soniox: ${formatUsd(transcription.estimatedCostUsd || 0)} · OpenAI: ${formatUsd(openAiSummary.estimatedCostUsd || 0)}`;
+  const transcriptionProvider = String(transcription.provider || "").trim();
+  const transcriptionLabel = transcriptionProvider === "soniox"
+    ? "Soniox"
+    : transcriptionProvider === "openai"
+      ? "OpenAI STT"
+      : "Transcription";
+  const unpricedTranscriptionCalls =
+    Number(transcription.unpricedCalls || 0) +
+    Number(transcription.missingModelCalls || 0);
+  const costCaptionParts = [];
+  if (typeof transcription.estimatedCostUsd === "number") {
+    costCaptionParts.push(
+      `${transcriptionLabel}: ${formatUsd(transcription.estimatedCostUsd || 0)}`
+    );
+  }
+  costCaptionParts.push(`OpenAI: ${formatUsd(openAiSummary.estimatedCostUsd || 0)}`);
+  if (unpricedTranscriptionCalls > 0) {
+    costCaptionParts.push(`${formatNumber(unpricedTranscriptionCalls)} без ціни`);
+  }
+  if (Number(openAiSummary.unpricedCalls || 0) > 0) {
+    costCaptionParts.push(`${formatNumber(openAiSummary.unpricedCalls || 0)} summary без тарифу`);
+  }
+  elements.analyticsCostCaption.textContent = costCaptionParts.join(" · ");
   elements.analyticsEscalations.textContent = String(escalation.needed || 0);
   elements.analyticsEscalationsCaption.textContent =
     analyzedCalls ? `із ${analyzedCalls} проаналізованих` : "потребують передачі";

@@ -2,12 +2,48 @@
 
 const { canHaveRecording } = require("./call-summary-service");
 
-const OPENAI_SUMMARY_PRICING_USD = {
-  inputPerMillion: 0.20,
-  cachedInputPerMillion: 0.02,
-  outputPerMillion: 1.25
+const OPENAI_TEXT_PRICING_USD_BY_MODEL = {
+  "gpt-5.5": {
+    inputPerMillion: 5,
+    cachedInputPerMillion: 0.5,
+    outputPerMillion: 30
+  },
+  "gpt-5.4": {
+    inputPerMillion: 2.5,
+    cachedInputPerMillion: 0.25,
+    outputPerMillion: 15
+  },
+  "gpt-5.4-mini": {
+    inputPerMillion: 0.75,
+    cachedInputPerMillion: 0.075,
+    outputPerMillion: 4.5
+  },
+  "gpt-5.4-nano": {
+    inputPerMillion: 0.2,
+    cachedInputPerMillion: 0.02,
+    outputPerMillion: 1.25
+  }
 };
-const SONIOX_AUDIO_HOUR_USD = 0.10;
+
+const OPENAI_TEXT_PRICING_MODEL_KEYS = Object.keys(OPENAI_TEXT_PRICING_USD_BY_MODEL)
+  .sort((a, b) => b.length - a.length);
+
+const OPENAI_TRANSCRIPTION_PRICING_USD_BY_MODEL = {
+  "gpt-4o-transcribe": {
+    minuteUsd: 0.006
+  },
+  "gpt-4o-mini-transcribe": {
+    minuteUsd: 0.003
+  },
+  "whisper-1": {
+    minuteUsd: 0.006
+  }
+};
+
+const SONIOX_STT_PRICING_USD = {
+  asyncHourUsd: 0.10,
+  realtimeHourUsd: 0.12
+};
 
 function nowIso() {
   return new Date().toISOString();
@@ -35,9 +71,66 @@ function numeric(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function roundMoney(value) {
+  return Math.round(numeric(value) * 10000) / 10000;
+}
+
 function optionalNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function modelName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^(openai|soniox):/, "");
+}
+
+function openAiTextPricing(model) {
+  const normalized = modelName(model);
+  if (!normalized) {
+    return null;
+  }
+
+  for (const key of OPENAI_TEXT_PRICING_MODEL_KEYS) {
+    if (normalized === key || normalized.startsWith(`${key}-`)) {
+      return OPENAI_TEXT_PRICING_USD_BY_MODEL[key];
+    }
+  }
+
+  return null;
+}
+
+function transcriptionPricing(model) {
+  const raw = String(model || "").trim().toLowerCase();
+  const normalized = modelName(raw);
+  if (!normalized) {
+    return null;
+  }
+
+  if (raw.startsWith("soniox:") || normalized.startsWith("stt-")) {
+    const audioHourUsd = normalized.includes("-rt-") ||
+      normalized.includes("realtime")
+      ? SONIOX_STT_PRICING_USD.realtimeHourUsd
+      : SONIOX_STT_PRICING_USD.asyncHourUsd;
+    return {
+      provider: "soniox",
+      audioHourUsd
+    };
+  }
+
+  const openAiPricing = OPENAI_TRANSCRIPTION_PRICING_USD_BY_MODEL[normalized];
+  if (openAiPricing || raw.startsWith("openai:")) {
+    return openAiPricing
+      ? {
+          provider: "openai",
+          ...openAiPricing
+        }
+      : null;
+  }
+
+  return null;
 }
 
 function addCounter(map, key, label) {
@@ -131,7 +224,11 @@ function customMetricAnalytics(metricMap) {
     }));
 }
 
-function openAiSummaryCostUsd(usage) {
+function openAiSummaryCostUsd(usage, pricing) {
+  if (!pricing) {
+    return null;
+  }
+
   const inputTokens = numeric(usage.inputTokens);
   const cachedInputTokens = Math.min(inputTokens, numeric(usage.cachedInputTokens));
   const billableInputTokens = Math.max(
@@ -141,15 +238,45 @@ function openAiSummaryCostUsd(usage) {
   const outputTokens = numeric(usage.outputTokens);
 
   return (
-    (billableInputTokens * OPENAI_SUMMARY_PRICING_USD.inputPerMillion) / 1_000_000 +
-    (cachedInputTokens * OPENAI_SUMMARY_PRICING_USD.cachedInputPerMillion) / 1_000_000 +
-    (outputTokens * OPENAI_SUMMARY_PRICING_USD.outputPerMillion) / 1_000_000
+    (billableInputTokens * pricing.inputPerMillion) / 1_000_000 +
+    (cachedInputTokens * pricing.cachedInputPerMillion) / 1_000_000 +
+    (outputTokens * pricing.outputPerMillion) / 1_000_000
   );
+}
+
+function transcriptionCostUsd(model, durationSeconds) {
+  const pricing = transcriptionPricing(model);
+  if (!pricing) {
+    return {
+      costUsd: null,
+      pricing: null
+    };
+  }
+
+  if (pricing.audioHourUsd !== undefined) {
+    return {
+      costUsd: (numeric(durationSeconds) / 3600) * pricing.audioHourUsd,
+      pricing
+    };
+  }
+
+  if (pricing.minuteUsd !== undefined) {
+    return {
+      costUsd: (numeric(durationSeconds) / 60) * pricing.minuteUsd,
+      pricing
+    };
+  }
+
+  return {
+    costUsd: null,
+    pricing: null
+  };
 }
 
 class BinotelMonitorService {
   constructor(config, binotelClient, callSummaryService, store, recordingCache) {
-    this.config = config.binotelMonitor || {};
+    this.rootConfig = config || {};
+    this.config = this.rootConfig.binotelMonitor || {};
     this.binotelClient = binotelClient;
     this.callSummaryService = callSummaryService;
     this.store = store;
@@ -698,6 +825,15 @@ class BinotelMonitorService {
     let analyzedRecordingSeconds = 0;
     let escalationNeeded = 0;
     let usageCapturedCalls = 0;
+    let openAiSummaryCost = 0;
+    let openAiSummaryPricedCalls = 0;
+    let openAiSummaryUnpricedCalls = 0;
+    let transcriptionCost = 0;
+    let transcriptionPricedCalls = 0;
+    let transcriptionUnpricedCalls = 0;
+    let transcriptionMissingModelCalls = 0;
+    let transcriptionPricedSeconds = 0;
+    const transcriptionProviderCounts = new Map();
     const openAiSummaryUsage = {
       inputTokens: 0,
       cachedInputTokens: 0,
@@ -745,13 +881,51 @@ class BinotelMonitorService {
       }
 
       analyzedCalls += 1;
-      analyzedRecordingSeconds += numeric(ai.callDurationSec || call.billSec);
+      const recordingSeconds = numeric(ai.callDurationSec || call.billSec);
+      analyzedRecordingSeconds += recordingSeconds;
       const summary = ai.summary || {};
+      const models = ai.models || {};
       const summaryUsage = ai.usage && ai.usage.summary;
       if (summaryUsage) {
         usageCapturedCalls += 1;
         for (const key of Object.keys(openAiSummaryUsage)) {
           openAiSummaryUsage[key] += numeric(summaryUsage[key]);
+        }
+
+        const summaryModel =
+          models.summary ||
+          summary.model ||
+          (this.rootConfig.openai && this.rootConfig.openai.summaryModel) ||
+          "";
+        const summaryPricing = openAiTextPricing(summaryModel);
+        const summaryCost = openAiSummaryCostUsd(summaryUsage, summaryPricing);
+        if (summaryCost === null) {
+          openAiSummaryUnpricedCalls += 1;
+        } else {
+          openAiSummaryPricedCalls += 1;
+          openAiSummaryCost += summaryCost;
+        }
+      }
+
+      const transcriptionModel = models.transcription || "";
+      if (!transcriptionModel) {
+        transcriptionMissingModelCalls += 1;
+      } else {
+        const estimate = transcriptionCostUsd(transcriptionModel, recordingSeconds);
+        const provider = estimate.pricing && estimate.pricing.provider;
+        if (provider) {
+          transcriptionProviderCounts.set(
+            provider,
+            (transcriptionProviderCounts.get(provider) || 0) + 1
+          );
+        }
+
+        if (estimate.costUsd === null) {
+          transcriptionUnpricedCalls += 1;
+        } else {
+          transcriptionCost += estimate.costUsd;
+          transcriptionPricedCalls += 1;
+          transcriptionPricedSeconds += recordingSeconds;
         }
       }
 
@@ -816,13 +990,16 @@ class BinotelMonitorService {
           ? Math.round((category.count / classifiedCalls) * 1000) / 10
           : 0
       }));
-    const openAiSummaryCost = openAiSummaryCostUsd(openAiSummaryUsage);
-    const transcriptionProvider =
-      (this.callSummaryService && this.callSummaryService.transcriptionProvider) ||
-      "";
-    const transcriptionCost = transcriptionProvider === "soniox"
-      ? (analyzedRecordingSeconds / 3600) * SONIOX_AUDIO_HOUR_USD
-      : null;
+    const transcriptionProviders = Object.fromEntries(transcriptionProviderCounts);
+    const transcriptionProviderEntries = Object.entries(transcriptionProviders);
+    const transcriptionProvider = transcriptionProviderEntries.length === 1
+      ? transcriptionProviderEntries[0][0]
+      : transcriptionProviderEntries.length > 1
+        ? "mixed"
+        : "";
+    const currentSummaryPricing = openAiTextPricing(
+      this.rootConfig.openai && this.rootConfig.openai.summaryModel
+    );
 
     const analytics = {
       periodDays: options.periodDays || null,
@@ -859,22 +1036,28 @@ class BinotelMonitorService {
         transcriptionProvider,
         openAiSummary: {
           ...openAiSummaryUsage,
-          estimatedCostUsd: Math.round(openAiSummaryCost * 10000) / 10000,
-          pricing: OPENAI_SUMMARY_PRICING_USD
+          estimatedCostUsd: roundMoney(openAiSummaryCost),
+          pricedCalls: openAiSummaryPricedCalls,
+          unpricedCalls: openAiSummaryUnpricedCalls,
+          pricing: currentSummaryPricing,
+          pricingByModel: OPENAI_TEXT_PRICING_USD_BY_MODEL
         },
         transcription: {
           provider: transcriptionProvider,
-          audioHours: Math.round((analyzedRecordingSeconds / 3600) * 100) / 100,
-          estimatedCostUsd: transcriptionCost === null
-            ? null
-            : Math.round(transcriptionCost * 10000) / 10000,
-          pricing: transcriptionProvider === "soniox"
-            ? { audioHourUsd: SONIOX_AUDIO_HOUR_USD }
-            : null
+          providers: transcriptionProviders,
+          audioHours: Math.round((transcriptionPricedSeconds / 3600) * 100) / 100,
+          estimatedCostUsd: transcriptionPricedCalls
+            ? roundMoney(transcriptionCost)
+            : null,
+          pricedCalls: transcriptionPricedCalls,
+          unpricedCalls: transcriptionUnpricedCalls,
+          missingModelCalls: transcriptionMissingModelCalls,
+          pricing: {
+            soniox: SONIOX_STT_PRICING_USD,
+            openai: OPENAI_TRANSCRIPTION_PRICING_USD_BY_MODEL
+          }
         },
-        estimatedTotalCostUsd: transcriptionCost === null
-          ? Math.round(openAiSummaryCost * 10000) / 10000
-          : Math.round((openAiSummaryCost + transcriptionCost) * 10000) / 10000
+        estimatedTotalCostUsd: roundMoney(openAiSummaryCost + transcriptionCost)
       }
     };
 
