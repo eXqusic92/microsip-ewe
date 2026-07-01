@@ -867,6 +867,70 @@ function callIdFromCall(call) {
   return text(call && (call.generalCallId || call.id || call.callId));
 }
 
+function monitorAnalyticsRow(row) {
+  const callId = text(row && row.call_id);
+  const generalCallId = text(row && row.general_call_id, callId);
+  const summaryPayload = cloneJson(row && row.summary_payload, {}) || {};
+  const metrics = Array.isArray(row && row.metrics) ? row.metrics : [];
+  const customEvaluation = {
+    ...(summaryPayload.customEvaluation || {})
+  };
+  if (metrics.length) {
+    customEvaluation.metrics = metrics;
+  }
+
+  const summary = {
+    ...summaryPayload,
+    callType: text(summaryPayload.callType || (row && row.summary_call_type)),
+    callTypeLabel: text(summaryPayload.callTypeLabel || (row && row.summary_call_type_label))
+  };
+  if (customEvaluation.metrics) {
+    summary.customEvaluation = customEvaluation;
+  }
+
+  const usage = row && row.usage_scope
+    ? {
+        summary: {
+          inputTokens: integer(row.input_tokens, 0),
+          cachedInputTokens: integer(row.cached_input_tokens, 0),
+          billableInputTokens: integer(row.billable_input_tokens, 0),
+          outputTokens: integer(row.output_tokens, 0),
+          reasoningTokens: integer(row.reasoning_tokens, 0),
+          totalTokens: integer(row.total_tokens, 0)
+        }
+      }
+    : null;
+
+  return {
+    call: {
+      id: callId,
+      callId,
+      generalCallId,
+      startedAt: optionalTimestamp(row && row.started_at),
+      billSec: integer(row && row.bill_sec, 0),
+      disposition: text(row && row.disposition),
+      recordingStatus: text(row && row.recording_status)
+    },
+    ai: row && row.ai_status
+      ? {
+          status: text(row.ai_status),
+          callId: text(row.summary_call_id, generalCallId),
+          generalCallId,
+          callStartedAt: optionalTimestamp(row.call_started_at),
+          updatedAt: optionalTimestamp(row.summary_updated_at),
+          completedAt: optionalTimestamp(row.completed_at),
+          summary,
+          error: text(row.summary_error),
+          message: text(row.summary_message),
+          attempts: integer(row.summary_attempts, 0),
+          terminalFailure: Boolean(row.terminal_failure),
+          usage,
+          callDurationSec: integer(row.call_duration_sec, row.bill_sec)
+        }
+      : null
+  };
+}
+
 function binotelCallColumns(call, currentPayload, options = {}) {
   const now = nowIso();
   const current = currentPayload || {};
@@ -1231,6 +1295,118 @@ class PostgresBinotelMonitorStore {
       limit,
       offset,
       calls: result.rows.map((row) => row.payload)
+    };
+  }
+
+  async analytics(options = {}) {
+    const limit = Math.max(
+      1,
+      Math.min(Number(options.limit || 100), this.maxCalls || 5000, 5000)
+    );
+    const query = text(options.query).toLowerCase();
+    const queryDigits = query.replace(/\D/g, "");
+    const clauses = [];
+    const values = [];
+
+    if (options.since) {
+      values.push(optionalTimestamp(options.since));
+      clauses.push(`calls.started_at >= $${values.length}`);
+    }
+
+    if (query) {
+      values.push(`%${query}%`);
+      const textParam = `$${values.length}`;
+      values.push(`%${queryDigits}%`);
+      const digitsParam = `$${values.length}`;
+      clauses.push(`(
+        lower(calls.external_number) LIKE ${textParam}
+        OR lower(calls.internal_number) LIKE ${textParam}
+        OR lower(calls.call_id) LIKE ${textParam}
+        OR lower(calls.employee_payload::text) LIKE ${textParam}
+        OR (${digitsParam} <> '%%' AND calls.external_digits LIKE ${digitsParam})
+      )`);
+    }
+
+    values.push(limit);
+    const limitParam = `$${values.length}`;
+    const whereClause = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+
+    const result = await this.pool.query(
+      `
+        WITH filtered_calls AS (
+          SELECT
+            calls.call_id,
+            calls.general_call_id,
+            calls.started_at,
+            calls.bill_sec,
+            calls.disposition,
+            calls.recording_status,
+            COUNT(*) OVER ()::int AS total
+          FROM binotel_calls calls
+          ${whereClause}
+          ORDER BY calls.started_at DESC NULLS LAST, calls.call_id DESC
+          LIMIT ${limitParam}
+        )
+        SELECT
+          filtered_calls.*,
+          summaries.call_id AS summary_call_id,
+          summaries.status AS ai_status,
+          summaries.call_started_at,
+          summaries.call_duration_sec,
+          summaries.updated_at AS summary_updated_at,
+          summaries.completed_at,
+          summaries.error AS summary_error,
+          summaries.message AS summary_message,
+          summaries.attempts AS summary_attempts,
+          summaries.terminal_failure,
+          summaries.call_type AS summary_call_type,
+          summaries.call_type_label AS summary_call_type_label,
+          summaries.summary_payload,
+          usage.scope AS usage_scope,
+          usage.input_tokens,
+          usage.cached_input_tokens,
+          usage.billable_input_tokens,
+          usage.output_tokens,
+          usage.reasoning_tokens,
+          usage.total_tokens,
+          COALESCE(metrics.items, '[]'::jsonb) AS metrics
+        FROM filtered_calls
+        LEFT JOIN call_summaries summaries
+          ON summaries.call_id = filtered_calls.general_call_id
+        LEFT JOIN call_summary_usage usage
+          ON usage.call_id = summaries.call_id
+         AND usage.scope = 'summary'
+        LEFT JOIN LATERAL (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'metricKey', metric_key,
+              'metricLabel', metric_label,
+              'metricGroup', metric_group,
+              'selectedOptionKey', selected_option_key,
+              'selectedOptionLabel', selected_option_label,
+              'score', score,
+              'maxScore', max_score,
+              'color', color,
+              'countsTowardScore', counts_toward_score,
+              'evidence', evidence,
+              'improvement', improvement,
+              'confidence', confidence
+            )
+            ORDER BY metric_key
+          ) AS items
+          FROM call_summary_metric_results
+          WHERE call_id = summaries.call_id
+        ) metrics ON true
+        ORDER BY filtered_calls.started_at DESC NULLS LAST, filtered_calls.call_id DESC
+      `,
+      values
+    );
+
+    return {
+      total: result.rows[0] ? result.rows[0].total : 0,
+      limit,
+      offset: 0,
+      calls: result.rows.map(monitorAnalyticsRow)
     };
   }
 

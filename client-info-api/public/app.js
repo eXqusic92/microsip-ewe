@@ -2672,6 +2672,25 @@ function operatorLabel(call, includeExtension = true) {
   ].filter(Boolean).join(" · ") || "Оператор не визначений";
 }
 
+function routeState(pathname = window.location.pathname) {
+  if (/^\/calls\/[^/]+$/.test(pathname)) {
+    return "detail";
+  }
+  if (pathname === "/calls-monitor") {
+    return "monitor";
+  }
+  if (pathname === "/call-analytics") {
+    return "analytics";
+  }
+  if (pathname === "/ai-settings") {
+    return "aiSettings";
+  }
+  if (pathname === "/admin") {
+    return "admin";
+  }
+  return "card";
+}
+
 function setState(state) {
   elements.emptyState.classList.toggle("hidden", state !== "empty");
   elements.loadingState.classList.toggle("hidden", state !== "loading");
@@ -2692,20 +2711,24 @@ function setState(state) {
     admin: "Адмінка",
     detail: "Деталі дзвінка"
   };
-  elements.pageTitle.textContent = titles[state] || "Картка клієнта";
+  const navState = state === "loading" ? routeState() : state;
+  const pageTitle = state === "loading" && titles[navState]
+    ? titles[navState]
+    : titles[state] || "Картка клієнта";
+  elements.pageTitle.textContent = pageTitle;
   if (state !== "detail") {
-    document.title = `${titles[state] || "Картка клієнта"} | DUMA`;
+    document.title = `${pageTitle} | DUMA`;
   }
 
   for (const link of elements.viewLinks) {
     const view = link.getAttribute("data-view-link");
     link.classList.toggle(
       "active",
-      ((state === "monitor" || state === "detail") && view === "calls-monitor") ||
-        (state === "analytics" && view === "call-analytics") ||
-        (state === "aiSettings" && view === "ai-settings") ||
-        (state === "admin" && view === "admin") ||
-        (["empty", "loading", "card"].includes(state) && view === "client-card")
+      ((navState === "monitor" || navState === "detail") && view === "calls-monitor") ||
+        (navState === "analytics" && view === "call-analytics") ||
+        (navState === "aiSettings" && view === "ai-settings") ||
+        (navState === "admin" && view === "admin") ||
+        (["empty", "card"].includes(navState) && view === "client-card")
     );
   }
 

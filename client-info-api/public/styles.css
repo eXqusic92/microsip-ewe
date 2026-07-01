@@ -5193,6 +5193,22 @@ body[data-theme="dark"] .detail-panel {
   box-shadow: var(--shadow);
 }
 
+@media (max-width: 1320px) {
+  .app-header {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .phone-search {
+    width: auto;
+    flex: 1;
+  }
+}
+
 @media (max-width: 1100px) {
   .app-header {
     align-items: stretch;

@@ -674,11 +674,14 @@ class BinotelMonitorService {
 
   async calculateCallTypeAnalytics(options = {}) {
     await this.ensureSyncBoundaries(await this.store.syncState());
-    const result = await this.store.list({
+    const listOptions = {
       limit: this.config.maxStoredCalls || 5000,
       query: options.query || "",
       since: options.since || null
-    });
+    };
+    const result = typeof this.store.analytics === "function"
+      ? await this.store.analytics(listOptions)
+      : await this.store.list(listOptions);
     const categoryMap = new Map();
     const questionMap = new Map();
     const churnRiskMap = new Map();
@@ -704,7 +707,8 @@ class BinotelMonitorService {
       totalTokens: 0
     };
 
-    for (const call of result.calls) {
+    for (const item of result.calls) {
+      const call = (item && item.call) || item;
       if (!canHaveRecording(call)) {
         continue;
       }
@@ -718,9 +722,12 @@ class BinotelMonitorService {
       eligibleCalls += 1;
       eligibleRecordingSeconds += numeric(call.billSec);
       const callId = call.generalCallId || call.id || call.callId;
-      const ai = callId && this.callSummaryService
-        ? await this.callSummaryService.status(callId)
-        : null;
+      let ai = null;
+      if (item && Object.prototype.hasOwnProperty.call(item, "ai")) {
+        ai = item.ai;
+      } else if (callId && this.callSummaryService) {
+        ai = await this.callSummaryService.status(callId);
+      }
 
       if (!ai || ai.status === "not_available" || ai.status === "disabled") {
         awaitingAnalysis += 1;
