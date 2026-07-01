@@ -840,21 +840,27 @@ class AutoClientStore {
   }
 }
 
-function createClientStore(config) {
-  const notesStore = new LocalNotesStore(
-    config.localDataFile,
-    config.noteAuthor
-  );
+function createClientStore(config, appStateDatabase = null) {
+  const notesStore =
+    (appStateDatabase && appStateDatabase.notesStore) ||
+    new LocalNotesStore(
+      config.localDataFile,
+      config.noteAuthor
+    );
   const binotelClient = new BinotelClient(config);
   const openAiClient = new OpenAiClient(config);
-  const aiAnalysisSettingsStore = new AiAnalysisSettingsStore(
-    config.aiAnalysisSettingsFile
-  );
+  const aiAnalysisSettingsStore =
+    (appStateDatabase && appStateDatabase.aiAnalysisSettingsStore) ||
+    new AiAnalysisSettingsStore(
+      config.aiAnalysisSettingsFile
+    );
   openAiClient.setAnalysisSettingsProvider(() =>
     aiAnalysisSettingsStore.getProfile()
   );
   const transcriptionClient = createTranscriptionClient(config, openAiClient);
-  const callSummaryStore = new CallSummaryStore(config.callSummariesFile);
+  const callSummaryStore =
+    (appStateDatabase && appStateDatabase.callSummaryStore) ||
+    new CallSummaryStore(config.callSummariesFile);
   const callSummaryService = new CallSummaryService(
     config,
     binotelClient,

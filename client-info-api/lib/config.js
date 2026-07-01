@@ -100,6 +100,7 @@ const binotelKey = process.env.BINOTEL_KEY || "";
 const binotelSecret = process.env.BINOTEL_SECRET || "";
 const openAiKey = process.env.OPENAI_API_KEY || "";
 const sonioxKey = process.env.SONIOX_API_KEY || "";
+const appStateDbPassword = process.env.APP_STATE_DB_PASSWORD || "";
 const transcriptionProvider = String(
   process.env.TRANSCRIPTION_PROVIDER || "openai"
 ).trim().toLowerCase();
@@ -169,6 +170,37 @@ module.exports = {
     connectionTimeoutMillis: Number(process.env.DB_CONNECT_TIMEOUT_MS || 5000),
     application_name: "duma-client-card-read-only",
     options: "-c default_transaction_read_only=on"
+  },
+  appStateDatabase: {
+    enabled: parseBoolean(
+      process.env.APP_STATE_DB_ENABLED,
+      Boolean(appStateDbPassword)
+    ),
+    host: process.env.APP_STATE_DB_HOST || process.env.APP_PGHOST || "127.0.0.1",
+    port: Number(process.env.APP_STATE_DB_PORT || process.env.APP_PGPORT || 5432),
+    database:
+      process.env.APP_STATE_DB_NAME ||
+      process.env.APP_PGDATABASE ||
+      "client_info_api",
+    user:
+      process.env.APP_STATE_DB_USER ||
+      process.env.APP_PGUSER ||
+      "postgres",
+    password: appStateDbPassword || process.env.APP_PGPASSWORD || "",
+    ssl: parseBoolean(
+      process.env.APP_STATE_DB_SSL === undefined
+        ? process.env.APP_PGSSL
+        : process.env.APP_STATE_DB_SSL,
+      false
+    ),
+    max: Number(process.env.APP_STATE_DB_POOL_MAX || 10),
+    idleTimeoutMillis: Number(
+      process.env.APP_STATE_DB_IDLE_TIMEOUT_MS || 30000
+    ),
+    connectionTimeoutMillis: Number(
+      process.env.APP_STATE_DB_CONNECT_TIMEOUT_MS || 5000
+    ),
+    applicationName: "client-info-api-app-state"
   },
   binotel: {
     enabled: parseBoolean(

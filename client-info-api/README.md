@@ -37,8 +37,33 @@ The connection enforces:
 default_transaction_read_only=on
 ```
 
-Only `SELECT` queries are used. The application does not create tables, run
-migrations, or write notes to PostgreSQL.
+Only `SELECT` queries are used for the CRM connection. The application does not
+create tables, run migrations, or write notes to this database.
+
+Writable application state is stored in a separate PostgreSQL database when
+`APP_STATE_DB_*` is configured:
+
+```text
+APP_STATE_DB_ENABLED=true
+APP_STATE_DB_HOST=127.0.0.1
+APP_STATE_DB_PORT=5432
+APP_STATE_DB_NAME=client_info_api
+APP_STATE_DB_USER=postgres
+APP_STATE_DB_PASSWORD=...
+APP_STATE_DB_SSL=false
+```
+
+This app-state database stores AI settings, AI summaries/transcripts, Binotel
+monitor state, local notes, and recording-cache metadata. If it is not
+configured, the server falls back to JSON files under `data/`.
+
+Create/apply the app-state schema with `db/001_app_state.sql`, then migrate the
+current JSON data with:
+
+```bash
+npm run check
+node scripts/migrate-local-data-to-db.js
+```
 
 Ticket history is read from `public.ticket`, not from `report_*` tables. The
 card uses the same ticket status rules as `ewe_web`:
@@ -61,7 +86,8 @@ system cancel       Скасований системою
 
 ## Local operator notes
 
-Operator notes are stored locally in:
+Operator notes are stored in the app-state PostgreSQL database when
+`APP_STATE_DB_*` is configured. Without it, the JSON fallback is:
 
 ```text
 data/client-notes.json
@@ -114,9 +140,9 @@ Processing is asynchronous:
 
 1. The card shows the cached summary immediately when it exists.
 2. If no cached summary exists, the server stores a queued/processing status in
-   local JSON and starts background processing.
+   app-state storage and starts background processing.
 3. The browser polls `/api/call-summary?callId=...` until the summary is ready.
-   This polling reads the local JSON cache and does not call Binotel again.
+   This polling reads the app-state cache and does not call Binotel again.
 
 Configure the transcription provider and OpenAI summary model in `.env`:
 
@@ -181,7 +207,7 @@ Binotel call-record -> audio download -> optional FFmpeg cleanup
 Soniox receives Ukrainian, Russian, and English language hints, speaker
 diarization, and DUMA/East West Eurolines domain context. The server uploads the
 recording, waits for the asynchronous transcription, stores the resulting text
-in local JSON, and deletes the temporary Soniox transcription and uploaded file.
+in app-state storage, and deletes the temporary Soniox transcription and uploaded file.
 `gpt-5.4-nano` receives the transcript plus compact client-card context
 (active/current trip candidates, nearest trip, recent tickets, passengers, and
 operator notes). It returns a short Ukrainian operator summary plus compact
@@ -205,8 +231,8 @@ Accuracy notes:
   mono 16 kHz WAV, voice-band filters, and loudness normalization. If FFmpeg
   fails, the original Binotel audio is used.
 - Temporary Soniox files are deleted after the transcript is downloaded. The
-  application keeps the transcript in `data/call-summaries.json`, so retries of
-  the OpenAI summary do not pay for transcription again.
+  application keeps the transcript in app-state storage, so retries of the
+  OpenAI summary do not pay for transcription again.
 - Changing `TRANSCRIPTION_PROVIDER` invalidates a cached transcript for that
   call and regenerates it with the selected provider when the call is processed.
 - The following `OPENAI_TRANSCRIPTION_*` options apply only when
@@ -266,14 +292,16 @@ Accuracy notes:
   the client's issue is already clear or the operator may already have context
   from CRM, Binotel, dispatchers, chats, or drivers.
 - Bump `OPENAI_SUMMARY_VERSION` when changing AI prompts/settings to force
-  cached summaries in `data/call-summaries.json` to be regenerated.
+  cached summaries to be regenerated.
 
-AI summaries are stored locally in `data/call-summaries.json`. The application
-does not write summaries, transcripts, or recordings to PostgreSQL.
+AI summaries are stored in the app-state PostgreSQL database when
+`APP_STATE_DB_*` is configured. The JSON fallback path is
+`data/call-summaries.json`.
 
 ## Custom AI analysis settings
 
-AI call evaluation settings are stored locally in:
+AI call evaluation settings are stored in the app-state PostgreSQL database when
+`APP_STATE_DB_*` is configured. The JSON fallback path is:
 
 ```text
 data/ai-analysis-settings.json
@@ -281,8 +309,7 @@ data/ai-analysis-settings.json
 
 The file is created from built-in defaults on first use and is excluded from
 Git. It contains call types, per-call-type metrics, AI instructions, and answer
-options with scores from `0` to `5` plus display colors. PostgreSQL is not used
-for these settings.
+options with scores from `0` to `5` plus display colors.
 
 Backend endpoints:
 

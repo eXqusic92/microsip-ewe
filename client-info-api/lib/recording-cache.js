@@ -35,9 +35,10 @@ function nowIso() {
 }
 
 class RecordingCache {
-  constructor(config, binotelClient) {
+  constructor(config, binotelClient, metadataStore = null) {
     this.config = config;
     this.binotelClient = binotelClient;
+    this.metadataStore = metadataStore;
     this.filename = config.binotelRecordingCacheFile;
     this.recordingsDir = config.binotelRecordingsDir;
     this.ttlMillis = config.binotelMonitor.recordingCacheTtlMillis;
@@ -56,8 +57,13 @@ class RecordingCache {
       return;
     }
 
-    await fs.mkdir(path.dirname(this.filename), { recursive: true });
     await fs.mkdir(this.recordingsDir, { recursive: true });
+    if (this.metadataStore) {
+      this.loaded = true;
+      return;
+    }
+
+    await fs.mkdir(path.dirname(this.filename), { recursive: true });
 
     try {
       const content = await fs.readFile(this.filename, "utf8");
@@ -80,6 +86,10 @@ class RecordingCache {
   }
 
   async metadata(callId) {
+    if (this.metadataStore) {
+      return this.metadataStore.metadata(callId);
+    }
+
     await this.load();
     return this.data.recordings[String(callId)] || null;
   }
@@ -141,8 +151,12 @@ class RecordingCache {
         cachedAt: entry.cachedAt || null
       };
     } catch {
-      delete this.data.recordings[callId];
-      await this.persist();
+      if (this.metadataStore) {
+        await this.metadataStore.delete(callId);
+      } else {
+        delete this.data.recordings[callId];
+        await this.persist();
+      }
       return null;
     }
   }
@@ -180,8 +194,7 @@ class RecordingCache {
     await fs.mkdir(this.recordingsDir, { recursive: true });
     await fs.writeFile(filePath, bytes);
 
-    await this.load();
-    this.data.recordings[callId] = {
+    const entry = {
       callId,
       filePath,
       filename,
@@ -190,7 +203,14 @@ class RecordingCache {
       cachedAt,
       expiresAt
     };
-    await this.persist();
+
+    if (this.metadataStore) {
+      await this.metadataStore.upsert(entry);
+    } else {
+      await this.load();
+      this.data.recordings[callId] = entry;
+      await this.persist();
+    }
 
     return {
       bytes,
@@ -202,6 +222,17 @@ class RecordingCache {
   }
 
   async purgeExpired() {
+    if (this.metadataStore) {
+      const expired = await this.metadataStore.expired(new Date());
+      for (const entry of expired) {
+        if (entry.filePath) {
+          await fs.unlink(entry.filePath).catch(() => {});
+        }
+        await this.metadataStore.delete(entry.callId);
+      }
+      return;
+    }
+
     await this.load();
 
     const now = Date.now();
