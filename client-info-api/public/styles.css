@@ -250,6 +250,39 @@ body[data-theme="dark"] .app-header::after {
   flex: 1 1 auto;
 }
 
+@media (min-width: 1321px) {
+  .brand-lockup {
+    display: grid;
+    grid-template-columns: auto minmax(280px, max-content);
+    grid-template-areas:
+      "brand title"
+      "brand tabs";
+    column-gap: 18px;
+    row-gap: 8px;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+
+  .brand {
+    grid-area: brand;
+    align-self: center;
+  }
+
+  .brand-lockup h1 {
+    grid-area: title;
+    align-self: end;
+  }
+
+  .app-tabs {
+    grid-area: tabs;
+    justify-self: start;
+  }
+
+  .header-actions {
+    flex-basis: 600px;
+  }
+}
+
 .phone-search {
   display: flex;
   align-items: center;
@@ -5193,13 +5226,14 @@ body[data-theme="dark"] .detail-panel {
   box-shadow: var(--shadow);
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 1480px) {
   .app-header {
     align-items: stretch;
     flex-wrap: wrap;
   }
 
   .header-actions {
+    justify-content: flex-start;
     width: 100%;
   }
 
