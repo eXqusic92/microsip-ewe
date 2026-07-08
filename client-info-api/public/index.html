@@ -173,11 +173,11 @@
           <section class="profile-block profile-dates">
             <div>
               <span>Перше замовлення</span>
-              <strong id="first-order">—</strong>
+              <strong id="first-order">Завантаження</strong>
             </div>
             <div>
               <span>Останнє замовлення</span>
-              <strong id="last-order">—</strong>
+              <strong id="last-order">Завантаження</strong>
             </div>
           </section>
         </div>
@@ -222,7 +222,7 @@
                     <p class="section-label">AI-підсумок</p>
                     <h3>Останній записаний дзвінок</h3>
                   </div>
-                  <span class="status" id="ai-summary-status">—</span>
+                  <span class="status" id="ai-summary-status">Очікуємо</span>
                 </div>
                 <p class="ai-summary-text" id="ai-summary-text">
                   Очікуємо дані дзвінка…
@@ -380,15 +380,15 @@
           <div class="monitor-status-grid">
             <div>
               <span>Стан</span>
-              <strong id="monitor-status">—</strong>
+              <strong id="monitor-status">Підключення</strong>
             </div>
             <div>
               <span>Остання синхронізація</span>
-              <strong id="monitor-updated">—</strong>
+              <strong id="monitor-updated">Очікуємо</strong>
             </div>
             <div>
               <span>Наступна спроба</span>
-              <strong id="monitor-next-sync">—</strong>
+              <strong id="monitor-next-sync">Очікуємо</strong>
             </div>
           </div>
         </div>
@@ -480,39 +480,39 @@
               <p class="section-label">Підсумок</p>
               <h2>Загальна активність</h2>
             </div>
-            <span class="muted" id="call-stats-range">—</span>
+            <span class="muted" id="call-stats-range">Рахуємо</span>
           </div>
 
           <div class="call-stats-summary">
             <div>
               <span>Усі дзвінки</span>
               <strong id="call-stats-total">0</strong>
-              <small id="call-stats-total-caption">—</small>
+              <small id="call-stats-total-caption">Рахуємо</small>
             </div>
             <div>
               <span>Вхідні</span>
               <strong id="call-stats-incoming">0</strong>
-              <small id="call-stats-incoming-caption">—</small>
+              <small id="call-stats-incoming-caption">Рахуємо</small>
             </div>
             <div>
               <span>Вихідні</span>
               <strong id="call-stats-outgoing">0</strong>
-              <small id="call-stats-outgoing-caption">—</small>
+              <small id="call-stats-outgoing-caption">Рахуємо</small>
             </div>
             <div>
               <span>Відповіді</span>
               <strong id="call-stats-answer-rate">0%</strong>
-              <small id="call-stats-answer-caption">—</small>
+              <small id="call-stats-answer-caption">Рахуємо</small>
             </div>
             <div>
               <span>Розмови</span>
               <strong id="call-stats-talk-time">0 хв</strong>
-              <small id="call-stats-talk-caption">—</small>
+              <small id="call-stats-talk-caption">Рахуємо</small>
             </div>
             <div>
               <span>Середня розмова</span>
-              <strong id="call-stats-avg-duration">—</strong>
-              <small id="call-stats-avg-wait">—</small>
+              <strong id="call-stats-avg-duration">0 хв</strong>
+              <small id="call-stats-avg-wait">очікування...</small>
             </div>
             <div>
               <span>Клієнтів</span>
@@ -529,7 +529,7 @@
             <div>
               <span>Обраний зріз</span>
               <strong id="call-stats-focus-title">Загальна вибірка</strong>
-              <small id="call-stats-focus-subtitle">—</small>
+              <small id="call-stats-focus-subtitle">Усі дзвінки</small>
             </div>
             <div class="call-stats-focus-metrics" id="call-stats-focus-metrics"></div>
           </div>
@@ -667,7 +667,7 @@
             <div>
               <span>Найчастіше звертаються</span>
               <strong id="analytics-top-type">Ще немає даних</strong>
-              <small id="analytics-top-caption">—</small>
+              <small id="analytics-top-caption">за вибраний період</small>
             </div>
             <div>
               <span>Очікують аналізу</span>
@@ -677,7 +677,7 @@
             <div>
               <span>Хвилин записів</span>
               <strong id="analytics-audio-minutes">0</strong>
-              <small id="analytics-audio-caption">середня тривалість: —</small>
+              <small id="analytics-audio-caption">середня тривалість: рахуємо</small>
             </div>
             <div>
               <span>OpenAI токени</span>
@@ -929,7 +929,7 @@
               <p class="section-label">Доступ</p>
               <h2>Список користувачів</h2>
             </div>
-            <span class="muted" id="admin-user-count">—</span>
+            <span class="muted" id="admin-user-count">Завантаження...</span>
           </div>
           <p class="form-message" id="admin-users-message" aria-live="polite"></p>
           <div class="admin-users-list" id="admin-users-list"></div>
@@ -941,7 +941,7 @@
               <p class="section-label">AI-аналіз</p>
               <h2>Внутрішні номери</h2>
             </div>
-            <span class="muted" id="admin-analysis-number-count">—</span>
+            <span class="muted" id="admin-analysis-number-count">Завантаження...</span>
           </div>
           <div class="admin-panel-actions">
             <button class="secondary-button" id="admin-analysis-enable-all" type="button">Увімкнути всі</button>
@@ -958,7 +958,7 @@
               <p class="section-label">Telegram User API</p>
               <h2>Акаунти для пошуку переписок</h2>
             </div>
-            <span class="muted" id="admin-telegram-count">—</span>
+            <span class="muted" id="admin-telegram-count">Завантаження...</span>
           </div>
 
           <form class="admin-telegram-add" id="admin-telegram-form">
@@ -987,31 +987,31 @@
         <div class="call-detail-hero">
           <div>
             <p class="section-label">Деталі дзвінка</p>
-            <h1 id="detail-phone">—</h1>
-            <p id="detail-date">—</p>
+            <h1 id="detail-phone">Завантаження</h1>
+            <p id="detail-date">Очікуємо дані дзвінка</p>
           </div>
           <div class="call-detail-badges">
             <span class="status" id="detail-call-type">Без типу дзвінка</span>
-            <span class="status" id="detail-ai-status">—</span>
+            <span class="status" id="detail-ai-status">Очікуємо AI</span>
           </div>
         </div>
 
         <div class="call-detail-facts">
           <div>
             <span>Хто прийняв</span>
-            <strong id="detail-operator">—</strong>
+            <strong id="detail-operator">Завантаження</strong>
           </div>
           <div>
             <span>Напрямок і статус</span>
-            <strong id="detail-direction">—</strong>
+            <strong id="detail-direction">Завантаження</strong>
           </div>
           <div>
             <span>Тривалість розмови</span>
-            <strong id="detail-duration">—</strong>
+            <strong id="detail-duration">0:00</strong>
           </div>
           <div>
             <span>Binotel ID</span>
-            <strong id="detail-binotel-id">—</strong>
+            <strong id="detail-binotel-id">Завантаження</strong>
           </div>
         </div>
 
@@ -1063,7 +1063,7 @@
                 <p class="section-label">Оцінка дзвінка</p>
                 <h2>Ваші метрики</h2>
               </div>
-              <strong class="quality-score" id="detail-quality-score">—</strong>
+              <strong class="quality-score" id="detail-quality-score">Н/д</strong>
             </div>
             <p class="quality-summary" id="detail-quality-summary">Оцінка зʼявиться після AI-аналізу дзвінка.</p>
             <div class="quality-context" id="detail-quality-context"></div>
@@ -1078,7 +1078,7 @@
               <p class="section-label">Квитки</p>
               <h2>Квитки за цим номером</h2>
             </div>
-            <span class="muted" id="detail-ticket-count">—</span>
+            <span class="muted" id="detail-ticket-count">Завантаження</span>
           </div>
           <div class="ticket-list detail-ticket-list" id="detail-ticket-list"></div>
         </section>
