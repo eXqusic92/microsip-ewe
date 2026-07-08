@@ -1498,6 +1498,22 @@ function renderAiSettings() {
   updateAiSettingsChrome();
 }
 
+function scrollAiSettingsToStart() {
+  if (!elements.aiSettingsPage) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    const header = document.querySelector(".app-header");
+    const headerStyle = header ? window.getComputedStyle(header) : null;
+    const headerOffset = headerStyle && ["fixed", "sticky"].includes(headerStyle.position)
+      ? header.getBoundingClientRect().height
+      : 0;
+    const top = elements.aiSettingsPage.getBoundingClientRect().top + window.scrollY - headerOffset - 12;
+    window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+  });
+}
+
 function applyAiSettingsPayload(payload, dirty = false) {
   const selectedCallTypeKey = aiSettingsState.selectedCallTypeKey;
   const selectedMetricKey = aiSettingsState.selectedMetricKey;
@@ -1653,6 +1669,7 @@ function addAiCallType(kind = "call") {
   aiSettingsState.screen = "detail";
   markAiSettingsDirty("Додано тип аналізу.");
   renderAiSettings();
+  scrollAiSettingsToStart();
   void saveAiSettings({ silent: true });
 }
 
@@ -1685,6 +1702,7 @@ function duplicateAiCallType(key) {
   aiSettingsState.screen = "detail";
   markAiSettingsDirty("Тип аналізу продубльовано.");
   renderAiSettings();
+  scrollAiSettingsToStart();
   void saveAiSettings({ silent: true });
 }
 
@@ -2206,8 +2224,12 @@ function renderAdminUsers() {
         ${escapeHtml(userRoleLabel(user.role))}
       </span>
       <div class="admin-user-actions">
-        <button class="admin-icon-button" type="button" data-admin-action="edit-user" data-user-id="${escapeHtml(user.id)}">Редагувати</button>
-        <button class="admin-icon-button is-danger" type="button" data-admin-action="delete-user" data-user-id="${escapeHtml(user.id)}"${isSelf ? " disabled" : ""}>Видалити</button>
+        <button class="admin-icon-button" type="button" data-admin-action="edit-user" data-user-id="${escapeHtml(user.id)}" aria-label="Редагувати користувача" title="Редагувати">
+          ${aiIcon("edit")}
+        </button>
+        <button class="admin-icon-button is-danger" type="button" data-admin-action="delete-user" data-user-id="${escapeHtml(user.id)}" aria-label="Видалити користувача" title="Видалити"${isSelf ? " disabled" : ""}>
+          ${aiIcon("trash")}
+        </button>
       </div>
     `;
     elements.adminUsersList.append(row);
@@ -2937,11 +2959,13 @@ function handleAiSettingsClick(event) {
     aiSettingsState.selectedMetricKey = "";
     aiSettingsState.screen = "detail";
     renderAiSettings();
+    scrollAiSettingsToStart();
   } else if (aiAction === "back-to-types") {
     aiSettingsState.screen = "list";
     aiSettingsState.selectedCallTypeKey = "";
     aiSettingsState.selectedMetricKey = "";
     renderAiSettings();
+    scrollAiSettingsToStart();
   } else if (aiAction === "open-type-settings") {
     openAiTypeModal();
   } else if (aiAction === "toggle-call-type") {
