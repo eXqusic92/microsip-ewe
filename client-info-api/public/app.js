@@ -4301,10 +4301,6 @@ function appendOrderGroup(container, group) {
   const status = orderGroupStatus(group);
   const article = document.createElement("article");
   article.className = "order-row";
-  article.style.display = "block";
-  article.style.boxSizing = "border-box";
-  article.style.width = "100%";
-  article.style.padding = "24px 0";
   article.tabIndex = 0;
   article.setAttribute("role", "button");
   article.setAttribute("aria-label", `Відкрити замовлення ${orderNumber}`);
@@ -4350,10 +4346,6 @@ function appendOrderGroup(container, group) {
 
   const infoGrid = document.createElement("div");
   infoGrid.className = "order-info-grid";
-  infoGrid.style.display = "grid";
-  infoGrid.style.gridTemplateColumns = "repeat(auto-fit, minmax(150px, 1fr))";
-  infoGrid.style.gap = "10px";
-  infoGrid.style.marginTop = "16px";
   const appendInfo = (label, value) => {
     if (!value) {
       return;
@@ -4385,11 +4377,6 @@ function appendOrderGroup(container, group) {
 
   const topRow = document.createElement("div");
   topRow.className = "order-row-main";
-  topRow.style.display = "grid";
-  topRow.style.gridTemplateColumns = "clamp(145px, 16vw, 170px) minmax(0, 1fr) minmax(160px, 220px)";
-  topRow.style.alignItems = "start";
-  topRow.style.gap = "24px";
-  topRow.style.minWidth = "0";
   topRow.append(date, main, price);
 
   article.append(topRow, infoGrid);

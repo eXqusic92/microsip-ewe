@@ -1006,33 +1006,40 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .empty-state {
-  min-height: 52vh;
+  min-height: clamp(220px, 34vh, 320px);
   display: grid;
-  place-items: center;
+  grid-template-columns: auto minmax(0, 430px);
+  gap: 6px 18px;
   align-content: center;
-  padding: 42px;
-  border: 1px dashed var(--line-strong);
+  justify-content: center;
+  padding: 30px 34px;
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
-  text-align: center;
+  text-align: left;
   color: var(--muted);
 }
 
 .empty-state h1 {
-  margin: 18px 0 8px;
+  margin: 0;
   color: var(--ink);
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
-  font-size: 28px;
+  font-size: 24px;
+  line-height: 1.18;
+  text-wrap: balance;
 }
 
 .empty-state p {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 
 .empty-icon {
   display: grid;
+  grid-row: 1 / 3;
   width: 58px;
   height: 58px;
   place-items: center;
@@ -3154,7 +3161,7 @@ body[data-theme="dark"] .login-form input:focus {
 
 .order-row-main {
   display: grid;
-  grid-template-columns: 170px minmax(0, 1fr) minmax(190px, 220px);
+  grid-template-columns: clamp(145px, 16vw, 170px) minmax(0, 1fr) minmax(160px, 220px);
   align-items: start;
   gap: 24px;
   min-width: 0;
@@ -3231,7 +3238,7 @@ body[data-theme="dark"] .login-form input:focus {
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   margin-top: 16px;
 }
@@ -8554,7 +8561,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   background: rgba(31, 43, 51, 0.92);
 }
 
-@media (max-width: 1480px) {
+@media (max-width: 1240px) {
   .app-header {
     align-items: stretch;
     flex-wrap: wrap;
@@ -8828,8 +8835,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
 
 @media (max-width: 720px) {
   .app-header {
-    position: sticky;
-    top: 0;
+    position: static;
     align-items: stretch;
     flex-direction: column;
     gap: 12px;
@@ -8967,6 +8973,18 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .profile-menu-popover {
     right: 0;
     width: min(270px, calc(100vw - 24px));
+  }
+
+  .empty-state {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    min-height: 300px;
+    padding: 28px 22px;
+    text-align: center;
+  }
+
+  .empty-icon {
+    grid-row: auto;
   }
 
   .auth-user {
@@ -9434,6 +9452,16 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .order-row-main {
     grid-template-columns: 1fr;
     gap: 14px;
+  }
+
+  .order-row .order-title {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .order-row .order-title strong {
+    min-width: 0;
+    white-space: normal;
   }
 
   .ticket-date,
