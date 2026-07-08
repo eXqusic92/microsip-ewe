@@ -1100,7 +1100,7 @@ body[data-theme="dark"] .login-form input:focus {
 
 .admin-page {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .admin-hero,
@@ -1115,9 +1115,9 @@ body[data-theme="dark"] .login-form input:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  min-height: 86px;
-  padding: 16px 20px;
+  gap: 12px;
+  min-height: 78px;
+  padding: 14px 18px;
 }
 
 .admin-hero h1,
@@ -1128,7 +1128,7 @@ body[data-theme="dark"] .login-form input:focus {
 .admin-hero h1 {
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
-  font-size: 25px;
+  font-size: 24px;
   line-height: 1.14;
 }
 
@@ -1141,6 +1141,7 @@ body[data-theme="dark"] .login-form input:focus {
 
 .admin-add-user {
   flex: 0 0 auto;
+  min-height: 44px;
   white-space: nowrap;
 }
 
@@ -1156,7 +1157,7 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .admin-tabs button {
-  min-height: 40px;
+  min-height: 44px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -1173,13 +1174,13 @@ body[data-theme="dark"] .login-form input:focus {
 
 .admin-panel {
   display: grid;
-  gap: 14px;
-  padding: 18px 20px 20px;
+  gap: 12px;
+  padding: 16px 18px 18px;
 }
 
 .admin-users-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .admin-panel-actions {
@@ -1196,31 +1197,31 @@ body[data-theme="dark"] .login-form input:focus {
 
 .admin-numbers-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .admin-user-card {
   display: grid;
-  grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 1fr) 120px auto;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 1fr) 118px auto;
   align-items: center;
-  gap: 10px 14px;
-  min-height: 68px;
+  gap: 8px 12px;
+  min-height: 64px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-soft);
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .admin-number-card {
   display: grid;
-  grid-template-columns: 56px minmax(150px, 0.9fr) 110px minmax(220px, 1.2fr);
+  grid-template-columns: 52px minmax(150px, 0.9fr) 104px minmax(220px, 1.2fr);
   align-items: center;
-  gap: 10px 14px;
-  min-height: 72px;
+  gap: 8px 12px;
+  min-height: 68px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-soft);
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .admin-number-card.is-disabled {
@@ -1230,7 +1231,7 @@ body[data-theme="dark"] .login-form input:focus {
 .admin-number-switch {
   position: relative;
   display: inline-flex;
-  width: 52px;
+  width: 44px;
   height: 44px;
   align-items: center;
   justify-content: center;
@@ -1356,8 +1357,8 @@ body[data-theme="dark"] .login-form input:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  min-height: 40px;
+  width: 44px;
+  min-height: 44px;
   border: 1px solid var(--line-strong);
   border-radius: 7px;
   background: var(--panel);
@@ -1406,7 +1407,12 @@ body[data-theme="dark"] .login-form input:focus {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
   align-items: end;
-  gap: 12px;
+  gap: 10px;
+}
+
+.admin-telegram-add .primary-button,
+.admin-telegram-confirm .secondary-button {
+  min-height: 44px;
 }
 
 .admin-telegram-add label,
@@ -1435,18 +1441,18 @@ body[data-theme="dark"] .login-form input:focus {
 
 .admin-telegram-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .admin-telegram-card {
   display: grid;
   grid-template-columns: minmax(190px, 1fr) auto minmax(150px, 0.7fr) auto;
   align-items: center;
-  gap: 10px 12px;
+  gap: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-soft);
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .admin-telegram-card.is-connected {
@@ -1492,7 +1498,7 @@ body[data-theme="dark"] .login-form input:focus {
   grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr) auto;
   align-items: center;
   border-top: 1px solid var(--line);
-  padding-top: 12px;
+  padding-top: 10px;
 }
 
 .admin-telegram-error {
@@ -4329,17 +4335,17 @@ body[data-theme="dark"] .login-form input:focus {
 
 .monitor-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(390px, 0.64fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.58fr);
+  gap: 16px;
   align-items: stretch;
-  padding: 18px 20px;
+  padding: 16px 18px;
 }
 
 .monitor-hero h1 {
   margin: 0;
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
-  font-size: 30px;
+  font-size: 28px;
   line-height: 1.12;
   text-wrap: balance;
 }
@@ -4366,8 +4372,8 @@ body[data-theme="dark"] .login-form input:focus {
   flex-direction: column;
   justify-content: center;
   gap: 6px;
-  min-height: 74px;
-  padding: 12px 14px;
+  min-height: 66px;
+  padding: 10px 12px;
   border-right: 1px solid var(--line);
 }
 
@@ -4386,7 +4392,7 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .monitor-panel {
-  padding: 18px 20px 20px;
+  padding: 16px 18px 18px;
 }
 
 .monitor-analytics {
@@ -6639,13 +6645,13 @@ body[data-theme="dark"] .ai-settings-page {
   flex-wrap: wrap;
   align-items: stretch;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .monitor-toolbar input {
   min-width: 0;
   flex: 1 1 240px;
-  min-height: 40px;
+  min-height: 44px;
   border: 1px solid var(--field-border);
   border-radius: 7px;
   background: var(--field);
@@ -6660,7 +6666,7 @@ body[data-theme="dark"] .ai-settings-page {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: 44px;
   border: 1px solid var(--field-border);
   border-radius: 7px;
   background: var(--field);
@@ -6683,6 +6689,17 @@ body[data-theme="dark"] .ai-settings-page {
   max-width: min(520px, calc(100vw - 32px));
 }
 
+.monitor-toolbar .monitor-page-size .custom-select-button,
+.monitor-toolbar .monitor-filter-select .custom-select-button {
+  min-height: 44px;
+}
+
+.monitor-toolbar > .secondary-button,
+.monitor-toolbar > .primary-button,
+.monitor-pagination .secondary-button {
+  min-height: 44px;
+}
+
 .monitor-toolbar input:focus,
 .monitor-page-size:focus-within,
 .monitor-filter-select:focus-within {
@@ -6693,20 +6710,20 @@ body[data-theme="dark"] .ai-settings-page {
 
 .monitor-list {
   display: grid;
-  gap: 10px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 .monitor-call-link {
   display: grid;
   grid-template-columns:
-    minmax(210px, 1fr)
-    minmax(170px, 0.7fr)
-    minmax(210px, 0.9fr)
-    minmax(92px, 0.35fr)
-    24px;
+    minmax(200px, 1fr)
+    minmax(160px, 0.64fr)
+    minmax(190px, 0.82fr)
+    minmax(82px, 0.3fr)
+    22px;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   color: var(--ink);
   text-decoration: none;
   transition:
@@ -6735,13 +6752,13 @@ body[data-theme="dark"] .ai-settings-page {
 .monitor-call-phone {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
 }
 
 .monitor-call-phone .call-direction-icon {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
 }
 
 .monitor-call-phone strong {
@@ -6749,7 +6766,7 @@ body[data-theme="dark"] .ai-settings-page {
   overflow: hidden;
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
-  font-size: 17px;
+  font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -6758,12 +6775,12 @@ body[data-theme="dark"] .ai-settings-page {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  margin-top: 8px;
+  margin-top: 6px;
   border: 1px solid color-mix(in srgb, var(--call-type-color, var(--line-strong)) 55%, var(--line));
   border-radius: 999px;
   background: color-mix(in srgb, var(--call-type-color, var(--panel-soft)) 12%, var(--panel-soft));
   color: var(--call-type-color, var(--muted));
-  padding: 5px 9px;
+  padding: 4px 8px;
   overflow: hidden;
   font-size: 11px;
   font-weight: 900;
@@ -6777,7 +6794,7 @@ body[data-theme="dark"] .ai-settings-page {
   flex-wrap: wrap;
   gap: 6px;
   max-width: 100%;
-  margin-top: 7px;
+  margin-top: 6px;
 }
 
 .monitor-call-alerts[hidden] {
@@ -6822,7 +6839,7 @@ body[data-theme="dark"] .ai-settings-page {
 .monitor-call-fact {
   display: grid;
   min-width: 0;
-  gap: 7px;
+  gap: 4px;
 }
 
 .monitor-call-fact span {
@@ -6839,8 +6856,8 @@ body[data-theme="dark"] .ai-settings-page {
 }
 
 .monitor-call-arrow {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   color: var(--muted);
   fill: none;
   stroke: currentColor;
@@ -6863,8 +6880,8 @@ body[data-theme="dark"] .ai-settings-page {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 16px;
-  padding-top: 14px;
+  margin-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--line);
 }
 
@@ -6875,8 +6892,8 @@ body[data-theme="dark"] .ai-settings-page {
 }
 
 .monitor-page-button {
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--panel-soft);
@@ -6904,7 +6921,7 @@ body[data-theme="dark"] .ai-settings-page {
 }
 
 .monitor-call-row {
-  padding: 16px;
+  padding: 12px 14px;
 }
 
 .monitor-call-top,
@@ -8742,11 +8759,11 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   }
 
   .admin-user-card {
-    grid-template-columns: minmax(180px, 1fr) minmax(160px, 1fr) auto;
+    grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.86fr) auto;
   }
 
   .admin-number-card {
-    grid-template-columns: 52px minmax(180px, 1fr) minmax(160px, 1fr);
+    grid-template-columns: 44px minmax(180px, 1fr) minmax(120px, 0.7fr);
   }
 
   .admin-telegram-add,
@@ -9213,7 +9230,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
 
   .admin-hero,
   .admin-panel {
-    padding: 16px;
+    padding: 14px;
   }
 
   .admin-hero,
@@ -9232,11 +9249,15 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .admin-user-card {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
+    gap: 7px 10px;
+    padding: 10px 12px;
   }
 
   .admin-number-card {
-    grid-template-columns: 52px minmax(0, 1fr);
+    grid-template-columns: 44px minmax(0, 1fr) auto;
     align-items: center;
+    gap: 7px 10px;
+    padding: 10px 12px;
   }
 
   .admin-user-meta {
@@ -9244,7 +9265,9 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   }
 
   .admin-number-meta {
-    grid-column: 2;
+    grid-column: 3;
+    grid-row: 1 / 3;
+    text-align: right;
   }
 
   .admin-role-pill {
@@ -9262,7 +9285,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   }
 
   .admin-number-extra {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
   }
 
   .admin-number-switch {
@@ -9271,6 +9294,53 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
 
   .admin-user-actions {
     flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .admin-panel-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-panel-actions .primary-button {
+    grid-column: 1 / -1;
+  }
+
+  .admin-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .admin-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-tabs button {
+    flex: 0 0 auto;
+  }
+
+  .admin-telegram-card {
+    gap: 7px 10px;
+    padding: 10px 12px;
+  }
+
+  .admin-telegram-confirm {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-telegram-confirm input:first-child {
+    grid-column: 1;
+  }
+
+  .admin-telegram-confirm input:nth-child(2) {
+    grid-column: 1 / -1;
+  }
+
+  .admin-telegram-confirm .secondary-button {
+    grid-column: 2;
+    grid-row: 1;
+    padding-inline: 12px;
   }
 
   .account-form-grid {
@@ -9278,12 +9348,12 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   }
 
   .monitor-hero {
-    gap: 14px;
-    padding: 16px;
+    gap: 10px;
+    padding: 14px;
   }
 
   .monitor-hero h1 {
-    font-size: 23px;
+    font-size: 21px;
     line-height: 1.16;
   }
 
@@ -9329,9 +9399,10 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   }
 
   .monitor-status-grid div {
-    justify-content: flex-start;
-    min-height: 84px;
-    padding: 10px 8px;
+    justify-content: center;
+    gap: 4px;
+    min-height: 60px;
+    padding: 8px;
     border-right: 1px solid var(--line);
     border-bottom: 0;
   }
@@ -9396,9 +9467,9 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
 
   .monitor-toolbar {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(78px, 0.72fr) repeat(2, minmax(0, 1fr));
     align-items: stretch;
-    gap: 8px;
+    gap: 6px;
   }
 
   .monitor-toolbar input {
@@ -9421,7 +9492,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   }
 
   .monitor-toolbar > .primary-button {
-    grid-column: 1 / -1;
+    grid-column: 3;
   }
 
   .monitor-page-size,
@@ -9437,12 +9508,27 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
     justify-content: space-between;
   }
 
+  .monitor-page-size > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .monitor-page-size {
+    justify-content: center;
+    padding-inline: 8px;
+  }
+
   .monitor-filter-select .custom-select {
-    min-width: 128px;
+    min-width: 122px;
   }
 
   .monitor-page-size .custom-select {
-    min-width: 64px;
+    min-width: 52px;
   }
 
   .monitor-page-size .custom-select-button,
@@ -9460,57 +9546,85 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   }
 
   .monitor-call-link {
-    grid-template-columns: minmax(0, 1fr) 20px;
-    gap: 10px 12px;
+    grid-template-columns: minmax(0, 1fr) minmax(66px, auto) 20px;
+    align-items: start;
+    gap: 7px 10px;
   }
 
   .monitor-call-row {
-    padding: 14px;
+    padding: 11px 12px;
   }
 
   .monitor-call-phone .call-direction-icon {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
   }
 
   .monitor-call-phone strong {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .monitor-call-identity > span {
-    margin-top: 6px;
-    padding: 4px 7px;
+    margin-top: 5px;
+    padding: 3px 7px;
+  }
+
+  .monitor-call-alerts {
+    gap: 4px;
+    margin-top: 4px;
   }
 
   .monitor-alert-badge {
     padding: 3px 7px;
   }
 
-  .monitor-call-identity,
-  .monitor-call-fact,
-  .monitor-call-fact:nth-of-type(4) {
-    grid-column: 1;
+  .monitor-call-identity {
+    grid-column: 1 / 3;
+    grid-row: 1;
   }
 
   .monitor-call-fact {
-    grid-template-columns: minmax(72px, 0.36fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 2px;
+  }
+
+  .monitor-call-fact:nth-of-type(2),
+  .monitor-call-fact:nth-of-type(3) {
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: baseline;
-    gap: 4px 8px;
+    gap: 2px 8px;
+  }
+
+  .monitor-call-fact:nth-of-type(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .monitor-call-fact:nth-of-type(3) {
+    grid-column: 1 / 3;
+    grid-row: 3;
+  }
+
+  .monitor-call-fact:nth-of-type(4) {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: right;
   }
 
   .monitor-call-fact span {
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1.3;
   }
 
   .monitor-call-fact strong {
-    font-size: 12px;
+    font-size: 13px;
     white-space: normal;
   }
 
   .monitor-call-arrow {
-    grid-column: 2;
-    grid-row: 1 / 5;
+    grid-column: 3;
+    grid-row: 1 / 4;
     align-self: center;
     width: 20px;
     height: 20px;
