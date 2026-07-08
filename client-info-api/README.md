@@ -67,6 +67,12 @@ client before starting the server. Existing databases created before auth need
 npm run check
 ```
 
+Telegram service logic also has a local mock smoke test:
+
+```bash
+npm run test:telegram
+```
+
 ## Authentication
 
 All application pages, API endpoints, audio recordings, and the MicroSIP
@@ -109,6 +115,58 @@ buybus_annulment    Анульовано в автобусі
 system cancel       Скасований системою
 ```
 
+
+## Dispatcher trip assignments
+
+The nearest-trip card can show the assigned bus number for the ticket trip.
+The browser never logs into the dispatcher system. The backend logs in with a
+service user, keeps the dispatcher session cookie in memory, and calls
+`/api/trip-assignments?tripIds=...`. Create a dispatcher user with staff access
+and the `sales.assignments.view` permission, then configure:
+
+```text
+DISPATCHER_API_ENABLED=true
+DISPATCHER_API_BASE_URL=https://dispatcher.example.com
+DISPATCHER_API_USERNAME=client-info-service
+DISPATCHER_API_PASSWORD=...
+DISPATCHER_API_TIMEOUT_MS=5000
+DISPATCHER_API_CACHE_TTL_MS=60000
+```
+
+If this integration is not configured or the dispatcher request fails, the
+client card still loads; it simply omits the bus block.
+
+## Telegram User API
+
+Client card can search Telegram conversations by the customer phone number and
+send messages from connected company Telegram user accounts. Operators do not
+log into Telegram manually. Administrators add one or more phone numbers in the
+admin Telegram tab, send a login code, and confirm the account with the code
+and optional 2FA password.
+
+Create a Telegram app at `my.telegram.org`, then configure:
+
+```text
+TELEGRAM_ENABLED=true
+TELEGRAM_API_ID=123456
+TELEGRAM_API_HASH=...
+TELEGRAM_CONNECTION_RETRIES=5
+TELEGRAM_REQUEST_TIMEOUT_MS=20000
+TELEGRAM_FAILURE_COOLDOWN_MS=60000
+TELEGRAM_ACCOUNT_LOOKUP_CONCURRENCY=2
+TELEGRAM_CONTACT_CACHE_TTL_MS=3600000
+TELEGRAM_DIALOG_LOOKUP_LIMIT=150
+TELEGRAM_MESSAGE_LIMIT=50
+TELEGRAM_DEVICE_MODEL=DUMA Client Info API
+TELEGRAM_SYSTEM_VERSION=macOS
+TELEGRAM_APP_VERSION=1.0
+```
+
+Telegram sessions, contact cache, and message cache are stored only in the
+app-state PostgreSQL database. If `TELEGRAM_ENABLED=false` or the API id/hash
+are empty, the client card shows Telegram as not configured and continues to
+load the rest of the card normally.
+
 ## Local operator notes
 
 Operator notes are stored in the app-state PostgreSQL database.
@@ -150,6 +208,23 @@ Binotel rate limiting:
 - Binotel error `106` is retried after the delay returned by Binotel, with a
   small safety padding.
 
+## Binotel real-time monitor
+
+The calls monitor stores synchronized Binotel calls in the app-state PostgreSQL
+database. `BINOTEL_MONITOR_MAX_STORED_CALLS=0` means the local monitor history is
+not trimmed. If it is set to a positive number, the backend keeps only that many
+newest calls and the UI labels the counter as the newest local calls, for example
+`останні 2000 дзвінків у локальній історії`.
+
+```text
+BINOTEL_MONITOR_ENABLED=true
+BINOTEL_MONITOR_POLL_INTERVAL_MS=60000
+BINOTEL_MONITOR_OVERLAP_SECONDS=300
+BINOTEL_MONITOR_MAX_STORED_CALLS=0
+BINOTEL_MONITOR_SYNC_SINCE=2026-07-02
+BINOTEL_AI_ANALYSIS_SINCE=2026-07-02
+```
+
 ## AI call summaries
 
 The card can prepare an AI summary for the latest recorded Binotel call.
@@ -174,6 +249,7 @@ SONIOX_ENABLED=
 SONIOX_API_KEY=...
 SONIOX_BASE_URL=https://api.soniox.com/v1
 SONIOX_MODEL=stt-async-v5
+SONIOX_CONTEXT_MODE=minimal
 SONIOX_LANGUAGE_HINTS=uk,ru,en
 SONIOX_LANGUAGE_HINTS_STRICT=false
 SONIOX_ENABLE_SPEAKER_DIARIZATION=true
@@ -206,8 +282,8 @@ Binotel call-record -> audio download -> optional FFmpeg cleanup
 ```
 
 Soniox receives Ukrainian, Russian, and English language hints, speaker
-diarization, and DUMA/East West Eurolines domain context. The server uploads the
-recording, waits for the asynchronous transcription, stores the resulting text
+diarization, and minimal DUMA/East West Eurolines domain context. The server uploads
+the recording, waits for the asynchronous transcription, stores the resulting text
 in app-state storage, and deletes the temporary Soniox transcription and uploaded file.
 `gpt-5.4-nano` receives the transcript plus compact client-card context
 (active/current trip candidates, nearest trip, recent tickets, passengers, and
@@ -226,8 +302,10 @@ Accuracy notes:
   calls.
 - `SONIOX_ENABLE_SPEAKER_DIARIZATION=true` separates the operator and client.
   The roles are assigned later by the OpenAI analysis model from the dialog.
-- Soniox `context.general`, `context.text`, and `context.terms` include the
-  company name, bus-ticket domain, cities, and common booking terminology.
+- `SONIOX_CONTEXT_MODE=minimal` keeps Soniox input-text tokens low by sending
+  only a short domain hint and the most important brand/booking terms. Use
+  `full` to restore the older long `context.text` + full terms payload, or
+  `none` to omit Soniox context completely.
 - `TRANSCRIPTION_AUDIO_PREPROCESSING=true` runs FFmpeg before Soniox:
   mono 16 kHz WAV, voice-band filters, and loudness normalization. If FFmpeg
   fails, the original Binotel audio is used.

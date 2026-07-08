@@ -66,6 +66,10 @@ function externalPhone(call) {
   );
 }
 
+function internalNumber(call) {
+  return String(call && call.internalNumber || "").trim();
+}
+
 function numeric(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -149,6 +153,253 @@ function addCounter(map, key, label) {
     current.label = String(label).trim();
   }
   map.set(normalizedKey, current);
+}
+
+function ratingIdentityKey(...parts) {
+  return parts
+    .map((part) => String(part || "").trim().toLowerCase())
+    .filter(Boolean)
+    .join("|");
+}
+
+function managerIdentity(row) {
+  const employee = row && row.employee && typeof row.employee === "object"
+    ? row.employee
+    : {};
+  const pbxNumber = row && row.pbxNumber && typeof row.pbxNumber === "object"
+    ? row.pbxNumber
+    : {};
+  const name = String(
+    employee.name ||
+      employee.fullName ||
+      employee.title ||
+      ""
+  ).trim();
+  const extension = String(
+    (row && row.internalNumber) ||
+      employee.internalNumber ||
+      employee.extension ||
+      employee.number ||
+      ""
+  ).trim();
+  const pbxName = String(pbxNumber.name || "").trim();
+  const pbxValue = String(pbxNumber.number || pbxNumber.id || "").trim();
+  const id = String(employee.id || employee.employeeId || employee.userId || "").trim();
+  const fallbackKey = ratingIdentityKey(name, extension) ||
+    ratingIdentityKey(extension) ||
+    ratingIdentityKey(name) ||
+    ratingIdentityKey(pbxValue || pbxName);
+  const key = id ? `employee:${id}` : fallbackKey || "unknown";
+
+  return {
+    key,
+    label: name || (extension ? `вн. ${extension}` : "") || pbxName || "Оператор не визначений",
+    name,
+    extension,
+    pbxName,
+    pbxNumber: pbxValue
+  };
+}
+
+function metricAveragePayload(item) {
+  const count = numeric(item.scoredMetricCount);
+  const scoreSum = numeric(item.scoreSum);
+  const maxScoreSum = numeric(item.maxScoreSum);
+  const normalizedScoreSum = numeric(item.normalizedScoreSum);
+
+  return {
+    scoredMetricCount: count,
+    scoreSum: roundMoney(scoreSum),
+    maxScoreSum: roundMoney(maxScoreSum),
+    averageScore: count ? Math.round((scoreSum / count) * 100) / 100 : null,
+    averageMaxScore: count ? Math.round((maxScoreSum / count) * 100) / 100 : null,
+    averagePercent: count
+      ? Math.round((normalizedScoreSum / count) * 100) / 100
+      : null,
+    totalPercent: maxScoreSum > 0
+      ? Math.round((scoreSum / maxScoreSum) * 10000) / 100
+      : null
+  };
+}
+
+function createMetricRating(key, label, group, color) {
+  return {
+    key,
+    label,
+    group,
+    color,
+    scoredMetricCount: 0,
+    scoreSum: 0,
+    maxScoreSum: 0,
+    normalizedScoreSum: 0,
+    options: new Map()
+  };
+}
+
+function addMetricRating(map, row, score, maxScore, percent) {
+  const key = String(row && row.metricKey || "").trim();
+  if (!key) {
+    return;
+  }
+
+  const current = map.get(key) || createMetricRating(
+    key,
+    String(row.metricLabel || key).trim(),
+    String(row.metricGroup || "").trim(),
+    String(row.color || "").trim()
+  );
+  current.scoredMetricCount += 1;
+  current.scoreSum += score;
+  current.maxScoreSum += maxScore;
+  current.normalizedScoreSum += percent;
+
+  const optionKey = String(row.selectedOptionKey || "").trim();
+  if (optionKey) {
+    const option = current.options.get(optionKey) || {
+      key: optionKey,
+      label: String(row.selectedOptionLabel || optionKey).trim(),
+      score,
+      maxScore,
+      count: 0
+    };
+    option.count += 1;
+    current.options.set(optionKey, option);
+  }
+
+  map.set(key, current);
+}
+
+function metricRatingList(map) {
+  return [...map.values()]
+    .map((metric) => ({
+      key: metric.key,
+      label: metric.label,
+      group: metric.group,
+      color: metric.color,
+      ...metricAveragePayload(metric),
+      options: [...metric.options.values()]
+        .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    }))
+    .sort((a, b) => {
+      const aPercent = Number.isFinite(Number(a.averagePercent)) ? Number(a.averagePercent) : -1;
+      const bPercent = Number.isFinite(Number(b.averagePercent)) ? Number(b.averagePercent) : -1;
+      return bPercent - aPercent ||
+        b.scoredMetricCount - a.scoredMetricCount ||
+        a.label.localeCompare(b.label);
+    });
+}
+
+function buildManagerRating(rows, options = {}) {
+  const managers = new Map();
+  const globalMetrics = new Map();
+  let scoredMetrics = 0;
+  let scoreSum = 0;
+  let maxScoreSum = 0;
+  let normalizedScoreSum = 0;
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const score = optionalNumber(row && row.score);
+    const maxScore = optionalNumber(row && row.maxScore);
+    if (score === null || maxScore === null || maxScore <= 0) {
+      continue;
+    }
+
+    const percent = (score / maxScore) * 100;
+    const identity = managerIdentity(row);
+    const current = managers.get(identity.key) || {
+      ...identity,
+      calls: new Set(),
+      callTypes: new Map(),
+      scoredMetricCount: 0,
+      scoreSum: 0,
+      maxScoreSum: 0,
+      normalizedScoreSum: 0,
+      metrics: new Map(),
+      lastCallAt: null
+    };
+    const callId = String(row && row.callId || "").trim();
+    if (callId && !current.calls.has(callId)) {
+      current.calls.add(callId);
+      const callType = String(row.callType || "unknown").trim() || "unknown";
+      const callTypeLabel = String(row.callTypeLabel || callType).trim();
+      const typeCounter = current.callTypes.get(callType) || {
+        type: callType,
+        label: callTypeLabel,
+        count: 0
+      };
+      typeCounter.count += 1;
+      current.callTypes.set(callType, typeCounter);
+    }
+    if (row && row.startedAt) {
+      const startedAt = new Date(row.startedAt).getTime();
+      const lastCallAt = current.lastCallAt
+        ? new Date(current.lastCallAt).getTime()
+        : 0;
+      if (Number.isFinite(startedAt) && startedAt > lastCallAt) {
+        current.lastCallAt = new Date(startedAt).toISOString();
+      }
+    }
+
+    current.scoredMetricCount += 1;
+    current.scoreSum += score;
+    current.maxScoreSum += maxScore;
+    current.normalizedScoreSum += percent;
+    addMetricRating(current.metrics, row, score, maxScore, percent);
+    managers.set(identity.key, current);
+
+    scoredMetrics += 1;
+    scoreSum += score;
+    maxScoreSum += maxScore;
+    normalizedScoreSum += percent;
+    addMetricRating(globalMetrics, row, score, maxScore, percent);
+  }
+
+  const managerRows = [...managers.values()]
+    .map((manager) => ({
+      key: manager.key,
+      label: manager.label,
+      name: manager.name,
+      extension: manager.extension,
+      pbxName: manager.pbxName,
+      pbxNumber: manager.pbxNumber,
+      ratedCallCount: manager.calls.size,
+      lastCallAt: manager.lastCallAt,
+      ...metricAveragePayload(manager),
+      callTypes: [...manager.callTypes.values()]
+        .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type)),
+      metrics: metricRatingList(manager.metrics)
+    }))
+    .sort((a, b) => {
+      const aPercent = Number.isFinite(Number(a.averagePercent)) ? Number(a.averagePercent) : -1;
+      const bPercent = Number.isFinite(Number(b.averagePercent)) ? Number(b.averagePercent) : -1;
+      return bPercent - aPercent ||
+        b.ratedCallCount - a.ratedCallCount ||
+        a.label.localeCompare(b.label);
+    })
+    .map((manager, index) => ({
+      ...manager,
+      rank: index + 1
+    }));
+
+  return {
+    periodDays: options.periodDays || null,
+    managerCount: managerRows.length,
+    ratedCalls: new Set(
+      (Array.isArray(rows) ? rows : [])
+        .map((row) => String(row && row.callId || "").trim())
+        .filter(Boolean)
+    ).size,
+    scoredMetrics,
+    ...metricAveragePayload({
+      scoredMetricCount: scoredMetrics,
+      scoreSum,
+      maxScoreSum,
+      normalizedScoreSum
+    }),
+    topManager: managerRows[0] || null,
+    managers: managerRows,
+    metrics: metricRatingList(globalMetrics)
+  };
 }
 
 function addCustomMetric(map, metric) {
@@ -293,6 +544,10 @@ class BinotelMonitorService {
     this.processStartedAt = nowIso();
     this.analyticsCache = new Map();
     this.analyticsPending = new Map();
+    this.managerRatingCache = new Map();
+    this.managerRatingPending = new Map();
+    this.callStatisticsCache = new Map();
+    this.callStatisticsPending = new Map();
     this.analyticsCacheMillis = 10 * 1000;
   }
 
@@ -459,13 +714,14 @@ class BinotelMonitorService {
         sync.lastOutgoingTimestamp,
         sync.monitorSinceTimestamp
       );
-      const [incomingCalls, outgoingCalls] = await Promise.all([
+      const [incomingCalls, outgoingCalls, disabledNumbers] = await Promise.all([
         this.binotelClient.allIncomingCallsSince(incomingSince),
-        this.binotelClient.allOutgoingCallsSince(outgoingSince)
+        this.binotelClient.allOutgoingCallsSince(outgoingSince),
+        this.disabledAnalysisInternalNumbers()
       ]);
       const calls = [...incomingCalls, ...outgoingCalls].map((call) => ({
         ...call,
-        aiEligible: this.isAiEligibleCall(call),
+        aiEligible: this.isAiEligibleCall(call, { disabledNumbers }),
         monitorCollectedAt: nowIso()
       }));
       const upsert = await this.store.upsertCalls(calls);
@@ -542,6 +798,7 @@ class BinotelMonitorService {
     const result = await this.store.list({
       limit: Math.max(Number(this.config.processingScanLimit || 0), 2000)
     });
+    const disabledNumbers = await this.disabledAnalysisInternalNumbers();
     let queued = 0;
 
     for (const call of result.calls) {
@@ -553,7 +810,7 @@ class BinotelMonitorService {
         continue;
       }
 
-      if (!this.isAiEligibleCall(call)) {
+      if (!this.isAiEligibleCall(call, { disabledNumbers })) {
         continue;
       }
 
@@ -642,6 +899,7 @@ class BinotelMonitorService {
     const result = await this.store.list({
       limit: Math.max(Number(this.config.processingScanLimit || 0), 2000)
     });
+    const disabledNumbers = await this.disabledAnalysisInternalNumbers();
     let cached = 0;
 
     for (const call of result.calls) {
@@ -649,7 +907,7 @@ class BinotelMonitorService {
         break;
       }
 
-      if (!this.isAiEligibleCall(call) || !canHaveRecording(call)) {
+      if (!this.isAiEligibleCall(call, { disabledNumbers }) || !canHaveRecording(call)) {
         continue;
       }
 
@@ -676,21 +934,52 @@ class BinotelMonitorService {
     }
   }
 
-  isAiEligibleCall(call) {
+  async disabledAnalysisInternalNumbers() {
+    if (this.store && typeof this.store.disabledAnalysisInternalNumbers === "function") {
+      return this.store.disabledAnalysisInternalNumbers();
+    }
+    return new Set();
+  }
+
+  isInternalNumberDisabled(call, disabledNumbers) {
+    const number = internalNumber(call);
+    return Boolean(number && disabledNumbers && disabledNumbers.has(number));
+  }
+
+  isAiEligibleCall(call, options = {}) {
     return Boolean(
       call &&
+        !this.isInternalNumberDisabled(call, options.disabledNumbers) &&
         callTimestamp(call) >= Number(this.aiAnalysisSinceTimestamp || 0)
     );
+  }
+
+  async visibleCall(callId) {
+    const call = await this.store.getCall(callId);
+    if (!call) {
+      return null;
+    }
+    if (this.isInternalNumberDisabled(call, await this.disabledAnalysisInternalNumbers())) {
+      return null;
+    }
+    return call;
+  }
+
+  clearAnalyticsCache() {
+    this.analyticsCache.clear();
+    this.managerRatingCache.clear();
+    this.callStatisticsCache.clear();
   }
 
   async listCalls(options = {}) {
     await this.ensureSyncBoundaries(await this.store.syncState());
     const result = await this.store.list(options);
+    const disabledNumbers = await this.disabledAnalysisInternalNumbers();
     const calls = await Promise.all(
       result.calls.map(async (call) => {
         const callId = call.generalCallId || call.id || call.callId;
         const recordable = canHaveRecording(call);
-        const aiEligible = this.isAiEligibleCall(call);
+        const aiEligible = this.isAiEligibleCall(call, { disabledNumbers });
         const recordingCached =
           Boolean(recordable && callId && this.recordingCache) &&
           await this.recordingCache.hasFresh(callId);
@@ -713,17 +1002,20 @@ class BinotelMonitorService {
 
     return {
       ...result,
-      calls
+      calls,
+      maxStoredCalls: this.config.maxStoredCalls || 0,
+      historyLimited: Number(this.config.maxStoredCalls || 0) > 0
     };
   }
 
   async callDetails(callId) {
     await this.ensureSyncBoundaries(await this.store.syncState());
-    const call = await this.store.getCall(callId);
+    const call = await this.visibleCall(callId);
     if (!call) {
       return null;
     }
 
+    const disabledNumbers = await this.disabledAnalysisInternalNumbers();
     const id = call.generalCallId || call.id || call.callId;
     const recordable = canHaveRecording(call);
     const recordingCached =
@@ -735,7 +1027,7 @@ class BinotelMonitorService {
 
     return {
       ...call,
-      aiEligible: this.isAiEligibleCall(call),
+      aiEligible: this.isAiEligibleCall(call, { disabledNumbers }),
       recordable,
       recordingCached,
       recordingUrl: recordable && id
@@ -747,7 +1039,7 @@ class BinotelMonitorService {
 
   async reanalyzeCall(callId) {
     await this.ensureSyncBoundaries(await this.store.syncState());
-    const call = await this.store.getCall(callId);
+    const call = await this.visibleCall(callId);
     if (!call) {
       return null;
     }
@@ -797,6 +1089,241 @@ class BinotelMonitorService {
     } finally {
       this.analyticsPending.delete(cacheKey);
     }
+  }
+
+  async managerRating(options = {}) {
+    const cacheKey = JSON.stringify({
+      query: options.query || "",
+      since: options.since || null,
+      periodDays: options.periodDays || null
+    });
+    const cached = this.managerRatingCache.get(cacheKey);
+    if (cached && Date.now() - cached.createdAt < this.analyticsCacheMillis) {
+      return cached.value;
+    }
+
+    const pending = this.managerRatingPending.get(cacheKey);
+    if (pending) {
+      return pending;
+    }
+
+    const calculation = this.calculateManagerRating(options);
+    this.managerRatingPending.set(cacheKey, calculation);
+
+    try {
+      const rating = await calculation;
+      this.managerRatingCache.set(cacheKey, {
+        createdAt: Date.now(),
+        value: rating
+      });
+      if (this.managerRatingCache.size > 20) {
+        const oldestKey = this.managerRatingCache.keys().next().value;
+        this.managerRatingCache.delete(oldestKey);
+      }
+
+      return rating;
+    } finally {
+      this.managerRatingPending.delete(cacheKey);
+    }
+  }
+
+  async callStatistics(options = {}) {
+    const cacheKey = JSON.stringify({
+      query: options.query || "",
+      from: options.from || null,
+      to: options.to || null,
+      periodKey: options.periodKey || "",
+      timezone: options.timezone || "Europe/Kyiv"
+    });
+    const cached = this.callStatisticsCache.get(cacheKey);
+    if (cached && Date.now() - cached.createdAt < this.analyticsCacheMillis) {
+      return cached.value;
+    }
+
+    const pending = this.callStatisticsPending.get(cacheKey);
+    if (pending) {
+      return pending;
+    }
+
+    const calculation = this.calculateCallStatistics(options);
+    this.callStatisticsPending.set(cacheKey, calculation);
+
+    try {
+      const stats = await calculation;
+      this.callStatisticsCache.set(cacheKey, {
+        createdAt: Date.now(),
+        value: stats
+      });
+      if (this.callStatisticsCache.size > 20) {
+        const oldestKey = this.callStatisticsCache.keys().next().value;
+        this.callStatisticsCache.delete(oldestKey);
+      }
+      return stats;
+    } finally {
+      this.callStatisticsPending.delete(cacheKey);
+    }
+  }
+
+  async calculateCallStatistics(options = {}) {
+    if (!this.store || typeof this.store.callStatistics !== "function") {
+      return {
+        period: {
+          from: options.from || null,
+          to: options.to || null,
+          periodKey: options.periodKey || "",
+          timezone: options.timezone || "Europe/Kyiv"
+        },
+        summary: {},
+        daily: [],
+        hourly: [],
+        weekdays: [],
+        directions: [],
+        dispositions: [],
+        durationBuckets: [],
+        managers: [],
+        lines: [],
+        topExternalNumbers: [],
+        heatmap: []
+      };
+    }
+
+    const result = await this.store.callStatistics({
+      query: options.query || "",
+      from: options.from || null,
+      to: options.to || null,
+      timezone: options.timezone || "Europe/Kyiv"
+    });
+
+    const integerValue = (value) => Math.trunc(numeric(value));
+    const timestampValue = (value) => value ? new Date(value).toISOString() : null;
+    const firstDefined = (...values) =>
+      values.find((value) => value !== undefined && value !== null);
+    const mapSeriesRow = (row) => ({
+      dayKey: row.day_key || row.dayKey || "",
+      dayStartedAt: timestampValue(row.day_started_at || row.dayStartedAt),
+      totalCalls: integerValue(firstDefined(row.total_calls, row.totalCalls)),
+      incomingCalls: integerValue(firstDefined(row.incoming_calls, row.incomingCalls)),
+      outgoingCalls: integerValue(firstDefined(row.outgoing_calls, row.outgoingCalls)),
+      answeredCalls: integerValue(firstDefined(row.answered_calls, row.answeredCalls)),
+      missedCalls: integerValue(firstDefined(row.missed_calls, row.missedCalls)),
+      totalBillSec: integerValue(firstDefined(row.total_bill_sec, row.totalBillSec))
+    });
+    const mapBucket = (row) => ({
+      bucket: String(row.bucket || ""),
+      label: String(row.label || ""),
+      sortOrder: integerValue(firstDefined(row.sort_order, row.sortOrder)),
+      totalCalls: integerValue(firstDefined(row.total_calls, row.totalCalls))
+    });
+    const mapManager = (row) => {
+      const totalCalls = integerValue(firstDefined(row.total_calls, row.totalCalls));
+      const answeredCalls = integerValue(firstDefined(row.answered_calls, row.answeredCalls));
+      const incomingCalls = integerValue(firstDefined(row.incoming_calls, row.incomingCalls));
+      const outgoingCalls = integerValue(firstDefined(row.outgoing_calls, row.outgoingCalls));
+      const totalBillSec = integerValue(firstDefined(row.total_bill_sec, row.totalBillSec));
+      return {
+        key: String(row.manager_key || row.key || ""),
+        label: String(row.label || "Оператор не визначений"),
+        internalNumber: String(row.internal_number || row.internalNumber || ""),
+        employeeName: String(row.employee_name || row.employeeName || ""),
+        pbxName: String(row.pbx_name || row.pbxName || ""),
+        totalCalls,
+        incomingCalls,
+        outgoingCalls,
+        answeredCalls,
+        missedCalls: integerValue(firstDefined(row.missed_calls, row.missedCalls)),
+        uniqueCustomers: integerValue(firstDefined(row.unique_customers, row.uniqueCustomers)),
+        totalBillSec,
+        totalWaitSec: integerValue(firstDefined(row.total_wait_sec, row.totalWaitSec)),
+        avgBillSec: integerValue(firstDefined(row.avg_bill_sec, row.avgBillSec)),
+        avgWaitSec: integerValue(firstDefined(row.avg_wait_sec, row.avgWaitSec)),
+        recordingCalls: integerValue(firstDefined(row.recording_calls, row.recordingCalls)),
+        answerRate: totalCalls ? Math.round((answeredCalls / totalCalls) * 1000) / 10 : 0,
+        incomingShare: totalCalls ? Math.round((incomingCalls / totalCalls) * 1000) / 10 : 0,
+        outgoingShare: totalCalls ? Math.round((outgoingCalls / totalCalls) * 1000) / 10 : 0,
+        talkHours: Math.round((totalBillSec / 3600) * 10) / 10,
+        firstCallAt: timestampValue(row.first_call_at || row.firstCallAt),
+        lastCallAt: timestampValue(row.last_call_at || row.lastCallAt)
+      };
+    };
+    const mapCompact = (row) => ({
+      key: String(row.key || row.direction || row.bucket || row.label || ""),
+      label: String(row.label || row.direction || "—"),
+      direction: String(row.direction || ""),
+      number: String(row.number || ""),
+      internalNumber: String(row.internal_number || row.internalNumber || ""),
+      phone: String(row.phone || ""),
+      externalDigits: String(row.external_digits || row.externalDigits || ""),
+      totalCalls: integerValue(firstDefined(row.total_calls, row.totalCalls)),
+      incomingCalls: integerValue(firstDefined(row.incoming_calls, row.incomingCalls)),
+      outgoingCalls: integerValue(firstDefined(row.outgoing_calls, row.outgoingCalls)),
+      answeredCalls: integerValue(firstDefined(row.answered_calls, row.answeredCalls)),
+      totalBillSec: integerValue(firstDefined(row.total_bill_sec, row.totalBillSec)),
+      lastCallAt: timestampValue(row.last_call_at || row.lastCallAt)
+    });
+
+    const periodStart = options.from ? new Date(options.from).getTime() : 0;
+    const periodEnd = options.to ? new Date(options.to).getTime() : Date.now();
+    const periodDays = periodStart && periodEnd > periodStart
+      ? Math.max(1, Math.ceil((periodEnd - periodStart) / (24 * 60 * 60 * 1000)))
+      : Math.max(1, (result.daily || []).length || 1);
+    const summary = result.summary || {};
+    summary.avgCallsPerDay = Math.round((numeric(summary.totalCalls) / periodDays) * 10) / 10;
+
+    return {
+      period: {
+        ...(result.period || {}),
+        periodKey: options.periodKey || "",
+        timezone: options.timezone || "Europe/Kyiv",
+        days: periodDays
+      },
+      summary,
+      daily: (result.daily || []).map(mapSeriesRow),
+      hourly: (result.hourly || []).map((row) => ({
+        hour: integerValue(row.hour),
+        totalCalls: integerValue(firstDefined(row.total_calls, row.totalCalls)),
+        answeredCalls: integerValue(firstDefined(row.answered_calls, row.answeredCalls)),
+        totalBillSec: integerValue(firstDefined(row.total_bill_sec, row.totalBillSec))
+      })),
+      weekdays: (result.weekdays || []).map((row) => ({
+        weekday: integerValue(row.weekday),
+        totalCalls: integerValue(firstDefined(row.total_calls, row.totalCalls)),
+        totalBillSec: integerValue(firstDefined(row.total_bill_sec, row.totalBillSec))
+      })),
+      directions: (result.directions || []).map(mapCompact),
+      dispositions: (result.dispositions || []).map(mapCompact),
+      durationBuckets: (result.durationBuckets || []).map(mapBucket),
+      managers: (result.managers || []).map(mapManager),
+      lines: (result.lines || []).map(mapCompact),
+      topExternalNumbers: (result.topExternalNumbers || []).map(mapCompact),
+      heatmap: (result.heatmap || []).map((row) => ({
+        weekday: integerValue(row.weekday),
+        hour: integerValue(row.hour),
+        totalCalls: integerValue(firstDefined(row.total_calls, row.totalCalls)),
+        totalBillSec: integerValue(firstDefined(row.total_bill_sec, row.totalBillSec))
+      }))
+    };
+  }
+
+  async calculateManagerRating(options = {}) {
+    if (typeof this.store.managerRating !== "function") {
+      return buildManagerRating([], {
+        periodDays: options.periodDays || null
+      });
+    }
+
+    const result = await this.store.managerRating({
+      limit: this.config.maxStoredCalls || 5000,
+      query: options.query || "",
+      since: options.since || null
+    });
+
+    return {
+      ...buildManagerRating(result.rows || [], {
+        periodDays: options.periodDays || null
+      }),
+      sourceRatedCalls: numeric(result.ratedCalls),
+      sourceScoredMetrics: numeric(result.scoredMetrics)
+    };
   }
 
   async calculateCallTypeAnalytics(options = {}) {

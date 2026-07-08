@@ -55,6 +55,74 @@ CREATE INDEX IF NOT EXISTS client_notes_phone_idx
 CREATE INDEX IF NOT EXISTS client_notes_phone_digits_created_at_idx
   ON client_notes (phone_digits, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS telegram_accounts (
+  id uuid PRIMARY KEY,
+  label text NOT NULL DEFAULT '',
+  phone text NOT NULL,
+  phone_digits text NOT NULL,
+  enabled boolean NOT NULL DEFAULT true,
+  status text NOT NULL DEFAULT 'draft' CHECK (
+    status IN ('draft', 'code_sent', 'password_required', 'connected', 'failed', 'disabled')
+  ),
+  is_default boolean NOT NULL DEFAULT false,
+  session_string text NOT NULL DEFAULT '',
+  login_session_string text NOT NULL DEFAULT '',
+  phone_code_hash text NOT NULL DEFAULT '',
+  code_sent_at timestamptz,
+  telegram_user_id text NOT NULL DEFAULT '',
+  username text NOT NULL DEFAULT '',
+  first_name text NOT NULL DEFAULT '',
+  last_name text NOT NULL DEFAULT '',
+  last_error text NOT NULL DEFAULT '',
+  last_connected_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT telegram_accounts_phone_digits_uniq UNIQUE (phone_digits)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS telegram_accounts_single_default_idx
+  ON telegram_accounts (is_default)
+  WHERE is_default;
+CREATE INDEX IF NOT EXISTS telegram_accounts_enabled_status_idx
+  ON telegram_accounts (enabled, status, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS telegram_contact_cache (
+  account_id uuid NOT NULL REFERENCES telegram_accounts(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  phone text NOT NULL,
+  phone_digits text NOT NULL,
+  found boolean NOT NULL DEFAULT false,
+  telegram_user_id text NOT NULL DEFAULT '',
+  access_hash text NOT NULL DEFAULT '',
+  username text NOT NULL DEFAULT '',
+  first_name text NOT NULL DEFAULT '',
+  last_name text NOT NULL DEFAULT '',
+  last_checked_at timestamptz NOT NULL DEFAULT now(),
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  PRIMARY KEY (account_id, phone_digits)
+);
+
+CREATE INDEX IF NOT EXISTS telegram_contact_cache_phone_digits_idx
+  ON telegram_contact_cache (phone_digits, last_checked_at DESC);
+
+CREATE TABLE IF NOT EXISTS telegram_message_cache (
+  account_id uuid NOT NULL REFERENCES telegram_accounts(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  peer_key text NOT NULL,
+  message_id bigint NOT NULL,
+  phone text NOT NULL,
+  phone_digits text NOT NULL,
+  direction text NOT NULL DEFAULT 'incoming' CHECK (direction IN ('incoming', 'outgoing')),
+  message_text text NOT NULL DEFAULT '',
+  sent_at timestamptz,
+  sender_id text NOT NULL DEFAULT '',
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (account_id, peer_key, message_id)
+);
+
+CREATE INDEX IF NOT EXISTS telegram_message_cache_phone_idx
+  ON telegram_message_cache (phone_digits, sent_at DESC NULLS LAST);
+
 CREATE TABLE IF NOT EXISTS ai_analysis_settings_profiles (
   id bigserial PRIMARY KEY,
   profile_key text NOT NULL DEFAULT 'default',
@@ -189,8 +257,22 @@ CREATE INDEX IF NOT EXISTS binotel_calls_disposition_idx
   ON binotel_calls (disposition);
 CREATE INDEX IF NOT EXISTS binotel_calls_ai_eligible_started_at_idx
   ON binotel_calls (ai_eligible, started_at DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS binotel_calls_internal_number_started_at_idx
+  ON binotel_calls (internal_number, started_at DESC NULLS LAST);
 CREATE INDEX IF NOT EXISTS binotel_calls_payload_gin_idx
   ON binotel_calls USING gin (payload);
+
+CREATE TABLE IF NOT EXISTS ai_analysis_internal_numbers (
+  internal_number text PRIMARY KEY,
+  enabled boolean NOT NULL DEFAULT true,
+  label text NOT NULL DEFAULT '',
+  notes text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ai_analysis_internal_numbers_enabled_idx
+  ON ai_analysis_internal_numbers (enabled, internal_number);
 
 CREATE TABLE IF NOT EXISTS call_summaries (
   call_id text PRIMARY KEY,

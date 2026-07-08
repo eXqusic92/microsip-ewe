@@ -6,6 +6,7 @@ const { BinotelClient } = require("./binotel-client");
 const BookingRules = require("./booking-rules");
 const { CallSummaryService } = require("./call-summary-service");
 const { createDemoCard } = require("./demo-data");
+const { DispatcherApiClient, normalizeTripId } = require("./dispatcher-api-client");
 const { OpenAiClient } = require("./openai-client");
 const { lookupVariants, normalizePhone, phoneDigits } = require("./phone");
 const { createTranscriptionClient } = require("./transcription-client");
@@ -51,6 +52,24 @@ function ticketStatus(value, returnItem) {
 
 function ticketStatusLabel(status) {
   return BookingRules.getSearchStatusLabel(status) || "Без статусу";
+}
+
+function activeOrUpcomingTripInfo(ticket, now) {
+  const departAt = ticket && ticket.departAt ? new Date(ticket.departAt).getTime() : 0;
+  const arriveAt = ticket && ticket.arriveAt ? new Date(ticket.arriveAt).getTime() : 0;
+  if (!departAt) {
+    return null;
+  }
+
+  if (departAt <= now && arriveAt && arriveAt >= now) {
+    return { priority: 0, sortTime: departAt };
+  }
+
+  if (departAt >= now) {
+    return { priority: 1, sortTime: departAt };
+  }
+
+  return null;
 }
 
 function decorateCardStatuses(card) {
@@ -121,6 +140,141 @@ async function attachLatestCallSummary(card, callSummaryService) {
   return card;
 }
 
+async function attachTripAssignmentBusNumbers(card, dispatcherClient) {
+  if (!card || !dispatcherClient || !dispatcherClient.enabled) {
+    return card;
+  }
+
+  const tripIds = [
+    ...new Set(
+      (card.tickets || [])
+        .map((ticket) => ticket && ticket.tripId)
+        .filter(Boolean)
+    )
+  ];
+
+  if (!tripIds.length) {
+    return card;
+  }
+
+  try {
+    const busAssignments = await dispatcherClient.getBusAssignmentsForTripIds(tripIds);
+    for (const ticket of card.tickets || []) {
+      const tripId = ticket && ticket.tripId;
+      if (!tripId || !Object.prototype.hasOwnProperty.call(busAssignments, String(tripId))) {
+        continue;
+      }
+
+      const assignment = busAssignments[String(tripId)] || {};
+      ticket.busNumber = assignment.busNumber || "";
+      ticket.busColor = assignment.busColor || "";
+      ticket.busAssignmentChecked = true;
+    }
+    refreshCardTransferSegments(card);
+  } catch (error) {
+    console.warn(`Dispatcher trip assignments unavailable: ${error.message}`);
+  }
+
+  return card;
+}
+
+function tripAssignmentPayload(busAssignments) {
+  return Object.fromEntries(
+    Object.entries(busAssignments || {}).map(([tripId, assignment]) => [
+      String(tripId),
+      {
+        tripId: String(tripId),
+        busNumber: text(assignment && assignment.busNumber),
+        busColor: text(assignment && assignment.busColor),
+        busAssignmentChecked: true
+      }
+    ])
+  );
+}
+
+function normalizeTripIdList(values) {
+  const source = Array.isArray(values)
+    ? values
+    : String(values || "")
+        .split(",")
+        .map((item) => item.trim());
+  return [...new Set(source.map(normalizeTripId).filter(Boolean))];
+}
+
+function compactTransferSegment(ticket) {
+  return {
+    id: ticket.id,
+    orderId: ticket.orderId,
+    tripId: ticket.tripId,
+    orderNumber: ticket.orderNumber,
+    ticketNumber: ticket.ticketNumber,
+    routeCode: ticket.routeCode,
+    status: ticket.status,
+    statusLabel: ticket.statusLabel,
+    passenger: ticket.passenger,
+    departAt: ticket.departAt,
+    arriveAt: ticket.arriveAt,
+    from: ticket.from,
+    to: ticket.to,
+    carrier: ticket.carrier,
+    agent: ticket.agent,
+    agentCode: ticket.agentCode,
+    seat: ticket.seat,
+    price: ticket.price,
+    busNumber: ticket.busNumber || "",
+    busColor: ticket.busColor || "",
+    busAssignmentChecked: Boolean(ticket.busAssignmentChecked),
+    transferLegIndex: ticket.transferLegIndex || null
+  };
+}
+
+function attachTicketTransferSegments(tickets) {
+  const list = Array.isArray(tickets) ? tickets : [];
+  const groups = new Map();
+
+  for (const ticket of list) {
+    const groupKey = text(ticket && ticket.transferGroupKey);
+    if (!groupKey) {
+      if (ticket) {
+        ticket.isTransfer = false;
+        ticket.transferSegments = [];
+      }
+      continue;
+    }
+
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, []);
+    }
+    groups.get(groupKey).push(ticket);
+  }
+
+  for (const group of groups.values()) {
+    group.sort((left, right) => {
+      const leftLeg = Number(left.transferLegIndex || 0);
+      const rightLeg = Number(right.transferLegIndex || 0);
+      if (leftLeg !== rightLeg) {
+        return leftLeg - rightLeg;
+      }
+      return new Date(left.departAt || 0) - new Date(right.departAt || 0);
+    });
+
+    const segments = group.map(compactTransferSegment);
+    for (const ticket of group) {
+      ticket.isTransfer = segments.length > 1;
+      ticket.transferSegments = segments.length > 1 ? segments : [];
+    }
+  }
+
+  return list;
+}
+
+function refreshCardTransferSegments(card) {
+  if (card && Array.isArray(card.tickets)) {
+    attachTicketTransferSegments(card.tickets);
+  }
+  return card;
+}
+
 function compactTicketContext(ticket) {
   if (!ticket) {
     return null;
@@ -134,6 +288,7 @@ function compactTicketContext(ticket) {
   return {
     id: ticket.id,
     orderId: ticket.orderId,
+    tripId: ticket.tripId,
     orderNumber: ticket.orderNumber,
     ticketNumber: ticket.ticketNumber,
     routeCode: ticket.routeCode,
@@ -146,7 +301,24 @@ function compactTicketContext(ticket) {
     destination: [toPoint, toLocality].filter(Boolean).join(", "),
     carrier: ticket.carrier,
     agent: ticket.agent,
-    seat: ticket.seat
+    seat: ticket.seat,
+    busNumber: ticket.busNumber || null,
+    busColor: ticket.busColor || null,
+    transferSegments: (ticket.transferSegments || [])
+      .map((segment) => ({
+        ticketNumber: segment.ticketNumber,
+        routeCode: segment.routeCode,
+        departAt: segment.departAt,
+        arriveAt: segment.arriveAt,
+        route: [
+          segment.from && segment.from.locality,
+          segment.to && segment.to.locality
+        ]
+          .filter(Boolean)
+          .join(" -> "),
+        seat: segment.seat || null
+      }))
+      .filter((segment) => segment.route)
   };
 }
 
@@ -255,11 +427,12 @@ function createEmptyCard(phone, source, warnings = []) {
 }
 
 class DemoClientStore {
-  constructor(config, notesStore, binotelClient, callSummaryService, warnings = []) {
+  constructor(config, notesStore, binotelClient, callSummaryService, dispatcherClient, warnings = []) {
     this.config = config;
     this.notesStore = notesStore;
     this.binotelClient = binotelClient;
     this.callSummaryService = callSummaryService;
+    this.dispatcherClient = dispatcherClient;
     this.mode = "demo";
     this.warnings = warnings;
   }
@@ -271,6 +444,7 @@ class DemoClientStore {
       dataMode: this.mode,
       databaseConfigured: Boolean(this.config.database.password),
       binotelConfigured: Boolean(this.binotelClient && this.binotelClient.enabled),
+      dispatcherApiConfigured: Boolean(this.dispatcherClient && this.dispatcherClient.enabled),
       openAiConfigured: Boolean(this.callSummaryService && this.callSummaryService.enabled),
       transcriptionProvider:
         (this.callSummaryService && this.callSummaryService.transcriptionProvider) ||
@@ -279,16 +453,65 @@ class DemoClientStore {
   }
 
   async getClientCard(phone) {
-    const card = createDemoCard(phone);
-    const [storedNotes, callsResult] = await Promise.all([
-      this.notesStore.list(phone),
-      getBinotelCalls(this.binotelClient, phone)
+    const card = await this.getClientCardBase(phone);
+    const [callsPayload, tripAssignmentsPayload] = await Promise.all([
+      this.getClientCardCalls(phone),
+      this.getTripAssignmentsForTripIds(
+        (card.tickets || []).map((ticket) => ticket.tripId)
+      )
     ]);
+    card.calls = callsPayload.calls || [];
+    card.latestCallSummary = callsPayload.latestCallSummary || null;
+    card.warnings = [...(card.warnings || []), ...(callsPayload.warnings || [])];
+    for (const ticket of card.tickets || []) {
+      const assignment = tripAssignmentsPayload.assignments[String(ticket.tripId || "")];
+      if (assignment) {
+        ticket.busNumber = assignment.busNumber || "";
+        ticket.busColor = assignment.busColor || "";
+        ticket.busAssignmentChecked = true;
+      }
+    }
+    if (card.upcomingTrip) {
+      const assignment = tripAssignmentsPayload.assignments[String(card.upcomingTrip.tripId || "")];
+      if (assignment) {
+        card.upcomingTrip.busNumber = assignment.busNumber || "";
+        card.upcomingTrip.busColor = assignment.busColor || "";
+        card.upcomingTrip.busAssignmentChecked = true;
+      }
+    }
+    refreshCardTransferSegments(card);
+    return decorateCardStatuses(card);
+  }
+
+  async getClientCardBase(phone) {
+    const card = createDemoCard(phone);
+    const storedNotes = await this.notesStore.list(phone);
     card.notes = [...storedNotes, ...card.notes];
     card.warnings = [...this.warnings, ...card.warnings];
-    attachBinotelCalls(card, callsResult);
-    await attachLatestCallSummary(card, this.callSummaryService);
+    card.calls = [];
+    card.latestCallSummary = null;
     return decorateCardStatuses(card);
+  }
+
+  async getClientCardCalls(rawPhone) {
+    const phone = normalizePhone(rawPhone);
+    const demoCard = createDemoCard(phone);
+    const callsResult = await getBinotelCalls(this.binotelClient, phone);
+    const calls = callsResult ? callsResult.calls : demoCard.calls || [];
+    return {
+      calls,
+      warnings: callsResult ? callsResult.warnings : [],
+      latestCallSummary: await this.callSummaryService.prepare(phone, calls)
+    };
+  }
+
+  async getTripAssignmentsForTripIds(rawTripIds) {
+    const tripIds = normalizeTripIdList(rawTripIds);
+    return {
+      assignments: tripAssignmentPayload(
+        await this.dispatcherClient.getBusAssignmentsForTripIds(tripIds)
+      )
+    };
   }
 
   async getTicketCard(rawPhone) {
@@ -323,15 +546,24 @@ class DemoClientStore {
     return this.notesStore.add(phone, noteText);
   }
 
+  async updateNote(noteId, noteText) {
+    return this.notesStore.update(noteId, noteText);
+  }
+
+  async deleteNote(noteId) {
+    return this.notesStore.delete(noteId);
+  }
+
   async close() {}
 }
 
 class PostgresClientStore {
-  constructor(config, notesStore, binotelClient, callSummaryService) {
+  constructor(config, notesStore, binotelClient, callSummaryService, dispatcherClient) {
     this.config = config;
     this.notesStore = notesStore;
     this.binotelClient = binotelClient;
     this.callSummaryService = callSummaryService;
+    this.dispatcherClient = dispatcherClient;
     this.mode = "postgres";
     this.pool = new Pool(config.database);
     this.closed = false;
@@ -355,6 +587,7 @@ class PostgresClientStore {
         database: "connected",
         databaseTime: result.rows[0].now,
         binotelConfigured: Boolean(this.binotelClient && this.binotelClient.enabled),
+        dispatcherApiConfigured: Boolean(this.dispatcherClient && this.dispatcherClient.enabled),
         openAiConfigured: Boolean(this.callSummaryService && this.callSummaryService.enabled),
         transcriptionProvider:
           (this.callSummaryService && this.callSummaryService.transcriptionProvider) ||
@@ -367,6 +600,7 @@ class PostgresClientStore {
         dataMode: this.mode,
         database: "unavailable",
         binotelConfigured: Boolean(this.binotelClient && this.binotelClient.enabled),
+        dispatcherApiConfigured: Boolean(this.dispatcherClient && this.dispatcherClient.enabled),
         openAiConfigured: Boolean(this.callSummaryService && this.callSummaryService.enabled),
         transcriptionProvider:
           (this.callSummaryService && this.callSummaryService.transcriptionProvider) ||
@@ -420,6 +654,12 @@ class PostgresClientStore {
           t.created_at AS ticket_created_at,
           t.sale_date AS ticket_sale_date,
           o.number::text AS order_number,
+          o.created_at AS order_created_at,
+          o.updated_at AS order_updated_at,
+          o.sale_date AS order_sale_date,
+          o.cost AS order_cost,
+          o.price AS order_price,
+          o.currency AS order_currency,
           t.number::text AS ticket_number,
           t.seat,
           t.seat_number,
@@ -432,10 +672,12 @@ class PostgresClientStore {
           NULLIF(BTRIM(gl_from.name), '') AS geo_locality_from_name,
           t.geo_point_from AS geo_point_from_id,
           NULLIF(BTRIM(gp_from.name), '') AS geo_point_from_name,
+          NULLIF(BTRIM(gp_from.address), '') AS geo_point_from_address,
           t.geo_locality_to AS geo_locality_to_id,
           NULLIF(BTRIM(gl_to.name), '') AS geo_locality_to_name,
           t.geo_point_to AS geo_point_to_id,
           NULLIF(BTRIM(gp_to.name), '') AS geo_point_to_name,
+          NULLIF(BTRIM(gp_to.address), '') AS geo_point_to_address,
           t.pass_name AS firstname,
           t.pass_surname AS lastname,
           COALESCE(NULLIF(BTRIM(oc.name), ''), NULLIF(BTRIM(t.carrier_code), '')) AS carrier_name,
@@ -444,7 +686,19 @@ class PostgresClientStore {
           t.cost AS ticket_cost,
           t.price AS ticket_price,
           t.tariff AS ticket_tariff,
-          t.currency AS currency_ticket
+          t.currency AS currency_ticket,
+          CASE
+            WHEN tc.id IS NOT NULL THEN COALESCE(tc.hash::text, tc.id::text)
+            ELSE ''
+          END AS combined_group_key,
+          COALESCE(tc.hash::text, '') AS combined_hash,
+          CASE
+            WHEN tc.ticket_from_id = t.id THEN 1
+            WHEN tc.ticket_to_id = t.id THEN 2
+            ELSE NULL
+          END AS combined_leg_index,
+          tc.ticket_from_id AS combined_ticket_from_id,
+          tc.ticket_to_id AS combined_ticket_to_id
         FROM public.ticket t
         INNER JOIN public."order" o ON o.id = t.order_id
         LEFT JOIN public.trip tr ON tr.id = t.trip_id
@@ -463,6 +717,14 @@ class PostgresClientStore {
         LEFT JOIN public.geo_point_i18n gp_to
           ON gp_to.geo_point_id = t.geo_point_to
           AND gp_to.locale = 'ua'
+        LEFT JOIN LATERAL (
+          SELECT id, hash, ticket_from_id, ticket_to_id
+          FROM public.ticket_combined tc
+          WHERE tc.ticket_from_id = t.id
+             OR tc.ticket_to_id = t.id
+          ORDER BY tc.id ASC
+          LIMIT 1
+        ) tc ON TRUE
         WHERE t.order_id = ANY($1::bigint[])
         ORDER BY t.depart_at DESC NULLS LAST, t.created_at DESC NULLS LAST, t.id DESC
         LIMIT 100
@@ -537,9 +799,17 @@ class PostgresClientStore {
       return {
         id: String(item.ticket_id),
         orderId: item.order_id ? String(item.order_id) : "",
+        tripId: item.trip_id ? String(item.trip_id) : "",
         orderUrl: item.order_id ? `${ORDER_VIEW_BASE_URL}${item.order_id}/view` : "",
         ticketNumber: text(item.ticket_number),
         orderNumber: text(item.order_number),
+        orderCreatedAt: timestamp(item.order_created_at),
+        orderUpdatedAt: timestamp(item.order_updated_at),
+        orderSaleDate: timestamp(item.order_sale_date),
+        orderPrice: {
+          amount: number(firstPresent(item.order_cost, item.order_price)),
+          currency: text(item.order_currency) || text(item.currency_ticket) || "UAH"
+        },
         routeCode: text(item.route_code),
         status,
         statusLabel: ticketStatusLabel(status),
@@ -548,11 +818,13 @@ class PostgresClientStore {
         arriveAt: timestamp(item.arrive_at),
         from: {
           locality: text(item.geo_locality_from_name),
-          point: text(item.geo_point_from_name)
+          point: text(item.geo_point_from_name),
+          address: text(item.geo_point_from_address)
         },
         to: {
           locality: text(item.geo_locality_to_name),
-          point: text(item.geo_point_to_name)
+          point: text(item.geo_point_to_name),
+          address: text(item.geo_point_to_address)
         },
         carrier: text(item.carrier_name),
         agent: text(item.agent_name),
@@ -562,6 +834,17 @@ class PostgresClientStore {
           amount: number(firstPresent(item.ticket_cost, item.ticket_price, item.ticket_tariff)),
           currency: text(item.currency_ticket) || "UAH"
         },
+        transferGroupKey: text(item.combined_group_key),
+        transferHash: text(item.combined_hash),
+        transferLegIndex: number(item.combined_leg_index) || null,
+        transferTicketFromId: item.combined_ticket_from_id
+          ? String(item.combined_ticket_from_id)
+          : "",
+        transferTicketToId: item.combined_ticket_to_id
+          ? String(item.combined_ticket_to_id)
+          : "",
+        isTransfer: Boolean(text(item.combined_group_key)),
+        transferSegments: [],
         saleDate: timestamp(item.ticket_sale_date),
         returnInfo: returnItem
           ? {
@@ -573,6 +856,7 @@ class PostgresClientStore {
           : null
       };
     });
+    attachTicketTransferSegments(tickets);
 
     const passengers = mostFrequent(tickets.map((ticket) => ticket.passenger));
     const emails = mostFrequent(orders.map((order) => text(order.email)));
@@ -595,14 +879,18 @@ class PostgresClientStore {
     const now = Date.now();
     const upcomingTrip =
       tickets
+        .map((ticket) => ({ ticket, tripInfo: activeOrUpcomingTripInfo(ticket, now) }))
         .filter(
-          (ticket) =>
-            ticket.departAt &&
-            new Date(ticket.departAt).getTime() >= now &&
+          ({ ticket, tripInfo }) =>
+            tripInfo &&
             !BookingRules.isClosedStatus(ticket.status) &&
             !ticket.returnInfo
         )
-        .sort((a, b) => new Date(a.departAt) - new Date(b.departAt))[0] || null;
+        .sort(
+          (left, right) =>
+            left.tripInfo.priority - right.tripInfo.priority ||
+            left.tripInfo.sortTime - right.tripInfo.sortTime
+        )[0]?.ticket || null;
 
     const notes = [
       ...clientNotes.map((note) => ({
@@ -660,20 +948,68 @@ class PostgresClientStore {
   }
 
   async getClientCard(rawPhone) {
+    const card = await this.getClientCardBase(rawPhone);
+    const [callsPayload, tripAssignmentsPayload] = await Promise.all([
+      this.getClientCardCalls(rawPhone),
+      this.getTripAssignmentsForTripIds(
+        (card.tickets || []).map((ticket) => ticket.tripId)
+      )
+    ]);
+    card.calls = callsPayload.calls || [];
+    card.latestCallSummary = callsPayload.latestCallSummary || null;
+    card.warnings = [...(card.warnings || []), ...(callsPayload.warnings || [])];
+    for (const ticket of card.tickets || []) {
+      const assignment = tripAssignmentsPayload.assignments[String(ticket.tripId || "")];
+      if (assignment) {
+        ticket.busNumber = assignment.busNumber || "";
+        ticket.busColor = assignment.busColor || "";
+        ticket.busAssignmentChecked = true;
+      }
+    }
+    if (card.upcomingTrip) {
+      const assignment = tripAssignmentsPayload.assignments[String(card.upcomingTrip.tripId || "")];
+      if (assignment) {
+        card.upcomingTrip.busNumber = assignment.busNumber || "";
+        card.upcomingTrip.busColor = assignment.busColor || "";
+        card.upcomingTrip.busAssignmentChecked = true;
+      }
+    }
+    refreshCardTransferSegments(card);
+    return decorateCardStatuses(card);
+  }
+
+  async getClientCardBase(rawPhone) {
     const phone = normalizePhone(rawPhone);
     const orders = await this.getOrders(phone);
     const orderIds = orders.map((order) => order.id);
-    const [tickets, returns, comments, clientNotes, callsResult] = await Promise.all([
+    const [tickets, returns, comments, clientNotes] = await Promise.all([
       this.getTickets(orderIds),
       this.getReturns(orderIds),
       this.getTicketComments(orderIds),
-      this.notesStore.list(phone),
-      getBinotelCalls(this.binotelClient, phone)
+      this.notesStore.list(phone)
     ]);
     const card = this.buildCard(phone, orders, tickets, returns, comments, clientNotes);
-    attachBinotelCalls(card, callsResult);
-    await attachLatestCallSummary(card, this.callSummaryService);
     return decorateCardStatuses(card);
+  }
+
+  async getClientCardCalls(rawPhone) {
+    const phone = normalizePhone(rawPhone);
+    const callsResult = await getBinotelCalls(this.binotelClient, phone);
+    const calls = callsResult ? callsResult.calls : [];
+    return {
+      calls,
+      warnings: callsResult ? callsResult.warnings : [],
+      latestCallSummary: await this.callSummaryService.prepare(phone, calls)
+    };
+  }
+
+  async getTripAssignmentsForTripIds(rawTripIds) {
+    const tripIds = normalizeTripIdList(rawTripIds);
+    return {
+      assignments: tripAssignmentPayload(
+        await this.dispatcherClient.getBusAssignmentsForTripIds(tripIds)
+      )
+    };
   }
 
   async getTicketCard(rawPhone) {
@@ -687,6 +1023,7 @@ class PostgresClientStore {
       this.notesStore.list(phone)
     ]);
     const card = this.buildCard(phone, orders, tickets, returns, comments, clientNotes);
+    await attachTripAssignmentBusNumbers(card, this.dispatcherClient);
     if (!orders.length) {
       card.notes = clientNotes.map((note) => ({
         id: `local-${note.id}`,
@@ -720,6 +1057,7 @@ class PostgresClientStore {
       this.notesStore.list(phone)
     ]);
     const card = this.buildCard(phone, orders, tickets, returns, comments, clientNotes);
+    await attachTripAssignmentBusNumbers(card, this.dispatcherClient);
     if (!orders.length) {
       card.notes = clientNotes.map((note) => ({
         id: `local-${note.id}`,
@@ -737,6 +1075,14 @@ class PostgresClientStore {
     return this.notesStore.add(phone, noteText);
   }
 
+  async updateNote(noteId, noteText) {
+    return this.notesStore.update(noteId, noteText);
+  }
+
+  async deleteNote(noteId) {
+    return this.notesStore.delete(noteId);
+  }
+
   async close() {
     if (this.closed) {
       return;
@@ -748,22 +1094,25 @@ class PostgresClientStore {
 }
 
 class AutoClientStore {
-  constructor(config, notesStore, binotelClient, callSummaryService) {
+  constructor(config, notesStore, binotelClient, callSummaryService, dispatcherClient) {
     this.config = config;
     this.mode = "auto";
     this.binotelClient = binotelClient;
     this.callSummaryService = callSummaryService;
+    this.dispatcherClient = dispatcherClient;
     this.postgres = new PostgresClientStore(
       config,
       notesStore,
       binotelClient,
-      callSummaryService
+      callSummaryService,
+      dispatcherClient
     );
     this.demo = new DemoClientStore(
       config,
       notesStore,
       binotelClient,
-      callSummaryService
+      callSummaryService,
+      dispatcherClient
     );
     this.databaseFailed = false;
   }
@@ -812,6 +1161,18 @@ class AutoClientStore {
     return this.run("getClientCard", phone);
   }
 
+  getClientCardBase(phone) {
+    return this.run("getClientCardBase", phone);
+  }
+
+  getClientCardCalls(phone) {
+    return this.run("getClientCardCalls", phone);
+  }
+
+  getTripAssignmentsForTripIds(tripIds) {
+    return this.run("getTripAssignmentsForTripIds", tripIds);
+  }
+
   getTicketCard(phone) {
     return this.run("getTicketCard", phone);
   }
@@ -830,6 +1191,14 @@ class AutoClientStore {
 
   addNote(phone, noteText) {
     return this.run("addNote", phone, noteText);
+  }
+
+  updateNote(noteId, noteText) {
+    return this.run("updateNote", noteId, noteText);
+  }
+
+  deleteNote(noteId) {
+    return this.run("deleteNote", noteId);
   }
 
   async close() {
@@ -851,6 +1220,7 @@ function createClientStore(config, appStateDatabase) {
 
   const notesStore = appStateDatabase.notesStore;
   const binotelClient = new BinotelClient(config);
+  const dispatcherClient = new DispatcherApiClient(config);
   const openAiClient = new OpenAiClient(config);
   const aiAnalysisSettingsStore = appStateDatabase.aiAnalysisSettingsStore;
   openAiClient.setAnalysisSettingsProvider(() =>
@@ -872,21 +1242,29 @@ function createClientStore(config, appStateDatabase) {
       config,
       notesStore,
       binotelClient,
-      callSummaryService
+      callSummaryService,
+      dispatcherClient
     );
   } else if (config.demoMode === "false") {
     store = new PostgresClientStore(
       config,
       notesStore,
       binotelClient,
-      callSummaryService
+      callSummaryService,
+      dispatcherClient
     );
   } else if (!config.database.password) {
-    store = new DemoClientStore(config, notesStore, binotelClient, callSummaryService, [
+    store = new DemoClientStore(config, notesStore, binotelClient, callSummaryService, dispatcherClient, [
       "DB_PASSWORD не заповнений, тому сервер працює в demo-режимі."
     ]);
   } else {
-    store = new AutoClientStore(config, notesStore, binotelClient, callSummaryService);
+    store = new AutoClientStore(
+      config,
+      notesStore,
+      binotelClient,
+      callSummaryService,
+      dispatcherClient
+    );
   }
 
   callSummaryService.setClientContextProvider((phone) =>

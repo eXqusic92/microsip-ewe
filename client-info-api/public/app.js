@@ -1,11 +1,10 @@
 "use strict";
 
 const THEME_KEY = "ewe-ticket-theme";
-const TICKETS_PREVIEW_LIMIT = 7;
+const RECENT_ORDERS_PREVIEW_LIMIT = 2;
 const DETAIL_TICKETS_PREVIEW_LIMIT = 3;
 const CALLS_PREVIEW_LIMIT = 7;
 const MONITOR_POLL_MS = 10000;
-const ORDER_VIEW_BASE_URL = "https://new-system-prod.ewe.ua/backend/orders/order/";
 const CALL_TYPE_LABELS = {
   warm_lead_followup: "Тепла заявка",
   ticket_booking: "Забронювати квиток",
@@ -79,7 +78,6 @@ const elements = {
   searchForm: document.querySelector("#phone-search"),
   phoneInput: document.querySelector("#phone-input"),
   themeToggle: document.querySelector("#theme-toggle"),
-  themeToggleLabel: document.querySelector("#theme-toggle-label"),
   profileMenu: document.querySelector("#profile-menu"),
   profileMenuTrigger: document.querySelector("#profile-menu-trigger"),
   profileMenuPopover: document.querySelector("#profile-menu-popover"),
@@ -98,18 +96,70 @@ const elements = {
   changePasswordNew: document.querySelector("#change-password-new"),
   changePasswordConfirm: document.querySelector("#change-password-confirm"),
   changePasswordMessage: document.querySelector("#change-password-message"),
-  pageTitle: document.querySelector("#page-title"),
   emptyState: document.querySelector("#empty-state"),
   loadingState: document.querySelector("#loading-state"),
   clientCard: document.querySelector("#client-card"),
   monitorPage: document.querySelector("#calls-monitor-page"),
+  callStatsPage: document.querySelector("#call-stats-page"),
+  callStatsFilter: document.querySelector("#call-stats-filter"),
+  callStatsPeriod: document.querySelector("#call-stats-period"),
+  callStatsFrom: document.querySelector("#call-stats-from"),
+  callStatsTo: document.querySelector("#call-stats-to"),
+  callStatsRange: document.querySelector("#call-stats-range"),
+  callStatsTotal: document.querySelector("#call-stats-total"),
+  callStatsTotalCaption: document.querySelector("#call-stats-total-caption"),
+  callStatsIncoming: document.querySelector("#call-stats-incoming"),
+  callStatsIncomingCaption: document.querySelector("#call-stats-incoming-caption"),
+  callStatsOutgoing: document.querySelector("#call-stats-outgoing"),
+  callStatsOutgoingCaption: document.querySelector("#call-stats-outgoing-caption"),
+  callStatsAnswerRate: document.querySelector("#call-stats-answer-rate"),
+  callStatsAnswerCaption: document.querySelector("#call-stats-answer-caption"),
+  callStatsTalkTime: document.querySelector("#call-stats-talk-time"),
+  callStatsTalkCaption: document.querySelector("#call-stats-talk-caption"),
+  callStatsAvgDuration: document.querySelector("#call-stats-avg-duration"),
+  callStatsAvgWait: document.querySelector("#call-stats-avg-wait"),
+  callStatsCustomers: document.querySelector("#call-stats-customers"),
+  callStatsCustomersCaption: document.querySelector("#call-stats-customers-caption"),
+  callStatsRecordings: document.querySelector("#call-stats-recordings"),
+  callStatsRecordingsCaption: document.querySelector("#call-stats-recordings-caption"),
+  callStatsFocus: document.querySelector("#call-stats-focus"),
+  callStatsFocusTitle: document.querySelector("#call-stats-focus-title"),
+  callStatsFocusSubtitle: document.querySelector("#call-stats-focus-subtitle"),
+  callStatsFocusMetrics: document.querySelector("#call-stats-focus-metrics"),
+  callStatsDailyChart: document.querySelector("#call-stats-daily-chart"),
+  callStatsHourlyChart: document.querySelector("#call-stats-hourly-chart"),
+  callStatsDirectionChart: document.querySelector("#call-stats-direction-chart"),
+  callStatsDispositionChart: document.querySelector("#call-stats-disposition-chart"),
+  callStatsDurationChart: document.querySelector("#call-stats-duration-chart"),
+  callStatsHeatmap: document.querySelector("#call-stats-heatmap"),
+  callStatsManagers: document.querySelector("#call-stats-managers"),
+  callStatsLines: document.querySelector("#call-stats-lines"),
+  callStatsInsights: document.querySelector("#call-stats-insights"),
   analyticsPage: document.querySelector("#analytics-page"),
   aiSettingsPage: document.querySelector("#ai-settings-page"),
   adminPage: document.querySelector("#admin-page"),
+  adminTitle: document.querySelector("#admin-title"),
+  adminDescription: document.querySelector("#admin-description"),
+  adminTabs: document.querySelector(".admin-tabs"),
+  adminTabButtons: document.querySelectorAll("[data-admin-tab]"),
+  adminPanels: document.querySelectorAll("[data-admin-panel]"),
   adminAddUser: document.querySelector("#admin-add-user"),
   adminUserCount: document.querySelector("#admin-user-count"),
   adminUsersMessage: document.querySelector("#admin-users-message"),
   adminUsersList: document.querySelector("#admin-users-list"),
+  adminAnalysisNumberCount: document.querySelector("#admin-analysis-number-count"),
+  adminAnalysisNumbersMessage: document.querySelector("#admin-analysis-numbers-message"),
+  adminAnalysisNumbersList: document.querySelector("#admin-analysis-numbers-list"),
+  adminAnalysisNumbersSave: document.querySelector("#admin-analysis-numbers-save"),
+  adminAnalysisEnableAll: document.querySelector("#admin-analysis-enable-all"),
+  adminAnalysisDisableAll: document.querySelector("#admin-analysis-disable-all"),
+  adminTelegramCount: document.querySelector("#admin-telegram-count"),
+  adminTelegramForm: document.querySelector("#admin-telegram-form"),
+  adminTelegramLabel: document.querySelector("#admin-telegram-label"),
+  adminTelegramPhone: document.querySelector("#admin-telegram-phone"),
+  adminTelegramAdd: document.querySelector("#admin-telegram-add"),
+  adminTelegramMessage: document.querySelector("#admin-telegram-message"),
+  adminTelegramList: document.querySelector("#admin-telegram-list"),
   adminUserModal: document.querySelector("#admin-user-modal"),
   adminUserForm: document.querySelector("#admin-user-form"),
   adminUserModalTitle: document.querySelector("#admin-user-modal-title"),
@@ -150,6 +200,15 @@ const elements = {
   callTypeEmpty: document.querySelector("#call-type-empty"),
   customerQuestionChart: document.querySelector("#customer-question-chart"),
   customerQuestionEmpty: document.querySelector("#customer-question-empty"),
+  managerRatingSummary: document.querySelector("#manager-rating-summary"),
+  managerRatingTable: document.querySelector("#manager-rating-table"),
+  managerRatingEmpty: document.querySelector("#manager-rating-empty"),
+  managerRatingModal: document.querySelector("#manager-rating-modal"),
+  managerRatingModalClose: document.querySelector("#manager-rating-modal-close"),
+  managerRatingModalTitle: document.querySelector("#manager-rating-modal-title"),
+  managerRatingModalSubtitle: document.querySelector("#manager-rating-modal-subtitle"),
+  managerRatingModalSummary: document.querySelector("#manager-rating-modal-summary"),
+  managerRatingModalMetrics: document.querySelector("#manager-rating-modal-metrics"),
   aiSettingsStatus: document.querySelector("#ai-settings-status"),
   aiSettingsMessage: document.querySelector("#ai-settings-message"),
   aiSettingsTabs: document.querySelector("#ai-settings-tabs"),
@@ -189,6 +248,8 @@ const elements = {
   aiTypeDescription: document.querySelector("#ai-type-description"),
   monitorSearchForm: document.querySelector("#monitor-search"),
   monitorQuery: document.querySelector("#monitor-query"),
+  monitorCallTypeFilter: document.querySelector("#monitor-call-type-filter"),
+  monitorProblemFilter: document.querySelector("#monitor-problem-filter"),
   monitorPageSize: document.querySelector("#monitor-page-size"),
   monitorRefresh: document.querySelector("#monitor-refresh"),
   monitorList: document.querySelector("#monitor-list"),
@@ -235,7 +296,6 @@ const elements = {
   clientName: document.querySelector("#client-name"),
   clientPhone: document.querySelector("#client-phone"),
   clientEmail: document.querySelector("#client-email"),
-  sourceIndicator: document.querySelector("#source-indicator"),
   passengerList: document.querySelector("#passenger-list"),
   firstOrder: document.querySelector("#first-order"),
   lastOrder: document.querySelector("#last-order"),
@@ -249,13 +309,43 @@ const elements = {
   callList: document.querySelector("#call-list"),
   callCountLabel: document.querySelector("#call-count-label"),
   callTemplate: document.querySelector("#call-template"),
+  telegramAccountDropdown: document.querySelector("#telegram-account-dropdown"),
+  telegramAccountTrigger: document.querySelector("#telegram-account-trigger"),
+  telegramAccountLabel: document.querySelector("#telegram-account-label"),
+  telegramAccountStatus: document.querySelector("#telegram-account-status"),
+  telegramAccountMenu: document.querySelector("#telegram-account-menu"),
+  messagingTabs: document.querySelector("#messaging-tabs"),
+  messagingTabButtons: document.querySelectorAll("[data-messaging-tab]"),
+  messagingPanels: document.querySelectorAll("[data-messaging-panel]"),
+  telegramPanel: document.querySelector("#telegram-panel"),
+  telegramRefresh: document.querySelector("#telegram-refresh"),
+  telegramThread: document.querySelector("#telegram-thread"),
+  telegramChat: document.querySelector("#telegram-chat"),
+  telegramCompose: document.querySelector("#telegram-compose"),
+  telegramReplyBar: document.querySelector("#telegram-reply-bar"),
+  telegramReplyTitle: document.querySelector("#telegram-reply-title"),
+  telegramReplyCancel: document.querySelector("#telegram-reply-cancel"),
+  telegramMessage: document.querySelector("#telegram-message"),
+  telegramSend: document.querySelector("#telegram-send"),
+  telegramMessageStatus: document.querySelector("#telegram-message-status"),
+  viberTabButton: document.querySelector("[data-messaging-tab='viber']"),
+  viberPanel: document.querySelector("#viber-panel"),
+  viberRefresh: document.querySelector("#viber-refresh"),
+  viberThread: document.querySelector("#viber-thread"),
+  viberChat: document.querySelector("#viber-chat"),
+  viberMessageStatus: document.querySelector("#viber-message-status"),
   callsModal: document.querySelector("#calls-modal"),
   callsModalList: document.querySelector("#calls-modal-list"),
   callsModalClose: document.querySelector("#calls-modal-close"),
+  telegramPhotoModal: document.querySelector("#telegram-photo-modal"),
+  telegramPhotoModalClose: document.querySelector("#telegram-photo-modal-close"),
+  telegramPhotoModalImage: document.querySelector("#telegram-photo-modal-image"),
+  telegramPhotoModalTitle: document.querySelector("#telegram-photo-modal-title"),
   ticketList: document.querySelector("#ticket-list"),
   ticketCountLabel: document.querySelector("#ticket-count-label"),
   ticketTemplate: document.querySelector("#ticket-template"),
   ticketsModal: document.querySelector("#tickets-modal"),
+  ticketsModalTitle: document.querySelector("#tickets-modal-title"),
   ticketsModalList: document.querySelector("#tickets-modal-list"),
   ticketsModalClose: document.querySelector("#tickets-modal-close"),
   notesList: document.querySelector("#notes-list"),
@@ -266,14 +356,29 @@ const elements = {
 
 let currentPhone = "";
 let currentSummaryCallId = "";
+let currentCard = null;
+let currentCardWarnings = [];
+let editingNoteId = "";
+let uiConfirmDialog = null;
+let clientLoadSequence = 0;
 let summaryPollTimer = null;
 let monitorPollTimer = null;
 let detailPollTimer = null;
 let monitorPage = 1;
 let monitorPageSize = 10;
 let monitorTotalCalls = 0;
+let currentCallStats = null;
+let currentTelegram = null;
+let currentViber = null;
+let currentMessagingChannel = "telegram";
+let selectedTelegramAccountId = "";
+let telegramAccountDropdownOpen = false;
+let telegramReplyTarget = null;
 let currentTickets = [];
 let currentCalls = [];
+let currentManagerRating = null;
+let ticketsModalBackView = null;
+let ticketsModalOrderGroups = [];
 let currentDetailCallId = "";
 let currentDetailTickets = [];
 let detailTicketsPhone = "";
@@ -342,10 +447,25 @@ const authState = {
   user: null
 };
 const adminState = {
+  activeTab: "users",
   users: [],
   loading: false,
-  editingUserId: ""
+  editingUserId: "",
+  analysisNumbers: [],
+  analysisNumbersLoading: false,
+  analysisNumbersSaving: false,
+  analysisNumbersDirty: false,
+  telegramAccounts: [],
+  telegramConfigured: false,
+  telegramEnabled: false,
+  telegramLoading: false,
+  telegramSaving: false
 };
+const callStatsCharts = new Map();
+const CALL_STATS_WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
+let callStatsHeatmapTooltipElement = null;
+let activeCallStatsHeatmapTooltipTrigger = null;
+let callStatsHeatmapTooltipsReady = false;
 
 function loginUrl() {
   const next = `${window.location.pathname}${window.location.search || ""}`;
@@ -380,6 +500,13 @@ function formatUsersCount(count) {
     return `${value} користувачі`;
   }
   return `${value} користувачів`;
+}
+
+function formatInternalNumbersCount(numbers) {
+  const list = Array.isArray(numbers) ? numbers : [];
+  const enabled = list.filter((item) => item.enabled !== false).length;
+  const disabled = Math.max(0, list.length - enabled);
+  return `${enabled} увімкнено · ${disabled} вимкнено`;
 }
 
 async function apiFetch(input, options = {}) {
@@ -447,13 +574,11 @@ function currentTheme() {
 
 function updateThemeControl() {
   const isDark = currentTheme() === "dark";
-  const label = isDark ? "Світла тема" : "Темна тема";
   elements.themeToggle.setAttribute(
     "aria-label",
     isDark ? "Увімкнути світлу тему" : "Увімкнути темну тему"
   );
   elements.themeToggle.setAttribute("aria-pressed", String(isDark));
-  elements.themeToggleLabel.textContent = label;
 }
 
 function setTheme(theme, persist = true) {
@@ -467,6 +592,9 @@ function setTheme(theme, persist = true) {
   updateThemeControl();
   detailAudioState.palette = null;
   drawDetailAudioCanvas();
+  if (currentCallStats) {
+    renderCallStatsCharts(currentCallStats);
+  }
 }
 
 function escapeHtml(value) {
@@ -476,6 +604,195 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function selectedCustomSelectOption(select) {
+  if (!select) {
+    return null;
+  }
+  return select.options[select.selectedIndex] || select.options[0] || null;
+}
+
+function closeCustomSelect(select) {
+  const custom = select && select._customSelect;
+  if (!custom) {
+    return;
+  }
+  custom.wrapper.classList.remove("is-open");
+  custom.button.setAttribute("aria-expanded", "false");
+  custom.menu.hidden = true;
+}
+
+function closeCustomSelects(exceptSelect = null) {
+  for (const select of document.querySelectorAll("select[data-custom-select='true']")) {
+    if (select !== exceptSelect) {
+      closeCustomSelect(select);
+    }
+  }
+}
+
+function syncCustomSelect(select) {
+  const custom = select && select._customSelect;
+  if (!custom) {
+    return;
+  }
+
+  const selectedOption = selectedCustomSelectOption(select);
+  const selectedText = selectedOption ? selectedOption.textContent.trim() : "—";
+  custom.button.disabled = select.disabled;
+  custom.button.title = selectedText;
+  custom.button.querySelector(".custom-select-value").textContent = selectedText;
+  custom.menu.replaceChildren();
+
+  for (const option of select.options) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "custom-select-option";
+    item.dataset.value = option.value;
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", String(option.selected));
+    item.disabled = option.disabled;
+    item.classList.toggle("is-active", option.selected);
+    item.textContent = option.textContent;
+    custom.menu.append(item);
+  }
+}
+
+function openCustomSelect(select) {
+  const custom = select && select._customSelect;
+  if (!custom || select.disabled) {
+    return;
+  }
+  closeCustomSelects(select);
+  syncCustomSelect(select);
+  custom.wrapper.classList.add("is-open");
+  custom.button.setAttribute("aria-expanded", "true");
+  custom.menu.hidden = false;
+}
+
+function focusCustomSelectOption(select, step = 0) {
+  const custom = select && select._customSelect;
+  if (!custom || custom.menu.hidden) {
+    return;
+  }
+  const options = [...custom.menu.querySelectorAll(".custom-select-option:not(:disabled)")];
+  if (!options.length) {
+    return;
+  }
+  const currentIndex = Math.max(
+    0,
+    options.findIndex((item) => item.dataset.value === select.value)
+  );
+  const nextIndex = Math.min(options.length - 1, Math.max(0, currentIndex + step));
+  options[nextIndex].focus();
+}
+
+function chooseCustomSelectValue(select, value) {
+  const previous = select.value;
+  select.value = value;
+  syncCustomSelect(select);
+  closeCustomSelect(select);
+  select._customSelect.button.focus();
+  if (select.value !== previous) {
+    select.dispatchEvent(new Event("input", { bubbles: true }));
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
+function enhanceCustomSelect(select) {
+  if (!select || select.dataset.customSelect === "true") {
+    syncCustomSelect(select);
+    return;
+  }
+
+  select.dataset.customSelect = "true";
+  select.classList.add("native-select-hidden");
+  select.setAttribute("aria-hidden", "true");
+  select.tabIndex = -1;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "custom-select";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "custom-select-button";
+  button.setAttribute("aria-haspopup", "listbox");
+  button.setAttribute("aria-expanded", "false");
+  button.innerHTML = '<span class="custom-select-value"></span>';
+
+  const menu = document.createElement("div");
+  menu.className = "custom-select-menu";
+  menu.setAttribute("role", "listbox");
+  menu.hidden = true;
+
+  wrapper.append(button, menu);
+  select.after(wrapper);
+  select._customSelect = { wrapper, button, menu };
+
+  button.addEventListener("click", () => {
+    if (menu.hidden) {
+      openCustomSelect(select);
+      focusCustomSelectOption(select);
+    } else {
+      closeCustomSelect(select);
+    }
+  });
+
+  button.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openCustomSelect(select);
+      focusCustomSelectOption(select, event.key === "ArrowDown" ? 1 : 0);
+    }
+  });
+
+  menu.addEventListener("click", (event) => {
+    const item = event.target.closest(".custom-select-option");
+    if (!item || item.disabled) {
+      return;
+    }
+    chooseCustomSelectValue(select, item.dataset.value || "");
+  });
+
+  menu.addEventListener("keydown", (event) => {
+    const options = [...menu.querySelectorAll(".custom-select-option:not(:disabled)")];
+    const index = options.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeCustomSelect(select);
+      button.focus();
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const nextIndex = event.key === "ArrowDown"
+        ? Math.min(options.length - 1, index + 1)
+        : Math.max(0, index - 1);
+      if (options[nextIndex]) {
+        options[nextIndex].focus();
+      }
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      const item = document.activeElement.closest(".custom-select-option");
+      if (item && !item.disabled) {
+        chooseCustomSelectValue(select, item.dataset.value || "");
+      }
+    }
+  });
+
+  select.addEventListener("change", () => syncCustomSelect(select));
+  syncCustomSelect(select);
+}
+
+function enhanceCustomSelects(root = document) {
+  if (!root || !root.querySelectorAll) {
+    return;
+  }
+  for (const select of root.querySelectorAll("select")) {
+    enhanceCustomSelect(select);
+  }
 }
 
 function formatPhone(value) {
@@ -520,6 +837,26 @@ function formatTime(value) {
     minute: "2-digit",
     timeZone: "Europe/Kyiv"
   }).format(new Date(value));
+}
+
+function dateKey(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Europe/Kyiv"
+  }).formatToParts(date);
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return map.year && map.month && map.day ? `${map.year}-${map.month}-${map.day}` : "";
 }
 
 function formatMoney(amount, currency) {
@@ -675,7 +1012,10 @@ const AI_ICON_PATHS = {
   list: '<path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path>',
   target: '<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle>',
   info: '<circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path>',
+  edit: '<path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>',
   check: '<path d="M20 6 9 17l-5-5"></path>',
+  send: '<path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path>',
+  power: '<path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path>',
   star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>',
   zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>',
   crown: '<path d="m2 5 4 7 6-7 6 7 4-7"></path><path d="M5 14h14"></path><path d="M6 18h12"></path>',
@@ -687,7 +1027,9 @@ const AI_ICON_PATHS = {
   chevronDown: '<path d="m6 9 6 6 6-6"></path>',
   plus: '<path d="M5 12h14"></path><path d="M12 5v14"></path>',
   x: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>',
-  link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"></path><path d="M15 7h2a5 5 0 1 1 0 10h-2"></path><line x1="8" x2="16" y1="12" y2="12"></line>'
+  link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"></path><path d="M15 7h2a5 5 0 1 1 0 10h-2"></path><line x1="8" x2="16" y1="12" y2="12"></line>',
+  reply: '<polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>',
+  fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="M16 13H8"></path><path d="M16 17H8"></path><path d="M10 9H8"></path>'
 };
 
 function aiIcon(name, className = "") {
@@ -1242,8 +1584,16 @@ async function saveAiSettings(options = {}) {
   }
 }
 
-async function resetAiSettings() {
-  if (!window.confirm("Скинути AI-налаштування до дефолтних?")) {
+async function resetAiSettings(anchor = null) {
+  const confirmed = await showUiConfirmDialog({
+    title: "Скинути AI-налаштування?",
+    message: "Усі типи дзвінків, метрики й варіанти оцінювання повернуться до стандартних правил. Поточні зміни буде втрачено.",
+    confirmLabel: "Скинути",
+    cancelLabel: "Залишити",
+    tone: "warning",
+    anchor
+  });
+  if (!confirmed) {
     return;
   }
 
@@ -1354,7 +1704,7 @@ function addAiMetric() {
   openAiMetricModal(metric.key);
 }
 
-function deleteAiCallType(key) {
+async function deleteAiCallType(key, anchor = null) {
   const callTypes = aiSettingsState.settings && aiSettingsState.settings.callTypes;
   if (!Array.isArray(callTypes) || callTypes.length <= 1) {
     setAiSettingsMessage("Має залишитися хоча б один тип аналізу.", "danger");
@@ -1362,7 +1712,20 @@ function deleteAiCallType(key) {
   }
 
   const index = callTypes.findIndex((item) => item.key === key);
-  if (index < 0 || !window.confirm("Видалити цей тип аналізу?")) {
+  if (index < 0) {
+    return;
+  }
+
+  const callType = callTypes[index];
+  const confirmed = await showUiConfirmDialog({
+    title: "Видалити тип аналізу?",
+    message: `Тип "${callType.label || callType.key}" і всі його метрики буде видалено з правил оцінювання.`,
+    confirmLabel: "Видалити",
+    cancelLabel: "Скасувати",
+    tone: "danger",
+    anchor
+  });
+  if (!confirmed) {
     return;
   }
 
@@ -1375,7 +1738,7 @@ function deleteAiCallType(key) {
   void saveAiSettings({ silent: true });
 }
 
-function deleteAiMetric(key) {
+async function deleteAiMetric(key, anchor = null) {
   const callType = selectedAiCallType();
   const metrics = callType && callType.metrics;
   if (!Array.isArray(metrics) || metrics.length <= 1) {
@@ -1384,7 +1747,20 @@ function deleteAiMetric(key) {
   }
 
   const index = metrics.findIndex((item) => item.key === key);
-  if (index < 0 || !window.confirm("Видалити цю метрику?")) {
+  if (index < 0) {
+    return;
+  }
+
+  const metric = metrics[index];
+  const confirmed = await showUiConfirmDialog({
+    title: "Видалити метрику?",
+    message: `Метрика "${metric.label || metric.key}" більше не впливатиме на оцінювання цього типу дзвінка.`,
+    confirmLabel: "Видалити",
+    cancelLabel: "Скасувати",
+    tone: "danger",
+    anchor
+  });
+  if (!confirmed) {
     return;
   }
 
@@ -1506,6 +1882,7 @@ function renderAiModalOptionList() {
       <textarea class="ai-modal-option-criteria" rows="2" placeholder="Критерії вибору цього варіанту..." data-ai-option-field="aiInstructions">${escapeHtml(option.aiInstructions || "")}</textarea>`;
     elements.aiModalOptionList.append(row);
   }
+  enhanceCustomSelects(elements.aiModalOptionList);
 }
 
 function openAiMetricModal(key) {
@@ -1837,13 +2214,246 @@ function renderAdminUsers() {
   }
 }
 
+function renderAdminChrome() {
+  const tab = adminState.activeTab || "users";
+  const copy = {
+    users: {
+      title: "Користувачі",
+      description: "Облікові записи для доступу до Client Info API."
+    },
+    "analysis-numbers": {
+      title: "AI-номери",
+      description: "Внутрішні номери, дзвінки яких потрапляють в AI-аналіз та статистику."
+    },
+    telegram: {
+      title: "Telegram",
+      description: "User API акаунти, через які картка клієнта шукає переписки по номеру телефона."
+    }
+  }[tab] || {
+    title: "Користувачі",
+    description: "Облікові записи для доступу до Client Info API."
+  };
+
+  if (elements.adminTitle) {
+    elements.adminTitle.textContent = copy.title;
+  }
+  if (elements.adminDescription) {
+    elements.adminDescription.textContent = copy.description;
+  }
+  if (elements.adminAddUser) {
+    elements.adminAddUser.classList.toggle("hidden", tab !== "users");
+  }
+  for (const button of elements.adminTabButtons || []) {
+    button.classList.toggle("active", button.dataset.adminTab === tab);
+  }
+  for (const panel of elements.adminPanels || []) {
+    panel.classList.toggle("hidden", panel.dataset.adminPanel !== tab);
+  }
+}
+
+function telegramAccountStatusLabel(status) {
+  return {
+    draft: "Очікує логін",
+    code_sent: "Код надіслано",
+    password_required: "Потрібен 2FA пароль",
+    connected: "Підключено",
+    failed: "Помилка",
+    disabled: "Вимкнено"
+  }[status] || "Невідомо";
+}
+
+function telegramAccountCountText() {
+  if (adminState.telegramLoading) {
+    return "Завантаження...";
+  }
+  if (!adminState.telegramConfigured) {
+    return adminState.telegramEnabled ? "Не налаштовано" : "Вимкнено";
+  }
+  const accounts = adminState.telegramAccounts || [];
+  const connected = accounts.filter((account) => account.status === "connected" && account.enabled !== false).length;
+  return `${connected}/${accounts.length} підключено`;
+}
+
+function setAdminTelegramFormEnabled(enabled) {
+  const isEnabled = enabled === true;
+  if (elements.adminTelegramAdd) {
+    elements.adminTelegramAdd.disabled = !isEnabled;
+  }
+  if (elements.adminTelegramLabel) {
+    elements.adminTelegramLabel.disabled = !isEnabled;
+  }
+  if (elements.adminTelegramPhone) {
+    elements.adminTelegramPhone.disabled = !isEnabled;
+  }
+}
+
+function renderAdminTelegramAccounts() {
+  if (!elements.adminTelegramList) {
+    return;
+  }
+
+  const accounts = adminState.telegramAccounts || [];
+  elements.adminTelegramCount.textContent = telegramAccountCountText();
+  setAdminTelegramFormEnabled(
+    adminState.telegramConfigured &&
+      !adminState.telegramSaving &&
+      !adminState.telegramLoading
+  );
+  elements.adminTelegramList.replaceChildren();
+
+  if (!adminState.telegramConfigured) {
+    const message = document.createElement("p");
+    message.className = "admin-empty";
+    message.textContent = adminState.telegramEnabled
+      ? "Додайте TELEGRAM_API_ID та TELEGRAM_API_HASH у .env, щоб логінити акаунти."
+      : "Telegram User API вимкнений у конфігурації.";
+    elements.adminTelegramList.append(message);
+    return;
+  }
+
+  if (adminState.telegramLoading) {
+    const message = document.createElement("p");
+    message.className = "admin-empty";
+    message.textContent = "Завантажуємо Telegram акаунти...";
+    elements.adminTelegramList.append(message);
+    return;
+  }
+
+  if (!accounts.length) {
+    const message = document.createElement("p");
+    message.className = "admin-empty";
+    message.textContent = "Додайте перший Telegram акаунт, щоб шукати переписки по номеру.";
+    elements.adminTelegramList.append(message);
+    return;
+  }
+
+  for (const account of accounts) {
+    const connected = account.status === "connected";
+    const needsConfirm = account.status === "code_sent" || account.status === "password_required";
+    const row = document.createElement("article");
+    row.className = `admin-telegram-card is-${account.status || "draft"}`;
+    row.dataset.telegramAccountId = account.id || "";
+    row.innerHTML = `
+      <div class="admin-telegram-main">
+        <strong>${escapeHtml(account.displayName || account.label || account.phone)}</strong>
+        <span>${escapeHtml(account.phone || "")}${account.username ? ` · @${escapeHtml(account.username)}` : ""}</span>
+      </div>
+      <span class="admin-role-pill ${connected ? "is-admin" : ""}">
+        ${escapeHtml(telegramAccountStatusLabel(account.status))}
+      </span>
+      <div class="admin-telegram-meta">
+        <strong>${escapeHtml(account.lastConnectedAt ? formatDateTime(account.lastConnectedAt) : "—")}</strong>
+        <span>Останній логін</span>
+      </div>
+      <div class="admin-telegram-actions">
+        <button class="admin-icon-button" type="button" data-telegram-action="send-code" aria-label="Надіслати код" title="Надіслати код">
+          ${aiIcon("send")}
+        </button>
+        <button class="admin-icon-button ${account.enabled === false ? "" : "is-danger"}" type="button" data-telegram-action="toggle" aria-label="${account.enabled === false ? "Увімкнути" : "Вимкнути"}" title="${account.enabled === false ? "Увімкнути" : "Вимкнути"}">
+          ${aiIcon(account.enabled === false ? "power" : "ban")}
+        </button>
+        <button class="admin-icon-button is-danger" type="button" data-telegram-action="delete" aria-label="Видалити" title="Видалити">
+          ${aiIcon("trash")}
+        </button>
+      </div>
+      <form class="admin-telegram-confirm ${needsConfirm ? "" : "hidden"}" data-telegram-confirm-form>
+        <input data-telegram-code type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Код Telegram">
+        <input data-telegram-password type="password" autocomplete="current-password" placeholder="2FA пароль, якщо є">
+        <button class="secondary-button" type="submit">Підтвердити</button>
+      </form>
+      ${account.lastError ? `<p class="admin-telegram-error">${escapeHtml(account.lastError)}</p>` : ""}
+    `;
+    elements.adminTelegramList.append(row);
+  }
+}
+
+function renderAdminAnalysisNumbers() {
+  if (!elements.adminAnalysisNumbersList) {
+    return;
+  }
+
+  const numbers = adminState.analysisNumbers;
+  elements.adminAnalysisNumberCount.textContent = adminState.analysisNumbersLoading
+    ? "Завантаження..."
+    : formatInternalNumbersCount(numbers);
+  elements.adminAnalysisNumbersSave.disabled =
+    adminState.analysisNumbersLoading ||
+    adminState.analysisNumbersSaving ||
+    !adminState.analysisNumbersDirty;
+  elements.adminAnalysisEnableAll.disabled =
+    adminState.analysisNumbersLoading || adminState.analysisNumbersSaving || !numbers.length;
+  elements.adminAnalysisDisableAll.disabled =
+    adminState.analysisNumbersLoading || adminState.analysisNumbersSaving || !numbers.length;
+  elements.adminAnalysisNumbersList.replaceChildren();
+
+  if (adminState.analysisNumbersLoading) {
+    const message = document.createElement("p");
+    message.className = "admin-empty";
+    message.textContent = "Завантажуємо внутрішні номери...";
+    elements.adminAnalysisNumbersList.append(message);
+    return;
+  }
+
+  if (!numbers.length) {
+    const message = document.createElement("p");
+    message.className = "admin-empty";
+    message.textContent = "Внутрішніх номерів ще немає в історії дзвінків.";
+    elements.adminAnalysisNumbersList.append(message);
+    return;
+  }
+
+  for (const item of numbers) {
+    const enabled = item.enabled !== false;
+    const metaParts = [
+      item.employeeName && item.employeeName !== item.label ? item.employeeName : "",
+      item.pbxName || "",
+      item.lastCallAt ? `останній: ${formatDateTime(item.lastCallAt)}` : ""
+    ].filter(Boolean);
+    const row = document.createElement("article");
+    row.className = `admin-number-card ${enabled ? "" : "is-disabled"}`;
+    row.dataset.internalNumber = item.number;
+    row.innerHTML = `
+      <label class="admin-number-switch">
+        <input type="checkbox" data-analysis-number="${escapeHtml(item.number)}" ${enabled ? "checked" : ""}>
+        <span aria-hidden="true"></span>
+      </label>
+      <div class="admin-number-main">
+        <strong>${escapeHtml(item.label || `вн. ${item.number}`)}</strong>
+        <span>вн. ${escapeHtml(item.number)}</span>
+      </div>
+      <div class="admin-number-meta">
+        <strong>${formatNumber(item.totalCalls || 0)}</strong>
+        <span>дзвінків у базі</span>
+      </div>
+      <div class="admin-number-extra">
+        <strong>${enabled ? "Аналізується" : "Виключено"}</strong>
+        <span>${escapeHtml(metaParts.join(" · ") || "Без додаткових даних")}</span>
+      </div>
+    `;
+    elements.adminAnalysisNumbersList.append(row);
+  }
+}
+
+function hydrateAdminAnalysisNumbers(numbers) {
+  return (Array.isArray(numbers) ? numbers : []).map((item) => ({
+    ...item,
+    enabled: item.enabled !== false,
+    originalEnabled: item.enabled !== false
+  }));
+}
+
+function syncAdminAnalysisNumbersDirty() {
+  adminState.analysisNumbersDirty = adminState.analysisNumbers.some(
+    (item) => (item.enabled !== false) !== (item.originalEnabled !== false)
+  );
+}
+
 async function loadAdminUsers() {
   if (!isAdminUser()) {
     window.location.href = "/client-card";
     return;
   }
 
-  setState("admin");
   adminState.loading = true;
   setMessage(elements.adminUsersMessage, "", "neutral");
   renderAdminUsers();
@@ -1861,6 +2471,252 @@ async function loadAdminUsers() {
   }
 }
 
+async function loadAdminAnalysisNumbers() {
+  if (!isAdminUser()) {
+    window.location.href = "/client-card";
+    return;
+  }
+
+  adminState.analysisNumbersLoading = true;
+  adminState.analysisNumbersDirty = false;
+  setMessage(elements.adminAnalysisNumbersMessage, "", "neutral");
+  renderAdminAnalysisNumbers();
+
+  try {
+    const response = await apiFetch("/api/admin/analysis-internal-numbers");
+    const payload = await readJsonResponse(response, "Не вдалося завантажити внутрішні номери.");
+    adminState.analysisNumbers = hydrateAdminAnalysisNumbers(payload.numbers);
+    adminState.analysisNumbersDirty = false;
+    setMessage(elements.adminAnalysisNumbersMessage, "", "neutral");
+  } catch (error) {
+    setMessage(
+      elements.adminAnalysisNumbersMessage,
+      error.message || "Не вдалося завантажити внутрішні номери."
+    );
+  } finally {
+    adminState.analysisNumbersLoading = false;
+    renderAdminAnalysisNumbers();
+  }
+}
+
+async function loadAdminTelegramAccounts() {
+  if (!isAdminUser()) {
+    window.location.href = "/client-card";
+    return;
+  }
+
+  adminState.telegramLoading = true;
+  setMessage(elements.adminTelegramMessage, "", "neutral");
+  renderAdminTelegramAccounts();
+
+  try {
+    const response = await apiFetch("/api/admin/telegram/accounts");
+    const payload = await readJsonResponse(response, "Не вдалося завантажити Telegram акаунти.");
+    adminState.telegramAccounts = Array.isArray(payload.accounts) ? payload.accounts : [];
+    adminState.telegramConfigured = payload.configured === true;
+    adminState.telegramEnabled = payload.enabled === true;
+    setMessage(elements.adminTelegramMessage, "", "neutral");
+  } catch (error) {
+    setMessage(
+      elements.adminTelegramMessage,
+      telegramFriendlyError(error.message || "Не вдалося завантажити Telegram акаунти.")
+    );
+  } finally {
+    adminState.telegramLoading = false;
+    renderAdminTelegramAccounts();
+  }
+}
+
+async function loadAdminPage(tab = adminState.activeTab || "users") {
+  if (!isAdminUser()) {
+    window.location.href = "/client-card";
+    return;
+  }
+
+  adminState.activeTab = tab;
+  setState("admin");
+  renderAdminChrome();
+  await Promise.all([
+    loadAdminUsers(),
+    loadAdminAnalysisNumbers(),
+    loadAdminTelegramAccounts()
+  ]);
+  renderAdminChrome();
+}
+
+function setAdminTab(tab) {
+  adminState.activeTab = ["users", "analysis-numbers", "telegram"].includes(tab)
+    ? tab
+    : "users";
+  renderAdminChrome();
+}
+
+async function handleAdminTelegramSubmit(event) {
+  event.preventDefault();
+  const phone = elements.adminTelegramPhone.value.trim();
+  if (!adminState.telegramConfigured) {
+    setMessage(elements.adminTelegramMessage, "Спочатку увімкніть Telegram User API і додайте TELEGRAM_API_ID/TELEGRAM_API_HASH у .env.");
+    return;
+  }
+  if (!phone || adminState.telegramSaving) {
+    return;
+  }
+
+  adminState.telegramSaving = true;
+  renderAdminTelegramAccounts();
+  setMessage(elements.adminTelegramMessage, "Додаємо Telegram акаунт...", "neutral");
+
+  try {
+    const response = await apiFetch("/api/admin/telegram/accounts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        label: elements.adminTelegramLabel.value,
+        phone
+      })
+    });
+    await readJsonResponse(response, "Не вдалося додати Telegram акаунт.");
+    elements.adminTelegramForm.reset();
+    setMessage(elements.adminTelegramMessage, "Акаунт додано. Тепер надішліть код.", "success");
+    await loadAdminTelegramAccounts();
+  } catch (error) {
+    setMessage(
+      elements.adminTelegramMessage,
+      telegramFriendlyError(error.message || "Не вдалося додати Telegram акаунт.")
+    );
+  } finally {
+    adminState.telegramSaving = false;
+    renderAdminTelegramAccounts();
+  }
+}
+
+async function postAdminTelegramAction(accountId, action, body = {}) {
+  const response = await apiFetch(
+    `/api/admin/telegram/accounts/${encodeURIComponent(accountId)}/${action}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    }
+  );
+  return readJsonResponse(response, "Не вдалося виконати Telegram дію.");
+}
+
+async function handleAdminTelegramClick(event) {
+  const button = event.target.closest("[data-telegram-action]");
+  if (!button || adminState.telegramSaving) {
+    return;
+  }
+  const row = button.closest("[data-telegram-account-id]");
+  const accountId = row && row.dataset.telegramAccountId;
+  if (!accountId) {
+    return;
+  }
+  const action = button.dataset.telegramAction;
+  const account = adminState.telegramAccounts.find((item) => item.id === accountId);
+
+  if (action === "delete") {
+    const confirmed = await showUiConfirmDialog({
+      title: "Видалити Telegram акаунт?",
+      message: "Сесія буде видалена з app-state БД. Для повторного використання треба буде логінитись знову.",
+      confirmLabel: "Видалити",
+      cancelLabel: "Скасувати",
+      tone: "danger",
+      anchor: button
+    });
+    if (!confirmed) {
+      return;
+    }
+  }
+
+  adminState.telegramSaving = true;
+  renderAdminTelegramAccounts();
+
+  try {
+    if (action === "send-code") {
+      setMessage(elements.adminTelegramMessage, "Надсилаємо код Telegram...", "neutral");
+      await postAdminTelegramAction(accountId, "send-code");
+      setMessage(elements.adminTelegramMessage, "Код надіслано. Введіть його в акаунті.", "success");
+    } else if (action === "toggle") {
+      const response = await apiFetch(`/api/admin/telegram/accounts/${encodeURIComponent(accountId)}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          enabled: account && account.enabled === false
+        })
+      });
+      await readJsonResponse(response, "Не вдалося змінити статус акаунта.");
+      setMessage(elements.adminTelegramMessage, "Статус акаунта оновлено.", "success");
+    } else if (action === "delete") {
+      const response = await apiFetch(`/api/admin/telegram/accounts/${encodeURIComponent(accountId)}`, {
+        method: "DELETE"
+      });
+      await readJsonResponse(response, "Не вдалося видалити Telegram акаунт.");
+      setMessage(elements.adminTelegramMessage, "Telegram акаунт видалено.", "success");
+    }
+    await loadAdminTelegramAccounts();
+  } catch (error) {
+    setMessage(
+      elements.adminTelegramMessage,
+      telegramFriendlyError(error.message || "Не вдалося виконати Telegram дію.")
+    );
+  } finally {
+    adminState.telegramSaving = false;
+    renderAdminTelegramAccounts();
+  }
+}
+
+async function handleAdminTelegramConfirm(event) {
+  const form = event.target.closest("[data-telegram-confirm-form]");
+  if (!form) {
+    return;
+  }
+  event.preventDefault();
+  if (adminState.telegramSaving) {
+    return;
+  }
+  const row = form.closest("[data-telegram-account-id]");
+  const accountId = row && row.dataset.telegramAccountId;
+  if (!accountId) {
+    return;
+  }
+  const code = form.querySelector("[data-telegram-code]")?.value || "";
+  const password = form.querySelector("[data-telegram-password]")?.value || "";
+
+  adminState.telegramSaving = true;
+  renderAdminTelegramAccounts();
+  setMessage(elements.adminTelegramMessage, "Підтверджуємо Telegram логін...", "neutral");
+
+  try {
+    const payload = await postAdminTelegramAction(accountId, "confirm", {
+      code,
+      password
+    });
+    setMessage(
+      elements.adminTelegramMessage,
+      payload.passwordRequired
+        ? telegramFriendlyError("SESSION_PASSWORD_NEEDED") + " Введіть пароль і підтвердіть ще раз."
+        : "Telegram акаунт підключено.",
+      payload.passwordRequired ? "neutral" : "success"
+    );
+    await loadAdminTelegramAccounts();
+  } catch (error) {
+    setMessage(
+      elements.adminTelegramMessage,
+      telegramFriendlyError(error.message || "Не вдалося підтвердити Telegram логін.")
+    );
+  } finally {
+    adminState.telegramSaving = false;
+    renderAdminTelegramAccounts();
+  }
+}
+
 function openAdminUserModal(user = null) {
   adminState.editingUserId = user ? user.id : "";
   elements.adminUserForm?.reset();
@@ -1869,6 +2725,7 @@ function openAdminUserModal(user = null) {
   elements.adminUserUsername.value = user ? user.username || "" : "";
   elements.adminUserName.value = user ? user.name || "" : "";
   elements.adminUserRole.value = user && user.role === "admin" ? "admin" : "user";
+  syncCustomSelect(elements.adminUserRole);
   elements.adminUserPassword.value = "";
   elements.adminUserPassword.required = !user;
   elements.adminUserPasswordLabel.textContent = user ? "Новий пароль" : "Пароль";
@@ -1923,13 +2780,20 @@ async function handleAdminUserSubmit(event) {
   }
 }
 
-async function deleteAdminUser(userId) {
+async function deleteAdminUser(userId, anchor = null) {
   const user = adminUserById(userId);
   if (!user) {
     return;
   }
 
-  const confirmed = window.confirm(`Видалити користувача ${user.name || user.username}?`);
+  const confirmed = await showUiConfirmDialog({
+    title: "Видалити користувача?",
+    message: `Користувач "${user.name || user.username}" втратить доступ до картки клієнта, дзвінків і налаштувань.`,
+    confirmLabel: "Видалити",
+    cancelLabel: "Скасувати",
+    tone: "danger",
+    anchor
+  });
   if (!confirmed) {
     return;
   }
@@ -1955,7 +2819,84 @@ function handleAdminUsersClick(event) {
   if (button.dataset.adminAction === "edit-user") {
     openAdminUserModal(adminUserById(userId));
   } else if (button.dataset.adminAction === "delete-user") {
-    void deleteAdminUser(userId);
+    void deleteAdminUser(userId, button);
+  }
+}
+
+function handleAdminTabsClick(event) {
+  const button = event.target.closest("[data-admin-tab]");
+  if (!button) {
+    return;
+  }
+  setAdminTab(button.dataset.adminTab || "users");
+}
+
+function handleAdminAnalysisNumbersChange(event) {
+  const input = event.target.closest("[data-analysis-number]");
+  if (!input) {
+    return;
+  }
+  const number = input.dataset.analysisNumber || "";
+  const item = adminState.analysisNumbers.find((entry) => entry.number === number);
+  if (!item) {
+    return;
+  }
+  item.enabled = input.checked;
+  syncAdminAnalysisNumbersDirty();
+  renderAdminAnalysisNumbers();
+}
+
+function setAllAdminAnalysisNumbers(enabled) {
+  if (!adminState.analysisNumbers.length) {
+    return;
+  }
+  for (const item of adminState.analysisNumbers) {
+    item.enabled = Boolean(enabled);
+  }
+  syncAdminAnalysisNumbersDirty();
+  renderAdminAnalysisNumbers();
+}
+
+async function saveAdminAnalysisNumbers() {
+  if (
+    adminState.analysisNumbersLoading ||
+    adminState.analysisNumbersSaving ||
+    !adminState.analysisNumbersDirty
+  ) {
+    return;
+  }
+
+  adminState.analysisNumbersSaving = true;
+  renderAdminAnalysisNumbers();
+  setMessage(elements.adminAnalysisNumbersMessage, "Зберігаємо налаштування номерів...", "neutral");
+
+  try {
+    const response = await apiFetch("/api/admin/analysis-internal-numbers", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        numbers: adminState.analysisNumbers.map((item) => ({
+          number: item.number,
+          enabled: item.enabled !== false,
+          customLabel: item.customLabel || "",
+          notes: item.notes || ""
+        }))
+      })
+    });
+    const payload = await readJsonResponse(response, "Не вдалося зберегти внутрішні номери.");
+    adminState.analysisNumbers = hydrateAdminAnalysisNumbers(payload.numbers);
+    adminState.analysisNumbersDirty = false;
+    setMessage(elements.adminAnalysisNumbersMessage, "Налаштування збережено.", "success");
+  } catch (error) {
+    setMessage(
+      elements.adminAnalysisNumbersMessage,
+      error.message || "Не вдалося зберегти внутрішні номери."
+    );
+  } finally {
+    adminState.analysisNumbersSaving = false;
+    renderAdminAnalysisNumbers();
   }
 }
 
@@ -2008,7 +2949,7 @@ function handleAiSettingsClick(event) {
   } else if (aiAction === "duplicate-call-type") {
     duplicateAiCallType(key);
   } else if (aiAction === "delete-call-type") {
-    deleteAiCallType(key);
+    void deleteAiCallType(key, actionButton);
   } else if (aiAction === "add-metric") {
     addAiMetric();
   } else if (aiAction === "toggle-metric") {
@@ -2016,7 +2957,7 @@ function handleAiSettingsClick(event) {
   } else if (aiAction === "edit-metric") {
     openAiMetricModal(key);
   } else if (aiAction === "delete-metric") {
-    deleteAiMetric(key);
+    void deleteAiMetric(key, actionButton);
   } else if (aiAction === "additional-toggle") {
     const pressed = actionButton.getAttribute("aria-pressed") === "true";
     actionButton.setAttribute("aria-pressed", String(!pressed));
@@ -2609,6 +3550,8 @@ function aiStatusInfo(status, terminalFailure = false) {
   switch (status) {
     case "done":
       return { label: "Готово", className: "status-paid" };
+    case "loading":
+      return { label: "Завантажуємо", className: "status-reserved" };
     case "queued":
       return { label: "У черзі", className: "status-reserved" };
     case "processing":
@@ -2630,6 +3573,23 @@ function callTypeLabel(summary) {
   }
 
   return summary.callTypeLabel || CALL_TYPE_LABELS[summary.callType] || "";
+}
+
+function populateMonitorCallTypeFilter() {
+  const select = elements.monitorCallTypeFilter;
+  if (!select || select.dataset.populated === "true") {
+    return;
+  }
+
+  const currentValue = select.value;
+  for (const [value, label] of Object.entries(CALL_TYPE_LABELS)) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    select.append(option);
+  }
+  select.value = currentValue;
+  select.dataset.populated = "true";
 }
 
 function fallbackCallTypeText(call, ai, disposition) {
@@ -2679,6 +3639,9 @@ function routeState(pathname = window.location.pathname) {
   if (pathname === "/calls-monitor") {
     return "monitor";
   }
+  if (pathname === "/call-stats") {
+    return "callStats";
+  }
   if (pathname === "/call-analytics") {
     return "analytics";
   }
@@ -2691,11 +3654,34 @@ function routeState(pathname = window.location.pathname) {
   return "card";
 }
 
+function syncDetailPanelHeights() {
+  const grid = document.querySelector(".call-detail-grid");
+  if (!grid) {
+    return;
+  }
+
+  grid.classList.remove("is-peer-height-locked");
+  grid.style.removeProperty("--detail-quality-height");
+
+  const aiPanel = grid.querySelector(".call-ai-panel");
+  const qualityPanel = grid.querySelector(".call-quality-panel");
+  if (!aiPanel || !qualityPanel || window.matchMedia("(max-width: 980px)").matches) {
+    return;
+  }
+
+  const qualityHeight = Math.ceil(qualityPanel.getBoundingClientRect().height);
+  if (qualityHeight > 0) {
+    grid.style.setProperty("--detail-quality-height", `${qualityHeight}px`);
+    grid.classList.add("is-peer-height-locked");
+  }
+}
+
 function setState(state) {
   elements.emptyState.classList.toggle("hidden", state !== "empty");
   elements.loadingState.classList.toggle("hidden", state !== "loading");
   elements.clientCard.classList.toggle("hidden", state !== "card");
   elements.monitorPage.classList.toggle("hidden", state !== "monitor");
+  elements.callStatsPage.classList.toggle("hidden", state !== "callStats");
   elements.analyticsPage.classList.toggle("hidden", state !== "analytics");
   elements.aiSettingsPage.classList.toggle("hidden", state !== "aiSettings");
   elements.adminPage.classList.toggle("hidden", state !== "admin");
@@ -2706,6 +3692,7 @@ function setState(state) {
     loading: "Завантаження",
     card: "Картка клієнта",
     monitor: "Дзвінки",
+    callStats: "Статистика дзвінків",
     analytics: "AI-аналітика",
     aiSettings: "AI-налаштування",
     admin: "Адмінка",
@@ -2715,25 +3702,30 @@ function setState(state) {
   const pageTitle = state === "loading" && titles[navState]
     ? titles[navState]
     : titles[state] || "Картка клієнта";
-  elements.pageTitle.textContent = pageTitle;
   if (state !== "detail") {
     document.title = `${pageTitle} | DUMA`;
   }
 
   for (const link of elements.viewLinks) {
     const view = link.getAttribute("data-view-link");
-    link.classList.toggle(
-      "active",
+    const isActive =
       ((navState === "monitor" || navState === "detail") && view === "calls-monitor") ||
+        (navState === "callStats" && view === "call-stats") ||
         (navState === "analytics" && view === "call-analytics") ||
         (navState === "aiSettings" && view === "ai-settings") ||
         (navState === "admin" && view === "admin") ||
-        (["empty", "card"].includes(navState) && view === "client-card")
-    );
+        (["empty", "card"].includes(navState) && view === "client-card");
+    link.classList.toggle("active", isActive);
+    if (isActive) {
+      link.setAttribute("aria-current", "page");
+    } else {
+      link.removeAttribute("aria-current");
+    }
   }
 
   if (state === "detail") {
     requestAnimationFrame(() => {
+      syncDetailPanelHeights();
       resizeDetailAudioCanvas(true);
       if (elements.detailAudio.src) {
         buildSyntheticDetailPeaks();
@@ -2772,65 +3764,636 @@ function renderPassengers(passengers) {
   }
 }
 
-function renderUpcoming(ticket) {
+function ticketTransferSegments(ticket) {
+  return Array.isArray(ticket && ticket.transferSegments)
+    ? ticket.transferSegments.filter((segment) => segment && (segment.from || segment.to))
+    : [];
+}
+
+function transferDisplaySegment(segments, fallbackTicket) {
+  const now = Date.now();
+  return (
+    segments.find((segment) => {
+      const departAt = segment.departAt ? new Date(segment.departAt).getTime() : 0;
+      const arriveAt = segment.arriveAt ? new Date(segment.arriveAt).getTime() : 0;
+      return (
+        (departAt && departAt >= now) ||
+        (departAt && arriveAt && departAt <= now && arriveAt >= now)
+      );
+    }) ||
+    segments[0] ||
+    fallbackTicket
+  );
+}
+
+function renderStopDetails(stop, fallbackText) {
+  const point = String(stop && stop.point || "").trim();
+  const address = String(stop && stop.address || "").trim();
+  const lines = [];
+
+  if (point) {
+    lines.push(point);
+  }
+  if (address && address.toLowerCase() !== point.toLowerCase()) {
+    lines.push(address);
+  }
+
+  if (!lines.length) {
+    lines.push(fallbackText || "Адреса не вказана");
+  }
+
+  return lines.map((line) => `<span>${escapeHtml(line)}</span>`).join("");
+}
+
+function sameDateOrderTickets(ticket) {
+  if (!ticket || !currentCard || !Array.isArray(currentCard.tickets)) {
+    return [];
+  }
+
+  const orderId = String(ticket.orderId || "");
+  const targetDate = dateKey(ticket.departAt);
+  if (!orderId || !targetDate) {
+    return [];
+  }
+
+  return currentCard.tickets
+    .filter(
+      (item) =>
+        item &&
+        String(item.orderId || "") === orderId &&
+        dateKey(item.departAt) === targetDate
+    )
+    .sort((left, right) => {
+      const leftTime = new Date(left.departAt || 0).getTime();
+      const rightTime = new Date(right.departAt || 0).getTime();
+      if (leftTime !== rightTime) {
+        return leftTime - rightTime;
+      }
+      return String(left.ticketNumber || "").localeCompare(String(right.ticketNumber || ""));
+    });
+}
+
+function timestampValue(value) {
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function firstTimestampValue(...values) {
+  for (const value of values) {
+    const time = timestampValue(value);
+    if (time) {
+      return time;
+    }
+  }
+
+  return 0;
+}
+
+function ticketOrderKey(ticket, fallbackIndex = 0) {
+  const orderId = String(ticket && ticket.orderId || "").trim();
+  if (orderId) {
+    return `order-id:${orderId}`;
+  }
+
+  const orderNumber = String(ticket && ticket.orderNumber || "").trim();
+  if (orderNumber) {
+    return `order-number:${orderNumber}`;
+  }
+
+  const ticketNumber = String(ticket && ticket.ticketNumber || "").trim();
+  if (ticketNumber) {
+    return `ticket:${ticketNumber}`;
+  }
+
+  const id = String(ticket && ticket.id || "").trim();
+  return id ? `ticket-id:${id}` : `row:${fallbackIndex}`;
+}
+
+function ticketOrderRecency(ticket) {
+  return firstTimestampValue(
+    ticket && ticket.orderSaleDate,
+    ticket && ticket.orderCreatedAt,
+    ticket && ticket.orderUpdatedAt,
+    ticket && ticket.saleDate,
+    ticket && ticket.departAt,
+    ticket && ticket.arriveAt
+  );
+}
+
+function ticketDepartSortValue(ticket) {
+  const time = timestampValue(ticket && ticket.departAt);
+  return time || Number.MAX_SAFE_INTEGER;
+}
+
+function sortTicketsForOrderModal(tickets) {
+  return [...(Array.isArray(tickets) ? tickets : [])].sort((left, right) => {
+    const departDiff = ticketDepartSortValue(left) - ticketDepartSortValue(right);
+    if (departDiff) {
+      return departDiff;
+    }
+
+    return String(left && left.ticketNumber || "").localeCompare(
+      String(right && right.ticketNumber || ""),
+      "uk",
+      { numeric: true }
+    );
+  });
+}
+
+function buildTicketOrderGroups(tickets) {
+  const groups = new Map();
+
+  (Array.isArray(tickets) ? tickets : []).forEach((ticket, index) => {
+    const key = ticketOrderKey(ticket, index);
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        firstIndex: index,
+        sortTime: 0,
+        tickets: [],
+        anchor: null
+      });
+    }
+
+    const group = groups.get(key);
+    group.tickets.push(ticket);
+    group.sortTime = Math.max(group.sortTime, ticketOrderRecency(ticket));
+  });
+
+  return [...groups.values()]
+    .map((group) => {
+      const sortedTickets = sortTicketsForOrderModal(group.tickets);
+      const transferAnchor = sortedTickets.find((ticket) => ticketTransferSegments(ticket).length > 1);
+      return {
+        ...group,
+        tickets: sortedTickets,
+        anchor: transferAnchor || sortedTickets[0] || group.tickets[0]
+      };
+    })
+    .sort((left, right) => {
+      if (right.sortTime !== left.sortTime) {
+        return right.sortTime - left.sortTime;
+      }
+
+      return left.firstIndex - right.firstIndex;
+    });
+}
+
+function orderGroupDate(group) {
+  return group && group.sortTime ? new Date(group.sortTime).toISOString() : "";
+}
+
+function orderGroupAgent(group) {
+  const tickets = group && Array.isArray(group.tickets) ? group.tickets : [];
+  const values = [
+    ...new Set(
+      tickets
+        .map((ticket) => String(ticket && (ticket.agent || ticket.agentCode) || "").trim())
+        .filter(Boolean)
+    )
+  ];
+
+  if (!values.length) {
+    return "Агент не вказаний";
+  }
+
+  if (values.length === 1) {
+    return values[0];
+  }
+
+  return `${values[0]} +${values.length - 1}`;
+}
+
+function orderGroupStatus(group) {
+  const tickets = group && Array.isArray(group.tickets) ? group.tickets : [];
+  const statuses = [
+    ...new Set(
+      tickets
+        .map((ticket) => String(ticket && ticket.status || "").trim())
+        .filter(Boolean)
+    )
+  ];
+
+  if (statuses.length === 1) {
+    const sample = tickets.find((ticket) => String(ticket && ticket.status || "").trim() === statuses[0]);
+    return statusInfo(sample && sample.status, sample && sample.statusLabel);
+  }
+
+  if (statuses.length > 1) {
+    return { label: "Змішаний статус", className: "" };
+  }
+
+  return { label: "Без статусу", className: "" };
+}
+
+function orderGroupTotalParts(group) {
+  const tickets = group && Array.isArray(group.tickets) ? group.tickets : [];
+  const orderPrice = tickets
+    .map((ticket) => ticket && ticket.orderPrice)
+    .find((price) => price && Number.isFinite(Number(price.amount)) && Number(price.amount) > 0);
+
+  if (orderPrice) {
+    return [{
+      amount: Number(orderPrice.amount),
+      currency: orderPrice.currency || "UAH"
+    }];
+  }
+
+  const totals = new Map();
+  for (const ticket of tickets) {
+    const price = ticket && ticket.price ? ticket.price : {};
+    const amount = Number(price.amount);
+    if (!Number.isFinite(amount)) {
+      continue;
+    }
+
+    const currency = price.currency || "UAH";
+    totals.set(currency, (totals.get(currency) || 0) + amount);
+  }
+
+  return [...totals.entries()].map(([currency, amount]) => ({ currency, amount }));
+}
+
+function formatOrderGroupTotal(group) {
+  const parts = orderGroupTotalParts(group);
+  if (!parts.length) {
+    return "—";
+  }
+
+  return parts
+    .map((part) => formatMoney(part.amount, part.currency))
+    .join(" + ");
+}
+
+function formatOrderTicketCount(count) {
+  const value = Number(count) || 0;
+  if (value === 1) {
+    return "1 квиток";
+  }
+  if (value >= 2 && value <= 4) {
+    return `${value} квитки`;
+  }
+  return `${value} квитків`;
+}
+
+function orderTicketsFor(ticket, sourceTickets = currentTickets) {
+  if (!ticket) {
+    return [];
+  }
+
+  const orderId = String(ticket.orderId || "").trim();
+  const orderNumber = String(ticket.orderNumber || "").trim();
+  const ticketNumber = String(ticket.ticketNumber || "").trim();
+  const ticketId = String(ticket.id || "").trim();
+  const list = Array.isArray(sourceTickets) ? sourceTickets : [];
+
+  return sortTicketsForOrderModal(
+    list.filter((item) => {
+      if (!item) {
+        return false;
+      }
+      if (orderId) {
+        return String(item.orderId || "").trim() === orderId;
+      }
+      if (orderNumber) {
+        return String(item.orderNumber || "").trim() === orderNumber;
+      }
+      if (ticketNumber) {
+        return String(item.ticketNumber || "").trim() === ticketNumber;
+      }
+      return ticketId && String(item.id || "").trim() === ticketId;
+    })
+  );
+}
+
+function renderTransferSegments(segments, options = {}) {
+  if (!segments.length) {
+    return "";
+  }
+
+  const items = segments
+    .map((segment, index) => {
+      const from = segment.from || {};
+      const to = segment.to || {};
+      const fromCity = from.locality || "Звідки не вказано";
+      const toCity = to.locality || "Куди не вказано";
+      const timeRange = `${formatTime(segment.departAt) || "—"}-${formatTime(segment.arriveAt) || "—"}`;
+      const busColor = /^#[0-9a-fA-F]{6}$/.test(String(segment.busColor || ""))
+        ? String(segment.busColor)
+        : "";
+      const busValue = options.busLoading && segment.tripId && !segment.busAssignmentChecked
+        ? `<span class="inline-loading"><span class="mini-spinner" aria-hidden="true"></span> Завантажуємо</span>`
+        : segment.busNumber
+          ? `${busColor ? `<span class="trip-bus-color" style="--bus-color: ${busColor}" aria-hidden="true"></span>` : ""}<span>${escapeHtml(segment.busNumber)}</span>`
+          : "Не призначено";
+
+      return `
+        <article class="trip-segment-card">
+          <div class="trip-segment-head">
+            <span>${index + 1}</span>
+            <strong>Сегмент ${index + 1}</strong>
+          </div>
+          <div class="trip-segment-route">
+            <div class="trip-segment-place">
+              <span>Звідки</span>
+              <strong>${escapeHtml(fromCity)}</strong>
+              <small>${renderStopDetails(from, "Адреса посадки не вказана")}</small>
+            </div>
+            <i class="trip-segment-line" aria-hidden="true"></i>
+            <div class="trip-segment-place">
+              <span>Куди</span>
+              <strong>${escapeHtml(toCity)}</strong>
+              <small>${renderStopDetails(to, "Адреса прибуття не вказана")}</small>
+            </div>
+          </div>
+          <div class="trip-segment-meta">
+            <div><b>Дата</b>${escapeHtml(formatDate(segment.departAt, { short: true }))}</div>
+            <div><b>Час</b>${escapeHtml(timeRange)}</div>
+            ${segment.ticketNumber ? `<div><b>Квиток</b>${escapeHtml(segment.ticketNumber)}</div>` : ""}
+            ${segment.seat ? `<div><b>Місце</b>${escapeHtml(segment.seat)}</div>` : ""}
+            <div><b>Автобус</b><em>${busValue}</em></div>
+          </div>
+          ${segment.routeCode ? `<p class="trip-segment-note">${escapeHtml(segment.routeCode)}</p>` : ""}
+        </article>
+      `;
+    })
+    .join("");
+
+  return `
+    <section class="trip-segments">
+      <div class="trip-subsection-title">
+        <span>Сегменти маршруту</span>
+        <strong>${segments.length} частини</strong>
+      </div>
+      <div class="trip-segment-grid">
+        ${items}
+      </div>
+    </section>
+  `;
+}
+
+function renderUpcoming(ticket, options = {}) {
   elements.upcomingSection.classList.toggle("hidden", !ticket);
   if (!ticket) {
     return;
   }
 
   const info = statusInfo(ticket.status, ticket.statusLabel);
+  const transferSegments = ticketTransferSegments(ticket);
+  const hasTransfer = transferSegments.length > 1;
+  const displaySegment = transferDisplaySegment(transferSegments, ticket);
+  const routeStartSegment = hasTransfer ? transferSegments[0] : ticket;
+  const routeEndSegment = hasTransfer ? transferSegments[transferSegments.length - 1] : ticket;
+  const from = (routeStartSegment && routeStartSegment.from) || ticket.from || {};
+  const to = (routeEndSegment && routeEndSegment.to) || ticket.to || {};
+  const scheduleTicket = displaySegment || ticket;
+  const fromCity = from.locality || "Звідки не вказано";
+  const toCity = to.locality || "Куди не вказано";
+  const departDate = formatDate(scheduleTicket.departAt, { short: true });
+  const departTime = formatTime(scheduleTicket.departAt) || "—";
+  const arriveTime = formatTime(scheduleTicket.arriveAt) || "—";
+  const agent = ticket.agent || ticket.agentCode || "Агент не вказаний";
+  const price = ticket.price || {};
+  const busLoading = Boolean(
+    options.busLoading &&
+    (ticket.tripId || transferSegments.some((segment) => segment && segment.tripId))
+  );
+  const busDetails =
+    ticket.busNumber ||
+    (ticket.busAssignmentChecked || ticket.tripId ? "Не призначено" : "");
+  const busColor = /^#[0-9a-fA-F]{6}$/.test(String(ticket.busColor || ""))
+    ? String(ticket.busColor)
+    : "";
+  const busValue = busLoading
+    ? `<span class="inline-loading"><span class="mini-spinner" aria-hidden="true"></span> Завантажуємо</span>`
+    : busDetails
+      ? `<span class="trip-bus-value">${busColor ? `<span class="trip-bus-color" style="--bus-color: ${busColor}" aria-hidden="true"></span>` : ""}<span>${escapeHtml(busDetails)}</span></span>`
+      : "";
+  const orderDetails = ticket.orderNumber || "Не вказано";
+  const ticketDetails = ticket.ticketNumber || "Не вказано";
+  const passengerDetails = [
+    ticket.passenger || "Пасажир не вказаний",
+    ticket.seat ? `місце ${ticket.seat}` : ""
+  ].filter(Boolean).join(" · ");
+  const showGeneralBus = Boolean(!hasTransfer && busValue);
+  const relatedTickets = sameDateOrderTickets(ticket);
+  const extraTicketCount = Math.max(0, relatedTickets.length - 1);
+
   elements.upcomingStatus.className = `status ${info.className}`;
   elements.upcomingStatus.textContent = info.label;
   elements.upcomingTrip.innerHTML = `
-    <div class="trip-date">
-      <strong>${escapeHtml(formatDate(ticket.departAt, { short: true }))}</strong>
-      <span>Відпр. ${escapeHtml(formatTime(ticket.departAt) || "—")} · приб. ${escapeHtml(formatTime(ticket.arriveAt) || "—")}</span>
-      <span>рейс ${escapeHtml(ticket.routeCode || "—")} · зам. ${escapeHtml(ticket.orderNumber || "—")} · кв. ${escapeHtml(ticket.ticketNumber || "—")}</span>
-    </div>
-    <div class="trip-place">
-      <strong>${escapeHtml(ticket.from.locality || "Місце не вказано")}</strong>
-      <span>${escapeHtml(ticket.from.point || "Станція не вказана")}</span>
-    </div>
-    <div class="trip-place">
-      <strong>${escapeHtml(ticket.to.locality || "Місце не вказано")}</strong>
-      <span>${escapeHtml(ticket.to.point || "Станція не вказана")}</span>
-    </div>
-    <div class="trip-details">
-      <strong>${escapeHtml(formatMoney(ticket.price.amount, ticket.price.currency))}</strong>
-      <span>${escapeHtml(ticket.passenger)}${ticket.seat ? ` · місце ${escapeHtml(ticket.seat)}` : ""}</span>
-      <span>${escapeHtml(ticket.carrier || "")}</span>
+    <div class="trip-card">
+      <div class="trip-hero">
+        <div class="trip-route">
+          <div class="trip-place trip-place-from">
+            <span>Звідки</span>
+            <strong>${escapeHtml(fromCity)}</strong>
+            <small>${renderStopDetails(from, "Адреса посадки не вказана")}</small>
+          </div>
+          <div class="trip-route-connector">
+            <span class="trip-route-line" aria-hidden="true"></span>
+          </div>
+          <div class="trip-place trip-place-to">
+            <span>Куди</span>
+            <strong>${escapeHtml(toCity)}</strong>
+            <small>${renderStopDetails(to, "Адреса прибуття не вказана")}</small>
+          </div>
+        </div>
+        <div class="trip-departure">
+          <span>Відправлення</span>
+          <strong>${escapeHtml(departDate)}</strong>
+          <b>${escapeHtml(departTime)}</b>
+          <small>прибуття ${escapeHtml(arriveTime)}</small>
+        </div>
+      </div>
+      ${hasTransfer ? renderTransferSegments(transferSegments, { busLoading }) : ""}
+      <section class="trip-general">
+        <div class="trip-subsection-title">
+          <span>Загальна інформація</span>
+          ${extraTicketCount ? `
+            <button class="trip-related-button" type="button" data-action="show-related-tickets">
+              Показати ще квитки (${extraTicketCount})
+            </button>
+          ` : ""}
+        </div>
+        <dl class="trip-info">
+          <div class="trip-info-item trip-info-passenger">
+            <dt>Пасажир</dt>
+            <dd>${escapeHtml(passengerDetails)}</dd>
+          </div>
+          <div class="trip-info-item trip-info-agent">
+            <dt>Агент</dt>
+            <dd>${escapeHtml(agent)}</dd>
+          </div>
+          ${showGeneralBus ? `
+            <div class="trip-info-item trip-info-bus">
+              <dt>Автобус</dt>
+              <dd>${busValue}</dd>
+            </div>
+          ` : ""}
+          <div class="trip-info-item trip-info-price">
+            <dt>Ціна</dt>
+            <dd>${escapeHtml(formatMoney(price.amount, price.currency))}</dd>
+          </div>
+          <div class="trip-info-item trip-info-order">
+            <dt>Замовлення</dt>
+            <dd>${escapeHtml(orderDetails)}</dd>
+          </div>
+          <div class="trip-info-item trip-info-ticket">
+            <dt>Квиток</dt>
+            <dd>${escapeHtml(ticketDetails)}</dd>
+          </div>
+        </dl>
+      </section>
     </div>
   `;
+
+  const relatedButton = elements.upcomingTrip.querySelector('[data-action="show-related-tickets"]');
+  if (relatedButton) {
+    relatedButton.addEventListener("click", () => {
+      openRelatedTicketsModal(relatedTickets, ticket);
+    });
+  }
 }
 
 function renderTickets(tickets) {
   elements.ticketList.replaceChildren();
   currentTickets = Array.isArray(tickets) ? tickets : [];
-  elements.ticketCountLabel.textContent = `${currentTickets.length} квитків`;
+  const orderGroups = buildTicketOrderGroups(currentTickets);
+  elements.ticketCountLabel.textContent = orderGroups.length
+    ? `${orderGroups.length} замовлень`
+    : "0 замовлень";
 
-  if (!currentTickets.length) {
+  if (!orderGroups.length) {
     const message = document.createElement("p");
     message.className = "no-data";
-    message.textContent = "За цим номером квитків не знайдено.";
+    message.textContent = "За цим номером замовлень не знайдено.";
     elements.ticketList.append(message);
     return;
   }
 
-  for (const ticket of currentTickets.slice(0, TICKETS_PREVIEW_LIMIT)) {
-    appendTicket(elements.ticketList, ticket);
+  for (const group of orderGroups.slice(0, RECENT_ORDERS_PREVIEW_LIMIT)) {
+    appendOrderGroup(elements.ticketList, group);
   }
 
-  if (currentTickets.length > TICKETS_PREVIEW_LIMIT) {
+  if (orderGroups.length > RECENT_ORDERS_PREVIEW_LIMIT) {
     const action = document.createElement("div");
     action.className = "tickets-action";
     const button = document.createElement("button");
     button.className = "secondary-button show-all-tickets";
     button.type = "button";
-    button.textContent = `Показати всі квитки (${currentTickets.length})`;
-    button.addEventListener("click", openTicketsModal);
+    button.textContent = `Показати всі замовлення (${orderGroups.length})`;
+    button.addEventListener("click", () => openOrderGroupsModal(orderGroups));
     action.append(button);
     elements.ticketList.append(action);
   }
+}
+
+function appendOrderGroup(container, group) {
+  const ticket = group && group.anchor;
+  const tickets = group && Array.isArray(group.tickets) ? group.tickets : [];
+  if (!ticket) {
+    return;
+  }
+
+  const orderNumber = ticket.orderNumber || ticket.orderId || "без номера";
+  const dateValue = orderGroupDate(group);
+  const status = orderGroupStatus(group);
+  const article = document.createElement("article");
+  article.className = "order-row";
+  article.style.display = "block";
+  article.style.boxSizing = "border-box";
+  article.style.width = "100%";
+  article.style.padding = "24px 0";
+  article.tabIndex = 0;
+  article.setAttribute("role", "button");
+  article.setAttribute("aria-label", `Відкрити замовлення ${orderNumber}`);
+  article.addEventListener("click", () => {
+    openOrderTicketsModal(ticket, tickets.length ? tickets : [ticket]);
+  });
+  article.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    openOrderTicketsModal(ticket, tickets.length ? tickets : [ticket]);
+  });
+
+  const date = document.createElement("div");
+  date.className = "order-date";
+  const dateStrong = document.createElement("strong");
+  dateStrong.textContent = formatDate(dateValue, { short: true });
+  const dateSpan = document.createElement("span");
+  dateSpan.textContent = formatTime(dateValue) || "замовлення";
+  date.append(dateStrong, dateSpan);
+
+  const main = document.createElement("div");
+  main.className = "order-main";
+
+  const title = document.createElement("div");
+  title.className = "ticket-route order-title";
+  const titleStrong = document.createElement("strong");
+  titleStrong.textContent = `Замовлення ${orderNumber}`;
+  const statusElement = document.createElement("span");
+  statusElement.className = `status ${status.className}`;
+  statusElement.textContent = status.label;
+  title.append(titleStrong, statusElement);
+
+  const caption = document.createElement("p");
+  caption.className = "order-caption";
+  caption.textContent = formatOrderTicketCount(tickets.length || 1);
+
+  const headline = document.createElement("div");
+  headline.className = "order-headline";
+  headline.append(title);
+
+  const infoGrid = document.createElement("div");
+  infoGrid.className = "order-info-grid";
+  infoGrid.style.display = "grid";
+  infoGrid.style.gridTemplateColumns = "repeat(auto-fit, minmax(150px, 1fr))";
+  infoGrid.style.gap = "10px";
+  infoGrid.style.marginTop = "16px";
+  const appendInfo = (label, value) => {
+    if (!value) {
+      return;
+    }
+    const item = document.createElement("div");
+    item.className = "order-info-item";
+    const itemLabel = document.createElement("span");
+    itemLabel.textContent = label;
+    const itemValue = document.createElement("strong");
+    itemValue.textContent = value;
+    item.append(itemLabel, itemValue);
+    infoGrid.append(item);
+  };
+
+  appendInfo("Агент", orderGroupAgent(group));
+  appendInfo("Квитків", formatOrderTicketCount(tickets.length || 1));
+  appendInfo("Створено", ticket.orderCreatedAt ? formatDateTime(ticket.orderCreatedAt) : "");
+  appendInfo("Продаж", ticket.orderSaleDate ? formatDateTime(ticket.orderSaleDate) : "");
+
+  main.append(headline, caption);
+
+  const price = document.createElement("div");
+  price.className = "order-price";
+  const priceStrong = document.createElement("strong");
+  priceStrong.textContent = formatOrderGroupTotal(group);
+  const priceLabel = document.createElement("span");
+  priceLabel.textContent = "Сума замовлення";
+  price.append(priceStrong, priceLabel);
+
+  const topRow = document.createElement("div");
+  topRow.className = "order-row-main";
+  topRow.style.display = "grid";
+  topRow.style.gridTemplateColumns = "clamp(145px, 16vw, 170px) minmax(0, 1fr) minmax(160px, 220px)";
+  topRow.style.alignItems = "start";
+  topRow.style.gap = "24px";
+  topRow.style.minWidth = "0";
+  topRow.append(date, main, price);
+
+  article.append(topRow, infoGrid);
+  container.append(article);
 }
 
 function renderDetailTicketsMessage(message, countText = "") {
@@ -2869,7 +4432,7 @@ function renderDetailTickets(tickets) {
   }
 
   for (const ticket of currentDetailTickets.slice(0, DETAIL_TICKETS_PREVIEW_LIMIT)) {
-    appendTicket(elements.detailTicketList, ticket);
+    appendTicket(elements.detailTicketList, ticket, { ticketSource: currentDetailTickets });
   }
 
   if (currentDetailTickets.length > DETAIL_TICKETS_PREVIEW_LIMIT) {
@@ -2946,20 +4509,17 @@ async function loadDetailTickets(phone) {
   }
 }
 
-function ticketOrderUrl(ticket) {
-  if (ticket.orderUrl) {
-    return ticket.orderUrl;
-  }
-  if (!ticket.orderId) {
-    return "";
-  }
-  return `${ORDER_VIEW_BASE_URL}${encodeURIComponent(ticket.orderId)}/view`;
-}
-
-function appendTicket(container, ticket) {
+function appendTicket(container, ticket, options = {}) {
   const fragment = elements.ticketTemplate.content.cloneNode(true);
+  const row = fragment.querySelector(".ticket-row");
   const status = statusInfo(ticket.status, ticket.statusLabel);
-  const route = [ticket.from.locality, ticket.to.locality].filter(Boolean).join(" → ");
+  const transferSegments = ticketTransferSegments(ticket);
+  const hasTransfer = transferSegments.length > 1;
+  const routeStartSegment = hasTransfer ? transferSegments[0] : ticket;
+  const routeEndSegment = hasTransfer ? transferSegments[transferSegments.length - 1] : ticket;
+  const routeFrom = (routeStartSegment && routeStartSegment.from) || ticket.from || {};
+  const routeTo = (routeEndSegment && routeEndSegment.to) || ticket.to || {};
+  const route = [routeFrom.locality, routeTo.locality].filter(Boolean).join(" → ");
   const fromPoint = [ticket.from.point, ticket.from.locality]
     .filter(Boolean)
     .join(", ");
@@ -2969,7 +4529,12 @@ function appendTicket(container, ticket) {
   const stations = [fromPoint || ticket.from.locality, toPoint || ticket.to.locality]
     .filter(Boolean)
     .join(" → ");
+  const transferLegIndex = Number(ticket.transferLegIndex || 0);
+  const transferPrefix = hasTransfer
+    ? `Пересадка ${transferLegIndex || "?"}/${transferSegments.length} · `
+    : "";
 
+  row.classList.toggle("is-transfer", hasTransfer);
   fragment.querySelector('[data-field="date"]').textContent = formatDate(
     ticket.departAt,
     { short: true }
@@ -2989,7 +4554,7 @@ function appendTicket(container, ticket) {
   fragment.querySelector('[data-field="arrive-time"]').textContent =
     `Прибуття: ${formatTime(ticket.arriveAt) || "—"}`;
   fragment.querySelector('[data-field="route-code"]').textContent =
-    `Рейс: ${ticket.routeCode || "—"}`;
+    `${transferPrefix}Рейс: ${ticket.routeCode || "—"}`;
   fragment.querySelector('[data-field="passenger"]').textContent =
     ticket.passenger;
   fragment.querySelector('[data-field="numbers"]').textContent =
@@ -3008,28 +4573,249 @@ function appendTicket(container, ticket) {
   fragment.querySelector('[data-field="carrier"]').textContent =
     ticket.carrier || "";
   const orderLink = fragment.querySelector('[data-field="order-link"]');
-  const url = ticketOrderUrl(ticket);
-  if (url) {
-    orderLink.href = url;
-  } else {
-    orderLink.removeAttribute("href");
-    orderLink.setAttribute("aria-disabled", "true");
-    orderLink.textContent = "Замовлення недоступне";
-  }
+  const orderTickets = options.orderTickets && options.orderTickets.length
+    ? sortTicketsForOrderModal(options.orderTickets)
+    : orderTicketsFor(ticket, options.ticketSource || currentTickets);
+  const ticketCount = Number(options.orderTicketCount || orderTickets.length || 1);
+  orderLink.textContent = ticketCount > 1
+    ? `Відкрити замовлення (${ticketCount})`
+    : "Відкрити замовлення";
+  orderLink.addEventListener("click", () => {
+    openOrderTicketsModal(ticket, orderTickets.length ? orderTickets : [ticket]);
+  });
 
   container.append(fragment);
 }
 
-function renderTicketsModal() {
-  elements.ticketsModalList.replaceChildren();
+function ticketModalRouteData(ticket) {
+  const transferSegments = ticketTransferSegments(ticket);
+  const hasTransfer = transferSegments.length > 1;
+  const routeStartSegment = hasTransfer ? transferSegments[0] : ticket;
+  const routeEndSegment = hasTransfer ? transferSegments[transferSegments.length - 1] : ticket;
+  const displaySegment = hasTransfer ? transferDisplaySegment(transferSegments, ticket) : ticket;
+  const from = (routeStartSegment && routeStartSegment.from) || ticket.from || {};
+  const to = (routeEndSegment && routeEndSegment.to) || ticket.to || {};
+  const fromCity = from.locality || "Звідки не вказано";
+  const toCity = to.locality || "Куди не вказано";
+  const transferCity = hasTransfer && transferSegments[0] && transferSegments[0].to
+    ? transferSegments[0].to.locality
+    : "";
 
-  for (const ticket of currentTickets) {
-    appendTicket(elements.ticketsModalList, ticket);
+  return {
+    transferSegments,
+    hasTransfer,
+    displaySegment: displaySegment || ticket,
+    from,
+    to,
+    fromCity,
+    toCity,
+    transferCity
+  };
+}
+
+function renderModalTicketSegments(segments) {
+  if (!segments.length) {
+    return "";
+  }
+
+  const items = segments
+    .map((segment, index) => {
+      const from = segment.from || {};
+      const to = segment.to || {};
+      const busColor = /^#[0-9a-fA-F]{6}$/.test(String(segment.busColor || ""))
+        ? String(segment.busColor)
+        : "";
+      const busValue = segment.busNumber
+        ? `${busColor ? `<span class="trip-bus-color" style="--bus-color: ${busColor}" aria-hidden="true"></span>` : ""}<span>${escapeHtml(segment.busNumber)}</span>`
+        : "Не призначено";
+
+      return `
+        <article class="modal-ticket-segment">
+          <div class="modal-ticket-segment-route">
+            <span>${index + 1}</span>
+            <strong>${escapeHtml(from.locality || "Звідки")} → ${escapeHtml(to.locality || "Куди")}</strong>
+          </div>
+          <div class="modal-ticket-segment-meta">
+            <span>${escapeHtml(formatDate(segment.departAt, { short: true }))}</span>
+            <span>${escapeHtml(formatTime(segment.departAt) || "—")}-${escapeHtml(formatTime(segment.arriveAt) || "—")}</span>
+            ${segment.ticketNumber ? `<span>кв. ${escapeHtml(segment.ticketNumber)}</span>` : ""}
+            ${segment.seat ? `<span>місце ${escapeHtml(segment.seat)}</span>` : ""}
+            <span class="trip-bus-value">${busValue}</span>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  return `
+    <section class="modal-ticket-segments">
+      <div class="modal-ticket-section-title">
+        <span>Сегменти маршруту</span>
+        <strong>${segments.length} частини</strong>
+      </div>
+      <div class="modal-ticket-segment-list">${items}</div>
+    </section>
+  `;
+}
+
+function appendModalTicket(container, ticket) {
+  const status = statusInfo(ticket.status, ticket.statusLabel);
+  const price = ticket.price || {};
+  const routeData = ticketModalRouteData(ticket);
+  const scheduleTicket = routeData.displaySegment;
+  const agent = ticket.agent || ticket.agentCode || "Агент не вказаний";
+  const passenger = ticket.passenger || "Пасажир не вказаний";
+  const seat = ticket.seat ? `місце ${ticket.seat}` : "без місця";
+  const orderNumber = ticket.orderNumber || "Не вказано";
+  const ticketNumber = ticket.ticketNumber || "Не вказано";
+  const carrier = ticket.carrier || "Перевізник не вказаний";
+  const routeCode = ticket.routeCode || "";
+  const busColor = /^#[0-9a-fA-F]{6}$/.test(String(ticket.busColor || ""))
+    ? String(ticket.busColor)
+    : "";
+  const busValue = ticket.busNumber
+    ? `${busColor ? `<span class="trip-bus-color" style="--bus-color: ${busColor}" aria-hidden="true"></span>` : ""}<span>${escapeHtml(ticket.busNumber)}</span>`
+    : ticket.busAssignmentChecked || ticket.tripId
+      ? "Не призначено"
+      : "";
+  const article = document.createElement("article");
+
+  article.className = `modal-ticket-card${routeData.hasTransfer ? " is-transfer" : ""}`;
+  article.innerHTML = `
+    <div class="modal-ticket-card-head">
+      <div class="modal-ticket-title">
+        ${routeData.hasTransfer ? `
+          <span class="modal-ticket-transfer">
+            Квиток з пересадкою${routeData.transferCity ? ` · через ${escapeHtml(routeData.transferCity)}` : ""}
+          </span>
+        ` : ""}
+        <strong>${escapeHtml(routeData.fromCity)} → ${escapeHtml(routeData.toCity)}</strong>
+      </div>
+      <div class="modal-ticket-badges">
+        <span class="status ${status.className}">${escapeHtml(status.label)}</span>
+        <strong>${escapeHtml(formatMoney(price.amount, price.currency))}</strong>
+      </div>
+    </div>
+
+    <div class="trip-hero modal-ticket-hero">
+      <div class="trip-route modal-ticket-route">
+        <div class="trip-place trip-place-from">
+          <span>Звідки</span>
+          <strong>${escapeHtml(routeData.fromCity)}</strong>
+          <small>${renderStopDetails(routeData.from, "Адреса посадки не вказана")}</small>
+        </div>
+        <div class="trip-route-connector">
+          <span class="trip-route-line" aria-hidden="true"></span>
+        </div>
+        <div class="trip-place trip-place-to">
+          <span>Куди</span>
+          <strong>${escapeHtml(routeData.toCity)}</strong>
+          <small>${renderStopDetails(routeData.to, "Адреса прибуття не вказана")}</small>
+        </div>
+      </div>
+      <div class="trip-departure modal-ticket-departure">
+        <span>Відправлення</span>
+        <strong>${escapeHtml(formatDate(scheduleTicket.departAt, { short: true }))}</strong>
+        <b>${escapeHtml(formatTime(scheduleTicket.departAt) || "—")}</b>
+        <small>прибуття ${escapeHtml(formatTime(scheduleTicket.arriveAt) || "—")}</small>
+      </div>
+    </div>
+
+    ${routeData.hasTransfer ? renderModalTicketSegments(routeData.transferSegments) : ""}
+
+    <section class="modal-ticket-section">
+      <div class="modal-ticket-section-title">
+        <span>Інформація квитка</span>
+      </div>
+      <dl class="trip-info modal-ticket-info">
+        <div class="trip-info-item trip-info-passenger">
+          <dt>Пасажир</dt>
+          <dd>${escapeHtml(`${passenger} · ${seat}`)}</dd>
+        </div>
+        <div class="trip-info-item trip-info-agent">
+          <dt>Агент</dt>
+          <dd>${escapeHtml(agent)}</dd>
+        </div>
+        <div class="trip-info-item trip-info-price">
+          <dt>Замовлення</dt>
+          <dd>${escapeHtml(orderNumber)}</dd>
+        </div>
+        <div class="trip-info-item trip-info-ticket">
+          <dt>Квиток</dt>
+          <dd>${escapeHtml(ticketNumber)}</dd>
+        </div>
+        ${busValue && !routeData.hasTransfer ? `
+          <div class="trip-info-item trip-info-bus">
+            <dt>Автобус</dt>
+            <dd>${typeof busValue === "string" && busValue.includes("<") ? busValue : escapeHtml(busValue)}</dd>
+          </div>
+        ` : ""}
+        <div class="trip-info-item modal-ticket-carrier">
+          <dt>Перевізник</dt>
+          <dd>${escapeHtml(carrier)}</dd>
+        </div>
+        ${routeCode ? `
+          <div class="trip-info-item modal-ticket-route-code">
+            <dt>Рейс</dt>
+            <dd>${escapeHtml(routeCode)}</dd>
+          </div>
+        ` : ""}
+      </dl>
+    </section>
+  `;
+
+  container.append(article);
+}
+
+function setTicketsModalTitle(title) {
+  if (elements.ticketsModalTitle) {
+    elements.ticketsModalTitle.textContent = title || "Усі квитки клієнта";
   }
 }
 
-function openTicketsModal() {
-  renderTicketsModal();
+function renderTicketsModal(tickets = currentTickets) {
+  elements.ticketsModalList.replaceChildren();
+  elements.ticketsModalList.classList.remove("order-list");
+  elements.ticketsModalList.style.display = "";
+
+  const list = Array.isArray(tickets) ? tickets : [];
+  if (!list.length) {
+    const message = document.createElement("p");
+    message.className = "no-data";
+    message.textContent = "Квитків для показу немає.";
+    elements.ticketsModalList.append(message);
+    return;
+  }
+
+  for (const ticket of list) {
+    appendModalTicket(elements.ticketsModalList, ticket);
+  }
+}
+
+function renderOrderGroupsModal(orderGroups = buildTicketOrderGroups(currentTickets)) {
+  elements.ticketsModalList.replaceChildren();
+  elements.ticketsModalList.classList.add("order-list");
+  elements.ticketsModalList.style.display = "block";
+
+  const groups = Array.isArray(orderGroups) ? orderGroups : [];
+  ticketsModalOrderGroups = groups;
+  if (!groups.length) {
+    const message = document.createElement("p");
+    message.className = "no-data";
+    message.textContent = "Замовлень для показу немає.";
+    elements.ticketsModalList.append(message);
+    return;
+  }
+
+  for (const group of groups) {
+    appendOrderGroup(elements.ticketsModalList, group);
+  }
+}
+
+function showTicketsModalDialog() {
+  if (elements.ticketsModal.open) {
+    return;
+  }
 
   if (typeof elements.ticketsModal.showModal === "function") {
     elements.ticketsModal.showModal();
@@ -3039,7 +4825,82 @@ function openTicketsModal() {
   elements.ticketsModal.setAttribute("open", "");
 }
 
+function openTicketsModal() {
+  ticketsModalBackView = null;
+  setTicketsModalTitle("Усі квитки клієнта");
+  renderTicketsModal(currentTickets);
+  showTicketsModalDialog();
+}
+
+function openOrderTicketsModal(sourceTicket, tickets = []) {
+  const shouldReturnToOrderGroups =
+    elements.ticketsModal.open &&
+    elements.ticketsModalList.classList.contains("order-list");
+  const list = tickets && tickets.length
+    ? sortTicketsForOrderModal(tickets)
+    : orderTicketsFor(sourceTicket, currentTickets);
+  const orderNumber = sourceTicket && sourceTicket.orderNumber
+    ? ` ${sourceTicket.orderNumber}`
+    : "";
+  const title = orderNumber
+    ? `Квитки замовлення${orderNumber}`
+    : "Квитки замовлення";
+
+  if (shouldReturnToOrderGroups) {
+    ticketsModalBackView = {
+      type: "order-groups",
+      orderGroups: ticketsModalOrderGroups.slice()
+    };
+  } else if (!elements.ticketsModal.open) {
+    ticketsModalBackView = null;
+  }
+
+  setTicketsModalTitle(title);
+  renderTicketsModal(list.length ? list : [sourceTicket].filter(Boolean));
+  showTicketsModalDialog();
+}
+
+function openOrderGroupsModal(orderGroups = buildTicketOrderGroups(currentTickets)) {
+  ticketsModalBackView = null;
+  setTicketsModalTitle("Усі замовлення клієнта");
+  renderOrderGroupsModal(orderGroups);
+  showTicketsModalDialog();
+}
+
+function openRelatedTicketsModal(tickets, sourceTicket) {
+  ticketsModalBackView = null;
+  const orderNumber = sourceTicket && sourceTicket.orderNumber
+    ? `замовлення ${sourceTicket.orderNumber}`
+    : "цього замовлення";
+  const dateLabel = sourceTicket && sourceTicket.departAt
+    ? ` на ${formatDate(sourceTicket.departAt, { short: true })}`
+    : "";
+
+  setTicketsModalTitle(`Квитки ${orderNumber}${dateLabel}`);
+  renderTicketsModal(tickets);
+  showTicketsModalDialog();
+}
+
+function restoreTicketsModalBackView() {
+  if (!ticketsModalBackView || ticketsModalBackView.type !== "order-groups") {
+    return false;
+  }
+
+  const orderGroups = Array.isArray(ticketsModalBackView.orderGroups)
+    ? ticketsModalBackView.orderGroups
+    : [];
+  ticketsModalBackView = null;
+  setTicketsModalTitle("Усі замовлення клієнта");
+  renderOrderGroupsModal(orderGroups);
+  return true;
+}
+
 function closeTicketsModal() {
+  if (restoreTicketsModalBackView()) {
+    return;
+  }
+
+  ticketsModalBackView = null;
   if (elements.ticketsModal.open && typeof elements.ticketsModal.close === "function") {
     elements.ticketsModal.close();
     return;
@@ -3078,6 +4939,765 @@ function renderCalls(calls) {
   }
 }
 
+function renderCallsLoading() {
+  currentCalls = [];
+  elements.callList.replaceChildren();
+  elements.callCountLabel.textContent = "Завантаження...";
+  const message = document.createElement("p");
+  message.className = "no-data async-loading";
+  message.innerHTML = `<span class="mini-spinner" aria-hidden="true"></span> Завантажуємо дзвінки Binotel...`;
+  elements.callList.append(message);
+}
+
+function renderCallsError(messageText) {
+  currentCalls = [];
+  elements.callList.replaceChildren();
+  elements.callCountLabel.textContent = "";
+  const message = document.createElement("p");
+  message.className = "no-data";
+  message.textContent = messageText || "Не вдалося завантажити дзвінки Binotel.";
+  elements.callList.append(message);
+}
+
+function telegramSetMessage(message, tone = "") {
+  if (!elements.telegramMessageStatus) {
+    return;
+  }
+  elements.telegramMessageStatus.textContent = telegramFriendlyError(message) || "";
+  if (tone) {
+    elements.telegramMessageStatus.dataset.tone = tone;
+  } else {
+    delete elements.telegramMessageStatus.dataset.tone;
+  }
+}
+
+function telegramFriendlyError(message) {
+  const raw = String(message || "").trim();
+  if (!raw) {
+    return "";
+  }
+  const normalized = raw.toLowerCase();
+  if (normalized.includes("telegram_not_configured")) {
+    return "Telegram User API ще не налаштований.";
+  }
+  if (normalized.includes("telegram_phone_invalid") || normalized.includes("phone_number_invalid")) {
+    return "Некоректний номер телефону для Telegram.";
+  }
+  if (normalized.includes("telegram_account_not_connected")) {
+    return "Telegram акаунт ще не підключений.";
+  }
+  if (
+    normalized.includes("auth_key_unregistered") ||
+    normalized.includes("auth_key_invalid") ||
+    normalized.includes("auth_key_duplicated") ||
+    normalized.includes("session_revoked") ||
+    normalized.includes("session_expired") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("not authorized")
+  ) {
+    return "Telegram-сесія акаунта застаріла. Перелогіньте цей акаунт в адмінці.";
+  }
+  if (normalized.includes("telegram_contact_not_found")) {
+    return "Контакт з таким номером не знайдено в Telegram.";
+  }
+  if (normalized.includes("phone_code_invalid")) {
+    return "Невірний Telegram-код.";
+  }
+  if (normalized.includes("phone_code_expired")) {
+    return "Telegram-код застарів. Надішліть код ще раз.";
+  }
+  if (normalized.includes("session_password_needed")) {
+    return "Telegram просить 2FA пароль.";
+  }
+  if (normalized.includes("password_hash_invalid") || normalized.includes("auth_user_cancel")) {
+    return "Невірний 2FA пароль Telegram.";
+  }
+  if (normalized.includes("flood_wait")) {
+    const seconds = raw.match(/\d+/)?.[0];
+    return seconds
+      ? `Telegram просить зачекати ${seconds} с перед наступною дією.`
+      : "Telegram тимчасово обмежив частоту запитів.";
+  }
+  if (normalized.includes("timeout") || normalized.includes("timed out")) {
+    return "Telegram тимчасово не відповідає. Показуємо кеш, якщо він є.";
+  }
+  return raw;
+}
+
+function setTelegramComposeEnabled(enabled) {
+  if (elements.telegramMessage) {
+    elements.telegramMessage.disabled = !enabled;
+  }
+  if (elements.telegramSend) {
+    elements.telegramSend.disabled = !enabled;
+  }
+}
+
+function currentTelegramPhone() {
+  return currentCard && currentCard.contact
+    ? currentCard.contact.phoneDigits || currentCard.contact.phone || currentPhone
+    : currentPhone;
+}
+
+function telegramMessageSummary(message) {
+  if (!message) {
+    return "повідомлення";
+  }
+  const textValue = String(message.text || "").trim();
+  if (textValue) {
+    return textValue.length > 90 ? `${textValue.slice(0, 87)}...` : textValue;
+  }
+  if (message.media && message.media.label) {
+    return message.media.label;
+  }
+  if (message.mediaLabel) {
+    return message.mediaLabel;
+  }
+  return "повідомлення";
+}
+
+function updateTelegramReplyBar() {
+  if (!elements.telegramReplyBar) {
+    return;
+  }
+  if (!telegramReplyTarget) {
+    elements.telegramReplyBar.classList.add("hidden");
+    if (elements.telegramReplyTitle) {
+      elements.telegramReplyTitle.textContent = "";
+    }
+    return;
+  }
+  elements.telegramReplyTitle.textContent = telegramMessageSummary(telegramReplyTarget);
+  elements.telegramReplyBar.classList.remove("hidden");
+}
+
+function setTelegramReplyTarget(message) {
+  telegramReplyTarget = message && message.id ? message : null;
+  updateTelegramReplyBar();
+  elements.telegramMessage?.focus();
+}
+
+function clearTelegramReplyTarget() {
+  telegramReplyTarget = null;
+  updateTelegramReplyBar();
+}
+
+function telegramAccountName(match) {
+  const account = (match && match.account) || {};
+  return account.displayName || account.label || account.phone || "Telegram акаунт";
+}
+
+function telegramAccountStatus(match) {
+  if (!match) {
+    return { label: "Не завантажено", tone: "muted" };
+  }
+  if (match.cached) {
+    return { label: "Кеш", tone: "neutral" };
+  }
+  if (match.error) {
+    return { label: "Помилка", tone: "error" };
+  }
+  if (match.found) {
+    return { label: "Знайдено", tone: "success" };
+  }
+  return { label: "Не знайдено", tone: "muted" };
+}
+
+function setTelegramAccountDropdownOpen(open) {
+  telegramAccountDropdownOpen = Boolean(open);
+  elements.telegramAccountDropdown?.classList.toggle("is-open", telegramAccountDropdownOpen);
+  elements.telegramAccountMenu?.classList.toggle("hidden", !telegramAccountDropdownOpen);
+  elements.telegramAccountTrigger?.setAttribute(
+    "aria-expanded",
+    String(telegramAccountDropdownOpen)
+  );
+}
+
+function clearTelegramAccountDropdown() {
+  setTelegramAccountDropdownOpen(false);
+  elements.telegramAccountMenu?.replaceChildren();
+  if (elements.telegramAccountLabel) {
+    elements.telegramAccountLabel.textContent = "Telegram";
+  }
+  if (elements.telegramAccountStatus) {
+    elements.telegramAccountStatus.textContent = "Не завантажено";
+    elements.telegramAccountStatus.className = "";
+  }
+  if (elements.telegramAccountTrigger) {
+    elements.telegramAccountTrigger.disabled = true;
+  }
+}
+
+function telegramContactInitials(value) {
+  const source = String(value || "TG").trim();
+  const letters = source
+    .split(/\s+/)
+    .map((part) => part[0])
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2);
+  return (letters || "TG").toUpperCase();
+}
+
+function renderTelegramThread(match, options = {}) {
+  if (!elements.telegramThread) {
+    return;
+  }
+  elements.telegramThread.replaceChildren();
+
+  if (!match && !options.title) {
+    elements.telegramThread.classList.add("hidden");
+    return;
+  }
+
+  const contact = (match && match.contact) || {};
+  const title = options.title || contact.displayName || contact.phone || currentPhone || "Telegram";
+  const subtitle = options.subtitle || [
+    contact.username ? `@${contact.username}` : "",
+    contact.phone || ""
+  ].filter(Boolean).join(" · ");
+  const status = options.status || (
+    match && match.cached
+      ? "Кеш"
+      : match && match.found
+        ? "Чат знайдено"
+        : "Не знайдено"
+  );
+
+  const avatar = document.createElement("span");
+  avatar.className = "telegram-thread-avatar";
+  avatar.textContent = telegramContactInitials(title);
+
+  const main = document.createElement("div");
+  main.className = "telegram-thread-main";
+  const name = document.createElement("strong");
+  name.textContent = title;
+  const meta = document.createElement("span");
+  meta.textContent = subtitle || "Telegram";
+  main.append(name, meta);
+
+  const badge = document.createElement("span");
+  badge.className = `telegram-thread-status ${options.tone ? `is-${options.tone}` : ""}`;
+  badge.textContent = status;
+
+  elements.telegramThread.append(avatar, main, badge);
+  elements.telegramThread.classList.remove("hidden");
+}
+
+function renderTelegramEmpty(message, options = {}) {
+  currentTelegram = options.keepState ? currentTelegram : null;
+  if (!options.keepState) {
+    clearTelegramReplyTarget();
+  }
+  if (!elements.telegramChat) {
+    return;
+  }
+  elements.telegramChat.replaceChildren();
+  const empty = document.createElement("div");
+  empty.className = `telegram-empty${options.loading ? " async-loading" : ""}`;
+  empty.innerHTML = options.loading
+    ? `<span class="mini-spinner" aria-hidden="true"></span> ${escapeHtml(message)}`
+    : escapeHtml(message);
+  elements.telegramChat.append(empty);
+  clearTelegramAccountDropdown();
+  elements.telegramRefresh.disabled = options.loading === true || !currentPhone;
+  renderTelegramThread(null, options.loading
+    ? {
+        title: "Telegram",
+        subtitle: currentPhone ? formatPhone(currentPhone) : "",
+        status: "Пошук",
+        tone: "neutral"
+      }
+    : {});
+  setTelegramComposeEnabled(false);
+}
+
+function renderTelegramLoading() {
+  renderTelegramEmpty("Шукаємо переписку в Telegram...", {
+    loading: true,
+    keepState: true
+  });
+}
+
+function telegramAccountLabel(match) {
+  const account = (match && match.account) || match || {};
+  const status = telegramAccountStatus(match).label.toLowerCase();
+  return `${account.displayName || account.label || account.phone || "Telegram"} · ${status}`;
+}
+
+function renderTelegramAccountSelect(payload) {
+  const matches = Array.isArray(payload.matches) ? payload.matches : [];
+  const selected = payload.selectedAccountId || (matches[0] && matches[0].account && matches[0].account.id) || "";
+  selectedTelegramAccountId = selected;
+  setTelegramAccountDropdownOpen(false);
+  elements.telegramAccountMenu?.replaceChildren();
+
+  const selectedMatch = matches.find(
+    (match) => match.account && match.account.id === selectedTelegramAccountId
+  ) || matches[0] || null;
+  const selectedStatus = telegramAccountStatus(selectedMatch);
+
+  if (elements.telegramAccountLabel) {
+    elements.telegramAccountLabel.textContent = selectedMatch
+      ? telegramAccountName(selectedMatch)
+      : "Telegram";
+  }
+  if (elements.telegramAccountStatus) {
+    elements.telegramAccountStatus.textContent = selectedStatus.label;
+    elements.telegramAccountStatus.className = `is-${selectedStatus.tone}`;
+  }
+  if (elements.telegramAccountTrigger) {
+    elements.telegramAccountTrigger.disabled = matches.length <= 1;
+  }
+
+  for (const match of matches) {
+    const account = match.account || {};
+    const status = telegramAccountStatus(match);
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = `telegram-account-option is-${status.tone}`;
+    option.dataset.telegramAccountId = account.id || "";
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", String(account.id === selectedTelegramAccountId));
+    if (account.id === selectedTelegramAccountId) {
+      option.classList.add("is-selected");
+    }
+
+    const main = document.createElement("span");
+    main.className = "telegram-account-option-main";
+    const name = document.createElement("strong");
+    name.textContent = telegramAccountName(match);
+    const meta = document.createElement("small");
+    meta.textContent = account.phone || account.label || "Telegram";
+    main.append(name, meta);
+
+    const badge = document.createElement("span");
+    badge.className = "telegram-account-option-badge";
+    badge.textContent = status.label;
+
+    option.append(main, badge);
+    elements.telegramAccountMenu?.append(option);
+  }
+}
+
+function telegramMediaUrl(message, accountId) {
+  const phone = currentTelegramPhone();
+  if (!phone || !accountId || !message || !message.id) {
+    return "";
+  }
+  const params = new URLSearchParams({
+    phone,
+    accountId,
+    messageId: String(message.id)
+  });
+  return `/api/telegram/media?${params.toString()}`;
+}
+
+function appendTelegramReplyPreview(bubble, message) {
+  const preview = message && message.replyPreview;
+  if (!preview && !message.replyToMessageId) {
+    return;
+  }
+  const node = document.createElement("button");
+  node.className = "telegram-reply-preview";
+  node.type = "button";
+  node.dataset.telegramJumpTo = String(message.replyToMessageId || "");
+  const label = document.createElement("span");
+  label.textContent = "Відповідь";
+  const value = document.createElement("strong");
+  value.textContent = preview
+    ? telegramMessageSummary(preview)
+    : `повідомлення #${message.replyToMessageId}`;
+  node.append(label, value);
+  bubble.append(node);
+}
+
+function appendTelegramMedia(bubble, message, accountId) {
+  const media = message && message.media;
+  if (!media || !media.downloadable) {
+    return;
+  }
+  const url = telegramMediaUrl(message, accountId);
+  if (!url) {
+    return;
+  }
+
+  if (media.type === "photo") {
+    const link = document.createElement("a");
+    link.className = "telegram-media-photo";
+    link.href = url;
+    link.dataset.telegramPhotoUrl = url;
+    link.dataset.telegramPhotoTitle = media.filename || "Telegram фото";
+    const image = document.createElement("img");
+    image.src = url;
+    image.alt = media.filename || "Telegram фото";
+    image.loading = "lazy";
+    link.append(image);
+    bubble.append(link);
+    return;
+  }
+
+  if (media.type === "pdf") {
+    const link = document.createElement("a");
+    link.className = "telegram-media-file is-pdf";
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.innerHTML = `${aiIcon("fileText")}<span><strong>${escapeHtml(media.filename || "PDF файл")}</strong><small>Відкрити PDF</small></span>`;
+    bubble.append(link);
+    return;
+  }
+
+  const file = document.createElement("a");
+  file.className = "telegram-media-file";
+  file.href = url;
+  file.target = "_blank";
+  file.rel = "noopener";
+  file.innerHTML = `${aiIcon("fileText")}<span><strong>${escapeHtml(media.filename || media.label || "Файл")}</strong><small>Завантажити</small></span>`;
+  bubble.append(file);
+}
+
+function renderTelegramMessages(messages, accountId = selectedTelegramAccountId) {
+  elements.telegramChat.replaceChildren();
+  const list = Array.isArray(messages) ? messages : [];
+  if (!list.length) {
+    const empty = document.createElement("div");
+    empty.className = "telegram-empty";
+    empty.textContent = "Переписки ще немає. Можна написати перше повідомлення.";
+    elements.telegramChat.append(empty);
+    return;
+  }
+
+  for (const message of list) {
+    const bubble = document.createElement("article");
+    bubble.className = `telegram-bubble ${message.direction === "outgoing" ? "is-outgoing" : "is-incoming"}`;
+    bubble.dataset.telegramMessageId = String(message.id || "");
+    appendTelegramReplyPreview(bubble, message);
+    appendTelegramMedia(bubble, message, accountId);
+    if (message.text) {
+      const textNode = document.createElement("p");
+      textNode.textContent = message.text;
+      bubble.append(textNode);
+    } else if (!message.media) {
+      const textNode = document.createElement("p");
+      textNode.textContent = "[порожнє повідомлення]";
+      bubble.append(textNode);
+    }
+    const footer = document.createElement("div");
+    footer.className = "telegram-bubble-footer";
+    const replyButton = document.createElement("button");
+    replyButton.className = "telegram-reply-button";
+    replyButton.type = "button";
+    replyButton.dataset.telegramReplyId = String(message.id || "");
+    replyButton.setAttribute("aria-label", "Відповісти");
+    replyButton.title = "Відповісти";
+    replyButton.innerHTML = aiIcon("reply");
+    const time = document.createElement("time");
+    time.dateTime = message.sentAt || "";
+    time.textContent = message.sentAt ? formatDateTime(message.sentAt) : "";
+    footer.append(replyButton, time);
+    bubble.append(footer);
+    elements.telegramChat.append(bubble);
+  }
+  elements.telegramChat.scrollTop = elements.telegramChat.scrollHeight;
+}
+
+function renderTelegramPanel(payload) {
+  currentTelegram = payload || null;
+  telegramSetMessage("");
+
+  if (!payload || payload.ok === false) {
+    renderTelegramEmpty(telegramFriendlyError((payload && payload.error) || "Не вдалося завантажити Telegram."));
+    return;
+  }
+
+  if (!payload.configured) {
+    renderTelegramEmpty("Telegram User API ще не налаштований в .env.");
+    return;
+  }
+
+  const matches = Array.isArray(payload.matches) ? payload.matches : [];
+  if (!matches.length) {
+    renderTelegramEmpty("Немає підключених Telegram акаунтів в адмінці.");
+    return;
+  }
+
+  renderTelegramAccountSelect(payload);
+  elements.telegramRefresh.disabled = false;
+
+  const selected = matches.find((match) => match.account && match.account.id === selectedTelegramAccountId) || matches[0];
+  const selectedMessages = selected && Array.isArray(selected.messages)
+    ? selected.messages
+    : payload.messages || [];
+  const canShowCached = Boolean(
+    selected &&
+    selected.cached &&
+    (selectedMessages.length || (selected.contact && selected.contact.found))
+  );
+  if (selected && selected.error && !canShowCached) {
+    clearTelegramReplyTarget();
+    renderTelegramThread(selected, {
+      title: "Telegram недоступний",
+      subtitle: telegramAccountName(selected),
+      status: "Помилка",
+      tone: "error"
+    });
+    renderTelegramMessages([], selected && selected.account && selected.account.id);
+    telegramSetMessage(selected.error, "error");
+    setTelegramComposeEnabled(false);
+    return;
+  }
+  if (!selected || !selected.found) {
+    clearTelegramReplyTarget();
+    renderTelegramThread(selected, {
+      title: currentPhone ? formatPhone(currentPhone) : "Клієнт",
+      subtitle: selected ? telegramAccountName(selected) : "",
+      status: "Не знайдено",
+      tone: "neutral"
+    });
+    renderTelegramMessages([], selected && selected.account && selected.account.id);
+    telegramSetMessage("Контакт з таким номером не знайдено в Telegram для вибраного акаунта.", "neutral");
+    setTelegramComposeEnabled(false);
+    return;
+  }
+
+  renderTelegramThread(selected, {
+    status: selected.cached || selected.unavailable ? "Кеш" : "Чат знайдено",
+    tone: selected.cached || selected.unavailable ? "neutral" : "success"
+  });
+  renderTelegramMessages(selectedMessages, selected.account && selected.account.id);
+  if (selected.cached || selected.unavailable) {
+    clearTelegramReplyTarget();
+    telegramSetMessage(
+      `Показуємо кешовану переписку. ${telegramFriendlyError(selected.error)}`,
+      "neutral"
+    );
+    setTelegramComposeEnabled(false);
+    return;
+  }
+  telegramSetMessage("");
+  setTelegramComposeEnabled(true);
+}
+
+function renderTelegramError(message) {
+  const friendly = telegramFriendlyError(message || "Не вдалося завантажити Telegram.");
+  renderTelegramEmpty(friendly);
+  telegramSetMessage(friendly, "error");
+}
+
+function setMessagingChannel(channel) {
+  const canShowViber =
+    elements.viberTabButton &&
+    !elements.viberTabButton.disabled &&
+    !elements.viberTabButton.classList.contains("hidden");
+  const next = channel === "viber" && canShowViber ? "viber" : "telegram";
+  currentMessagingChannel = next;
+  elements.messagingTabButtons?.forEach((button) => {
+    const active = button.dataset.messagingTab === next;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  elements.messagingPanels?.forEach((panel) => {
+    panel.classList.toggle("hidden", panel.dataset.messagingPanel !== next);
+  });
+}
+
+function setViberAvailable(available) {
+  const enabled = Boolean(available);
+  if (elements.viberTabButton) {
+    elements.viberTabButton.classList.toggle("hidden", !enabled);
+    elements.viberTabButton.disabled = !enabled;
+    elements.viberTabButton.setAttribute("aria-hidden", String(!enabled));
+    if (enabled) {
+      elements.viberTabButton.removeAttribute("tabindex");
+    } else {
+      elements.viberTabButton.setAttribute("tabindex", "-1");
+    }
+  }
+  if (!enabled) {
+    currentViber = null;
+    setMessagingChannel("telegram");
+  }
+}
+
+function handleMessagingTabsClick(event) {
+  const button = event.target.closest("[data-messaging-tab]");
+  if (!button || button.disabled || button.classList.contains("hidden")) {
+    return;
+  }
+  setMessagingChannel(button.dataset.messagingTab);
+}
+
+function viberSetMessage(message = "", type = "") {
+  if (!elements.viberMessageStatus) {
+    return;
+  }
+  elements.viberMessageStatus.textContent = message;
+  elements.viberMessageStatus.className = `form-message${type ? ` ${type}` : ""}`;
+}
+
+function viberFriendlyError(error) {
+  const code = String(error || "").toLowerCase();
+  if (code.includes("viber_not_configured")) {
+    return "Viber DB path ще не налаштований в .env.";
+  }
+  if (code.includes("viber_database_not_found")) {
+    return "Файл бази Viber не знайдено.";
+  }
+  if (code.includes("viber_database_key_required")) {
+    return "База Viber знайдена, але вона зашифрована. Потрібен VIBER_DB_KEY для Viber SQLite SEE.";
+  }
+  if (code.includes("viber_database_key_invalid")) {
+    return "Viber DB key не відкриває базу.";
+  }
+  if (code.includes("viber_schema_not_supported")) {
+    return "Не вдалося розпізнати схему Viber.";
+  }
+  if (code.includes("invalid_phone")) {
+    return "Некоректний номер для пошуку Viber.";
+  }
+  return error || "Не вдалося завантажити Viber.";
+}
+
+function renderViberThread(payload, options = {}) {
+  if (!elements.viberThread) {
+    return;
+  }
+  elements.viberThread.replaceChildren();
+
+  if (!payload && !options.title) {
+    elements.viberThread.classList.add("hidden");
+    return;
+  }
+
+  const contact = (payload && payload.contact) || {};
+  const title = options.title || contact.displayName || contact.phone || currentPhone || "Viber";
+  const subtitle = options.subtitle || contact.phone || (currentPhone ? formatPhone(currentPhone) : "");
+  const status = options.status || (payload && payload.found ? "Чат знайдено" : "Не знайдено");
+
+  const avatar = document.createElement("span");
+  avatar.className = "telegram-thread-avatar";
+  avatar.textContent = telegramContactInitials(title || "VI");
+
+  const main = document.createElement("div");
+  main.className = "telegram-thread-main";
+  const name = document.createElement("strong");
+  name.textContent = title;
+  const meta = document.createElement("span");
+  meta.textContent = subtitle || "Viber";
+  main.append(name, meta);
+
+  const badge = document.createElement("span");
+  badge.className = `telegram-thread-status ${options.tone ? `is-${options.tone}` : ""}`;
+  badge.textContent = status;
+
+  elements.viberThread.append(avatar, main, badge);
+  elements.viberThread.classList.remove("hidden");
+}
+
+function renderViberEmpty(message, options = {}) {
+  currentViber = options.keepState ? currentViber : null;
+  if (!elements.viberChat) {
+    return;
+  }
+  elements.viberChat.replaceChildren();
+  const empty = document.createElement("div");
+  empty.className = `telegram-empty${options.loading ? " async-loading" : ""}`;
+  empty.innerHTML = options.loading
+    ? `<span class="mini-spinner" aria-hidden="true"></span> ${escapeHtml(message)}`
+    : escapeHtml(message);
+  elements.viberChat.append(empty);
+  if (elements.viberRefresh) {
+    elements.viberRefresh.disabled = options.loading === true || !currentPhone;
+  }
+  renderViberThread(null, options.loading
+    ? {
+        title: "Viber",
+        subtitle: currentPhone ? formatPhone(currentPhone) : "",
+        status: "Пошук",
+        tone: "neutral"
+      }
+    : {});
+}
+
+function renderViberLoading() {
+  renderViberEmpty("Шукаємо переписку у Viber...", {
+    loading: true,
+    keepState: true
+  });
+  viberSetMessage("");
+}
+
+function renderViberMessages(messages) {
+  elements.viberChat.replaceChildren();
+  const list = Array.isArray(messages) ? messages : [];
+  if (!list.length) {
+    const empty = document.createElement("div");
+    empty.className = "telegram-empty";
+    empty.textContent = "Переписки у Viber для цього номера не знайдено.";
+    elements.viberChat.append(empty);
+    return;
+  }
+
+  for (const message of list) {
+    const bubble = document.createElement("article");
+    bubble.className = `telegram-bubble ${message.direction === "outgoing" ? "is-outgoing" : "is-incoming"}`;
+    if (message.text) {
+      const textNode = document.createElement("p");
+      textNode.textContent = message.text;
+      bubble.append(textNode);
+    } else {
+      const textNode = document.createElement("p");
+      textNode.textContent = "[повідомлення без тексту]";
+      bubble.append(textNode);
+    }
+
+    const footer = document.createElement("div");
+    footer.className = "telegram-bubble-footer";
+    const time = document.createElement("time");
+    time.dateTime = message.sentAt || "";
+    time.textContent = message.sentAt ? formatDateTime(message.sentAt) : "";
+    footer.append(time);
+    bubble.append(footer);
+    elements.viberChat.append(bubble);
+  }
+  elements.viberChat.scrollTop = elements.viberChat.scrollHeight;
+}
+
+function renderViberPanel(payload) {
+  currentViber = payload || null;
+  viberSetMessage("");
+
+  if (!payload || payload.ok === false) {
+    setViberAvailable(false);
+    return;
+  }
+
+  if (!payload.configured) {
+    setViberAvailable(false);
+    return;
+  }
+
+  if (payload.error) {
+    setViberAvailable(false);
+    return;
+  }
+
+  setViberAvailable(true);
+  renderViberThread(payload, {
+    status: payload.found ? "Чат знайдено" : "Не знайдено",
+    tone: payload.found ? "success" : "neutral"
+  });
+  renderViberMessages(payload.messages);
+  if (elements.viberRefresh) {
+    elements.viberRefresh.disabled = false;
+  }
+}
+
+function renderViberError(message) {
+  setViberAvailable(false);
+}
+
 function appendCall(container, call) {
   const fragment = elements.callTemplate.content.cloneNode(true);
   const direction = callDirectionInfo(call);
@@ -3110,19 +5730,9 @@ function appendCall(container, call) {
   dispositionElement.className = `status ${disposition.className}`;
 
   fragment.querySelector('[data-field="operator"]').textContent =
-    operatorLabel(call);
-  fragment.querySelector('[data-field="numbers"]').textContent =
-    call.pbxNumber && call.pbxNumber.number
-      ? `лінія ${formatCallPhone(call.pbxNumber.number)}`
-      : "лінія не вказана";
-  fragment.querySelector('[data-field="duration"]').textContent =
-    `очікування ${formatDuration(call.waitSec)} · розмова ${formatDuration(call.billSec)}`;
-  fragment.querySelector('[data-field="recording"]').textContent =
-    call.recordingStatusLabel || "запис не вказаний";
-  fragment.querySelector('[data-field="phone"]').textContent =
-    formatCallPhone(call.externalNumber);
-  fragment.querySelector('[data-field="binotel-id"]').textContent =
-    call.generalCallId ? `Binotel ID ${call.generalCallId}` : "";
+    call && call.employee && call.employee.name
+      ? call.employee.name
+      : "Оператор не визначений";
 
   container.append(fragment);
 }
@@ -3186,6 +5796,12 @@ function renderCallSummary(summary) {
     return;
   }
 
+  if (payload.status === "loading") {
+    elements.aiSummaryText.innerHTML =
+      `<span class="inline-loading"><span class="mini-spinner" aria-hidden="true"></span>${escapeHtml(payload.message || "Завантажуємо AI-підсумок…")}</span>`;
+    return;
+  }
+
   if (payload.status === "queued" || payload.status === "processing") {
     elements.aiSummaryText.textContent =
       payload.message || "Готуємо AI-підсумок останнього записаного дзвінка…";
@@ -3234,10 +5850,203 @@ function scheduleSummaryPoll() {
   }, 4000);
 }
 
+function canonicalNoteId(value) {
+  return String(value || "").replace(/^local-/, "");
+}
+
+function sameNoteId(left, right) {
+  const normalizedLeft = canonicalNoteId(left);
+  const normalizedRight = canonicalNoteId(right);
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+}
+
+function isEditableNote(note) {
+  const id = String(note && note.id || "");
+  const source = String(note && note.source || "");
+  return Boolean(
+    id &&
+      !id.startsWith("ticket-") &&
+      (source === "postgres" || source === "local_json")
+  );
+}
+
+function noteFooterText(note) {
+  const parts = [
+    note.createdBy,
+    note.createdAt ? formatDate(note.createdAt, { short: true }) : ""
+  ].filter(Boolean);
+
+  if (note.updatedAt) {
+    parts.push(`оновлено ${formatDate(note.updatedAt, { short: true })}`);
+  }
+
+  return parts.join(" · ");
+}
+
+function createNoteIconButton(action, label, icon, danger = false) {
+  const button = document.createElement("button");
+  button.className = `note-action-button${danger ? " is-danger" : ""}`;
+  button.type = "button";
+  button.dataset.noteAction = action;
+  button.setAttribute("aria-label", label);
+  button.title = label;
+  button.innerHTML = aiIcon(icon);
+  return button;
+}
+
+function animateUiConfirmPopover(popover) {
+  const animeApi = window.anime;
+  if (!popover || !animeApi) {
+    return;
+  }
+
+  const modernOptions = {
+    opacity: [0, 1],
+    y: [-6, 0],
+    scale: [0.96, 1],
+    duration: 220,
+    ease: "outCubic",
+    composition: "blend"
+  };
+  const legacyOptions = {
+    opacity: [0, 1],
+    translateY: [-6, 0],
+    scale: [0.98, 1],
+    duration: 220,
+    easing: "easeOutCubic"
+  };
+
+  if (typeof animeApi.animate === "function") {
+    animeApi.animate(popover, modernOptions);
+    return;
+  }
+
+  if (typeof animeApi === "function") {
+    animeApi({
+      targets: popover,
+      ...legacyOptions
+    });
+  }
+}
+
+function closeUiConfirmDialog(result) {
+  if (!uiConfirmDialog) {
+    return;
+  }
+
+  const dialog = uiConfirmDialog;
+  uiConfirmDialog = null;
+  window.removeEventListener("keydown", dialog.onKeyDown);
+  window.removeEventListener("resize", dialog.onReposition);
+  window.removeEventListener("scroll", dialog.onReposition, true);
+  dialog.layer.remove();
+  dialog.resolve(Boolean(result));
+}
+
+function positionUiConfirmPopover(popover, anchor) {
+  const viewportPadding = 12;
+  const anchorRect = anchor && typeof anchor.getBoundingClientRect === "function"
+    ? anchor.getBoundingClientRect()
+    : null;
+  const popoverRect = popover.getBoundingClientRect();
+
+  popover.classList.remove("is-placement-below", "is-centered");
+
+  if (!anchorRect) {
+    popover.classList.add("is-centered");
+    popover.style.left = `${Math.max(viewportPadding, (window.innerWidth - popoverRect.width) / 2)}px`;
+    popover.style.top = `${Math.max(viewportPadding, (window.innerHeight - popoverRect.height) / 2)}px`;
+    return;
+  }
+
+  const anchorCenter = anchorRect.left + anchorRect.width / 2;
+  const left = clampNumber(
+    anchorCenter - popoverRect.width / 2,
+    viewportPadding,
+    window.innerWidth - popoverRect.width - viewportPadding
+  );
+  const hasRoomAbove = anchorRect.top > popoverRect.height + viewportPadding + 12;
+  const top = hasRoomAbove
+    ? anchorRect.top - popoverRect.height - 12
+    : Math.min(anchorRect.bottom + 12, window.innerHeight - popoverRect.height - viewportPadding);
+
+  if (!hasRoomAbove) {
+    popover.classList.add("is-placement-below");
+  }
+
+  popover.style.left = `${left}px`;
+  popover.style.top = `${Math.max(viewportPadding, top)}px`;
+  popover.style.setProperty(
+    "--confirm-arrow-left",
+    `${clampNumber(anchorCenter - left, 18, popoverRect.width - 18)}px`
+  );
+}
+
+function showUiConfirmDialog({
+  title = "Підтвердити дію?",
+  message = "Перевірте дію перед підтвердженням.",
+  confirmLabel = "Підтвердити",
+  cancelLabel = "Скасувати",
+  tone = "danger",
+  anchor = null
+} = {}) {
+  if (uiConfirmDialog) {
+    closeUiConfirmDialog(false);
+  }
+
+  const layer = document.createElement("div");
+  layer.className = "booking-action-confirm-layer";
+  layer.innerHTML = `
+    <section class="booking-action-confirm-popover is-${escapeHtml(tone)}" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
+      <div class="booking-action-confirm-head">
+        <span class="booking-action-confirm-mark"></span>
+        <strong>${escapeHtml(title)}</strong>
+      </div>
+      <p>${escapeHtml(message)}</p>
+      <div class="booking-action-confirm-actions">
+        <button class="booking-action-confirm-button is-ghost" type="button" data-booking-confirm-cancel>${escapeHtml(cancelLabel)}</button>
+        <button class="booking-action-confirm-button is-confirm" type="button" data-booking-confirm-accept>${escapeHtml(confirmLabel)}</button>
+      </div>
+    </section>
+  `;
+  const popover = layer.querySelector(".booking-action-confirm-popover");
+  document.body.append(layer);
+
+  return new Promise((resolve) => {
+    const onReposition = () => positionUiConfirmPopover(popover, anchor);
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        closeUiConfirmDialog(false);
+      }
+    };
+
+    uiConfirmDialog = { layer, resolve, onKeyDown, onReposition };
+    layer.addEventListener("pointerdown", (event) => {
+      if (event.target === layer) {
+        closeUiConfirmDialog(false);
+      }
+    });
+    layer
+      .querySelector("[data-booking-confirm-cancel]")
+      ?.addEventListener("click", () => closeUiConfirmDialog(false));
+    layer
+      .querySelector("[data-booking-confirm-accept]")
+      ?.addEventListener("click", () => closeUiConfirmDialog(true));
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    onReposition();
+    animateUiConfirmPopover(popover);
+    layer.querySelector("[data-booking-confirm-cancel]")?.focus({ preventScroll: true });
+  });
+}
+
 function renderNotes(notes) {
   elements.notesList.replaceChildren();
+  const list = Array.isArray(notes) ? notes : [];
 
-  if (!notes.length) {
+  if (!list.length) {
     const message = document.createElement("p");
     message.className = "no-data";
     message.textContent = "Приміток поки немає.";
@@ -3245,51 +6054,597 @@ function renderNotes(notes) {
     return;
   }
 
-  for (const note of notes) {
+  for (const note of list) {
     const item = document.createElement("article");
     item.className = "note";
-    const body = document.createElement("p");
-    body.textContent = note.text;
+    item.dataset.noteId = note.id || "";
+
+    const isEditing = sameNoteId(editingNoteId, note.id);
+    const editable = isEditableNote(note);
+
+    if (isEditing) {
+      item.classList.add("is-editing");
+      const editor = document.createElement("textarea");
+      editor.className = "note-edit-input";
+      editor.maxLength = 2000;
+      editor.value = note.text || "";
+      editor.setAttribute("aria-label", "Текст примітки");
+
+      const actions = document.createElement("div");
+      actions.className = "note-actions";
+      actions.append(
+        createNoteIconButton("save", "Зберегти примітку", "check"),
+        createNoteIconButton("cancel", "Скасувати редагування", "x")
+      );
+      item.append(editor, actions);
+      elements.notesList.append(item);
+      queueMicrotask(() => {
+        editor.focus();
+        editor.setSelectionRange(editor.value.length, editor.value.length);
+      });
+      continue;
+    }
+
+    const body = document.createElement("div");
+    body.className = "note-body";
+    const textNode = document.createElement("p");
+    textNode.textContent = note.text;
+    body.append(textNode);
+
+    if (editable) {
+      const actions = document.createElement("div");
+      actions.className = "note-actions";
+      actions.append(
+        createNoteIconButton("edit", "Редагувати примітку", "edit"),
+        createNoteIconButton("delete", "Видалити примітку", "trash", true)
+      );
+      body.append(actions);
+    }
+
     const footer = document.createElement("footer");
-    footer.textContent = [
-      note.createdBy,
-      note.createdAt ? formatDate(note.createdAt, { short: true }) : ""
-    ]
-      .filter(Boolean)
-      .join(" · ");
+    footer.textContent = noteFooterText(note);
     item.append(body, footer);
     elements.notesList.append(item);
   }
 }
 
-function renderCard(card) {
+function setNoteFormMessage(message, tone = "") {
+  elements.noteMessage.textContent = message || "";
+  if (tone) {
+    elements.noteMessage.dataset.tone = tone;
+  } else {
+    delete elements.noteMessage.dataset.tone;
+  }
+}
+
+function applyUpdatedNote(noteId, updatedNote) {
+  if (!currentCard || !Array.isArray(currentCard.notes)) {
+    return;
+  }
+
+  currentCard.notes = currentCard.notes.map((note) => {
+    if (!sameNoteId(note.id, noteId)) {
+      return note;
+    }
+    return {
+      ...note,
+      ...updatedNote,
+      id: note.id,
+      source: note.source || updatedNote.source || "local_json"
+    };
+  });
+}
+
+function removeCurrentNote(noteId) {
+  if (!currentCard || !Array.isArray(currentCard.notes)) {
+    return;
+  }
+  currentCard.notes = currentCard.notes.filter((note) => !sameNoteId(note.id, noteId));
+}
+
+function appendCurrentNote(note) {
+  if (!currentCard) {
+    return;
+  }
+  if (!Array.isArray(currentCard.notes)) {
+    currentCard.notes = [];
+  }
+  currentCard.notes = [note, ...currentCard.notes];
+}
+
+async function saveNoteEdit(noteId, textarea) {
+  const nextText = String(textarea && textarea.value || "").trim();
+  if (!nextText) {
+    setNoteFormMessage("Примітка не може бути пустою.");
+    textarea.focus();
+    return;
+  }
+
+  setNoteFormMessage("Оновлюємо…", "neutral");
+
+  try {
+    const response = await apiFetch(`/api/client-notes/${encodeURIComponent(noteId)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify({ text: nextText })
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося оновити примітку");
+    }
+
+    applyUpdatedNote(noteId, payload.note || { text: nextText });
+    editingNoteId = "";
+    setNoteFormMessage("Примітку оновлено.", "success");
+    renderNotes(currentCard && currentCard.notes ? currentCard.notes : []);
+  } catch (error) {
+    setNoteFormMessage(error.message);
+  }
+}
+
+async function deleteNote(noteId) {
+  setNoteFormMessage("Видаляємо…", "neutral");
+
+  try {
+    const response = await apiFetch(`/api/client-notes/${encodeURIComponent(noteId)}`, {
+      method: "DELETE",
+      headers: { Accept: "application/json" }
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося видалити примітку");
+    }
+
+    removeCurrentNote(noteId);
+    if (sameNoteId(editingNoteId, noteId)) {
+      editingNoteId = "";
+    }
+    setNoteFormMessage("Примітку видалено.", "success");
+    renderNotes(currentCard && currentCard.notes ? currentCard.notes : []);
+  } catch (error) {
+    setNoteFormMessage(error.message);
+  }
+}
+
+function renderCard(card, options = {}) {
   clearTimeout(summaryPollTimer);
+  currentCard = card;
+  currentCardWarnings = [...(card.warnings || [])];
+  editingNoteId = "";
   currentPhone = card.contact.phone;
   currentSummaryCallId = "";
   elements.clientName.textContent = card.contact.primaryName;
   elements.clientPhone.textContent = formatPhone(card.contact.phone);
   elements.clientPhone.href = `tel:${card.contact.phone}`;
   elements.clientEmail.textContent = card.contact.emails[0] || "Email не вказаний";
-  elements.sourceIndicator.textContent =
-    card.source === "postgres" ? "PostgreSQL" : "Demo";
   elements.firstOrder.textContent = formatDate(card.stats.firstOrderAt);
   elements.lastOrder.textContent = formatDate(card.stats.lastOrderAt);
 
   renderWarnings(card.warnings);
   renderPassengers(card.contact.relatedPassengers);
-  renderUpcoming(card.upcomingTrip);
-  renderCallSummary(card.latestCallSummary);
-  renderCalls(card.calls);
+  renderUpcoming(card.upcomingTrip, { busLoading: options.extrasLoading });
+  if (options.extrasLoading) {
+    renderCallSummary({
+      status: "loading",
+      message: "Завантажуємо дзвінки та AI-підсумок..."
+    });
+    renderCallsLoading();
+    renderTelegramLoading();
+    setViberAvailable(false);
+  } else {
+    renderCallSummary(card.latestCallSummary);
+    renderCalls(card.calls);
+    renderTelegramEmpty("Telegram відкриється після завантаження картки.");
+    setViberAvailable(false);
+  }
   renderTickets(card.tickets);
   renderNotes(card.notes);
   setState("card");
 }
 
+function cardTripIds(card) {
+  return [
+    ...new Set(
+      (card && card.tickets || [])
+        .map((ticket) => ticket && ticket.tripId)
+        .filter(Boolean)
+    )
+  ];
+}
+
+function applyTripAssignmentsToCard(card, assignments) {
+  const map = assignments && typeof assignments === "object" ? assignments : {};
+  const apply = (ticket) => {
+    if (!ticket || !ticket.tripId) {
+      return;
+    }
+    const assignment = map[String(ticket.tripId)];
+    if (!assignment) {
+      return;
+    }
+    ticket.busNumber = assignment.busNumber || "";
+    ticket.busColor = assignment.busColor || "";
+    ticket.busAssignmentChecked = true;
+  };
+
+  for (const ticket of card.tickets || []) {
+    apply(ticket);
+  }
+  apply(card.upcomingTrip);
+  syncCardTransferSegments(card);
+}
+
+function syncCardTransferSegments(card) {
+  if (!card || !Array.isArray(card.tickets)) {
+    return;
+  }
+
+  const byId = new Map(card.tickets.map((ticket) => [String(ticket.id || ""), ticket]));
+  const byTripId = new Map(
+    card.tickets
+      .filter((ticket) => ticket && ticket.tripId)
+      .map((ticket) => [String(ticket.tripId), ticket])
+  );
+  const syncTicket = (ticket) => {
+    if (!ticket || !Array.isArray(ticket.transferSegments)) {
+      return;
+    }
+    ticket.transferSegments = ticket.transferSegments.map((segment) => {
+      const source =
+        byId.get(String(segment.id || "")) ||
+        byTripId.get(String(segment.tripId || "")) ||
+        null;
+      return source
+        ? {
+            ...segment,
+            busNumber: source.busNumber || "",
+            busColor: source.busColor || "",
+            busAssignmentChecked: Boolean(source.busAssignmentChecked)
+          }
+        : segment;
+    });
+  };
+
+  for (const ticket of card.tickets) {
+    syncTicket(ticket);
+  }
+  syncTicket(card.upcomingTrip);
+}
+
+async function loadClientTripAssignments(card, sequence) {
+  const tripIds = cardTripIds(card);
+  if (!tripIds.length) {
+    renderUpcoming(card.upcomingTrip);
+    return;
+  }
+
+  try {
+    const response = await apiFetch(
+      `/api/client-card-trip-assignments?tripIds=${encodeURIComponent(tripIds.join(","))}`,
+      { headers: { Accept: "application/json" } }
+    );
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося завантажити автобус.");
+    }
+    if (sequence !== clientLoadSequence || currentCard !== card) {
+      return;
+    }
+
+    applyTripAssignmentsToCard(card, payload.assignments);
+    renderUpcoming(card.upcomingTrip);
+  } catch (error) {
+    if (sequence !== clientLoadSequence || currentCard !== card) {
+      return;
+    }
+    renderUpcoming(card.upcomingTrip);
+  }
+}
+
+async function loadClientCalls(card, sequence) {
+  try {
+    const response = await apiFetch(
+      `/api/client-card-calls?phone=${encodeURIComponent(card.contact.phoneDigits || card.contact.phone)}`,
+      { headers: { Accept: "application/json" } }
+    );
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося завантажити дзвінки.");
+    }
+    if (sequence !== clientLoadSequence || currentCard !== card) {
+      return;
+    }
+
+    card.calls = payload.calls || [];
+    card.latestCallSummary = payload.latestCallSummary || null;
+    renderWarnings([...currentCardWarnings, ...(payload.warnings || [])]);
+    renderCallSummary(card.latestCallSummary);
+    renderCalls(card.calls);
+  } catch (error) {
+    if (sequence !== clientLoadSequence || currentCard !== card) {
+      return;
+    }
+    renderCallSummary({
+      status: "failed",
+      error: error.message || "Не вдалося завантажити AI-підсумок."
+    });
+    renderCallsError(error.message || "Не вдалося завантажити дзвінки Binotel.");
+  }
+}
+
+async function loadClientTelegram(card, sequence, accountId = selectedTelegramAccountId, options = {}) {
+  try {
+    const phone = card.contact.phoneDigits || card.contact.phone;
+    const params = new URLSearchParams({
+      phone,
+      limit: "50"
+    });
+    if (accountId) {
+      params.set("accountId", accountId);
+    }
+    if (options.force) {
+      params.set("force", "1");
+    }
+    const response = await apiFetch(`/api/telegram/conversation?${params.toString()}`, {
+      headers: { Accept: "application/json" }
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося завантажити Telegram.");
+    }
+    if (sequence !== clientLoadSequence || currentCard !== card) {
+      return;
+    }
+    renderTelegramPanel(payload);
+  } catch (error) {
+    if (sequence !== clientLoadSequence || currentCard !== card) {
+      return;
+    }
+    renderTelegramError(error.message || "Не вдалося завантажити Telegram.");
+  }
+}
+
+async function loadClientViber(card, sequence) {
+  try {
+    const phone = card.contact.phoneDigits || card.contact.phone;
+    const params = new URLSearchParams({
+      phone,
+      limit: "50"
+    });
+    const response = await apiFetch(`/api/viber/conversation?${params.toString()}`, {
+      headers: { Accept: "application/json" }
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося завантажити Viber.");
+    }
+    if (sequence !== clientLoadSequence || currentCard !== card) {
+      return;
+    }
+    renderViberPanel(payload);
+  } catch (error) {
+    if (sequence !== clientLoadSequence || currentCard !== card) {
+      return;
+    }
+    renderViberError(error.message || "Не вдалося завантажити Viber.");
+  }
+}
+
+async function reloadCurrentTelegram(accountId = selectedTelegramAccountId, options = {}) {
+  if (!currentCard) {
+    return;
+  }
+  renderTelegramLoading();
+  await loadClientTelegram(currentCard, clientLoadSequence, accountId, options);
+}
+
+async function reloadCurrentViber() {
+  if (!currentCard) {
+    return;
+  }
+  renderViberLoading();
+  await loadClientViber(currentCard, clientLoadSequence);
+}
+
+async function handleTelegramSend(event) {
+  event.preventDefault();
+  if (!currentCard || !selectedTelegramAccountId) {
+    return;
+  }
+  const message = elements.telegramMessage.value.trim();
+  if (!message) {
+    return;
+  }
+
+  setTelegramComposeEnabled(false);
+  telegramSetMessage("Надсилаємо повідомлення...", "neutral");
+
+  try {
+    const response = await apiFetch("/api/telegram/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        phone: currentCard.contact.phoneDigits || currentCard.contact.phone,
+        accountId: selectedTelegramAccountId,
+        text: message,
+        replyToMessageId: telegramReplyTarget && telegramReplyTarget.id
+          ? telegramReplyTarget.id
+          : undefined
+      })
+    });
+    const payload = await readJsonResponse(response, "Не вдалося надіслати Telegram повідомлення.");
+    elements.telegramMessage.value = "";
+    clearTelegramReplyTarget();
+    telegramSetMessage("Повідомлення надіслано.", "success");
+    if (currentTelegram && Array.isArray(currentTelegram.matches)) {
+      const match = currentTelegram.matches.find(
+        (item) => item.account && item.account.id === selectedTelegramAccountId
+      );
+      if (match) {
+        match.messages = [...(match.messages || []), payload.message].filter(Boolean);
+        renderTelegramPanel({
+          ...currentTelegram,
+          selectedAccountId: selectedTelegramAccountId
+        });
+      }
+    }
+    await reloadCurrentTelegram(selectedTelegramAccountId);
+  } catch (error) {
+    telegramSetMessage(error.message || "Не вдалося надіслати Telegram повідомлення.");
+    setTelegramComposeEnabled(true);
+  }
+}
+
+function handleTelegramMessageKeydown(event) {
+  if (
+    event.key !== "Enter" ||
+    event.shiftKey ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.isComposing
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  if (typeof elements.telegramCompose?.requestSubmit === "function") {
+    elements.telegramCompose.requestSubmit();
+  } else {
+    elements.telegramSend?.click();
+  }
+}
+
+function selectedTelegramMatch() {
+  const matches = Array.isArray(currentTelegram && currentTelegram.matches)
+    ? currentTelegram.matches
+    : [];
+  return matches.find((match) => match.account && match.account.id === selectedTelegramAccountId) || null;
+}
+
+function telegramMessageById(messageId) {
+  const selected = selectedTelegramMatch();
+  const messages = Array.isArray(selected && selected.messages) ? selected.messages : [];
+  return messages.find((message) => String(message.id) === String(messageId)) || null;
+}
+
+function openTelegramPhotoModal(url, title = "Фото") {
+  if (!elements.telegramPhotoModal || !elements.telegramPhotoModalImage) {
+    return;
+  }
+  elements.telegramPhotoModalImage.src = url;
+  elements.telegramPhotoModalImage.alt = title || "Telegram фото";
+  if (elements.telegramPhotoModalTitle) {
+    elements.telegramPhotoModalTitle.textContent = title || "Фото";
+  }
+  if (typeof elements.telegramPhotoModal.showModal === "function") {
+    elements.telegramPhotoModal.showModal();
+  } else {
+    elements.telegramPhotoModal.removeAttribute("hidden");
+  }
+}
+
+function closeTelegramPhotoModal() {
+  if (!elements.telegramPhotoModal) {
+    return;
+  }
+  if (typeof elements.telegramPhotoModal.close === "function") {
+    elements.telegramPhotoModal.close();
+  } else {
+    elements.telegramPhotoModal.setAttribute("hidden", "");
+  }
+  if (elements.telegramPhotoModalImage) {
+    elements.telegramPhotoModalImage.removeAttribute("src");
+    elements.telegramPhotoModalImage.alt = "Telegram фото";
+  }
+}
+
+function handleTelegramChatClick(event) {
+  const photoLink = event.target.closest("[data-telegram-photo-url]");
+  if (photoLink) {
+    event.preventDefault();
+    openTelegramPhotoModal(
+      photoLink.dataset.telegramPhotoUrl,
+      photoLink.dataset.telegramPhotoTitle || "Фото"
+    );
+    return;
+  }
+
+  const replyButton = event.target.closest("[data-telegram-reply-id]");
+  if (replyButton) {
+    const message = telegramMessageById(replyButton.dataset.telegramReplyId);
+    if (message) {
+      setTelegramReplyTarget(message);
+    }
+    return;
+  }
+
+  const jumpButton = event.target.closest("[data-telegram-jump-to]");
+  if (jumpButton) {
+    const targetId = jumpButton.dataset.telegramJumpTo;
+    const target = Array.from(elements.telegramChat.querySelectorAll("[data-telegram-message-id]"))
+      .find((node) => node.dataset.telegramMessageId === String(targetId));
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.classList.add("is-highlighted");
+      window.setTimeout(() => target.classList.remove("is-highlighted"), 900);
+    }
+  }
+}
+
+function selectTelegramAccount(accountId) {
+  const nextAccountId = String(accountId || "");
+  if (!nextAccountId) {
+    setTelegramAccountDropdownOpen(false);
+    return;
+  }
+
+  selectedTelegramAccountId = nextAccountId;
+  setTelegramAccountDropdownOpen(false);
+  clearTelegramReplyTarget();
+  if (currentTelegram && Array.isArray(currentTelegram.matches)) {
+    renderTelegramPanel({
+      ...currentTelegram,
+      selectedAccountId: selectedTelegramAccountId
+    });
+    return;
+  }
+  void reloadCurrentTelegram(selectedTelegramAccountId);
+}
+
+function handleTelegramAccountMenuClick(event) {
+  const option = event.target.closest("[data-telegram-account-id]");
+  if (!option) {
+    return;
+  }
+  selectTelegramAccount(option.dataset.telegramAccountId);
+}
+
+function loadClientExtras(card, sequence) {
+  loadClientTripAssignments(card, sequence);
+  loadClientCalls(card, sequence);
+  loadClientTelegram(card, sequence);
+  loadClientViber(card, sequence);
+}
+
 async function loadClient(phone) {
   clearTimeout(monitorPollTimer);
   clearTimeout(detailPollTimer);
+  clearTimeout(summaryPollTimer);
   const cleaned = String(phone || "").trim();
+  const sequence = ++clientLoadSequence;
   if (!cleaned) {
+    currentCard = null;
+    currentCardWarnings = [];
     setState("empty");
     return;
   }
@@ -3299,7 +6654,7 @@ async function loadClient(phone) {
 
   try {
     const response = await apiFetch(
-      `/api/client-card?phone=${encodeURIComponent(cleaned)}`,
+      `/api/client-card?phone=${encodeURIComponent(cleaned)}&fast=1`,
       { headers: { Accept: "application/json" } }
     );
     const card = await response.json();
@@ -3313,8 +6668,17 @@ async function loadClient(phone) {
     url.search = "";
     url.searchParams.set("phone", card.contact.phoneDigits || cleaned);
     window.history.replaceState({}, "", url);
-    renderCard(card);
+    if (sequence !== clientLoadSequence) {
+      return;
+    }
+    renderCard(card, { extrasLoading: true });
+    loadClientExtras(card, sequence);
   } catch (error) {
+    if (sequence !== clientLoadSequence) {
+      return;
+    }
+    currentCard = null;
+    currentCardWarnings = [];
     setState("empty");
     elements.emptyState.querySelector("h1").textContent = "Не вдалося відкрити картку";
     elements.emptyState.querySelector("p").textContent = error.message;
@@ -3390,6 +6754,404 @@ function appendAnalyticsDistributionRow(container, item, total, options = {}) {
   container.append(row);
 }
 
+function managerRatingScoreClass(value) {
+  return `quality-${scoreLevel(value)}`;
+}
+
+function managerRatingPercent(value) {
+  return Number.isFinite(Number(value)) ? `${Math.round(Number(value))}%` : "—";
+}
+
+function managerRatingPercentValue(item) {
+  const total = Number(item && item.totalPercent);
+  if (Number.isFinite(total)) {
+    return total;
+  }
+
+  const average = Number(item && item.averagePercent);
+  return Number.isFinite(average) ? average : null;
+}
+
+function managerRatingPointLabel(item) {
+  const score = Number(item && item.scoreSum);
+  const maxScore = Number(item && item.maxScoreSum);
+  if (Number.isFinite(score) && Number.isFinite(maxScore) && maxScore > 0) {
+    return `${formatMetricNumber(score)}/${formatMetricNumber(maxScore)}`;
+  }
+
+  const average = Number(item && item.averageScore);
+  const averageMax = Number(item && item.averageMaxScore);
+  if (Number.isFinite(average) && Number.isFinite(averageMax) && averageMax > 0) {
+    return `${formatMetricNumber(average)}/${formatMetricNumber(averageMax)}`;
+  }
+
+  return "—";
+}
+
+function managerRatingCountLabel(item, emptyLabel = "немає оцінок") {
+  const count = Number(item && item.scoredMetricCount);
+  if (Number.isFinite(count) && count > 0) {
+    return `${formatNumber(count)} оц.`;
+  }
+  return emptyLabel;
+}
+
+function managerMetricKey(metric) {
+  return String(metric && (metric.key || metric.id || metric.label) || "").trim();
+}
+
+function managerMetricLabel(metric) {
+  return String(metric && (metric.label || metric.key) || "Метрика").trim();
+}
+
+function managerMetricMap(manager) {
+  const map = new Map();
+  const metrics = Array.isArray(manager && manager.metrics) ? manager.metrics : [];
+  for (const metric of metrics) {
+    const key = managerMetricKey(metric);
+    if (key && !map.has(key)) {
+      map.set(key, metric);
+    }
+  }
+  return map;
+}
+
+function managerRatingColumnMetrics(rating, managers) {
+  const map = new Map();
+  const addMetric = (metric) => {
+    const key = managerMetricKey(metric);
+    if (key && !map.has(key)) {
+      map.set(key, {
+        key,
+        label: managerMetricLabel(metric),
+        group: metric && metric.group || "",
+        color: metric && metric.color || ""
+      });
+    }
+  };
+
+  for (const metric of Array.isArray(rating && rating.metrics) ? rating.metrics : []) {
+    addMetric(metric);
+  }
+  for (const manager of managers) {
+    for (const metric of Array.isArray(manager && manager.metrics) ? manager.metrics : []) {
+      addMetric(metric);
+    }
+  }
+
+  return [...map.values()];
+}
+
+function managerRatingMeta(manager) {
+  const callType = Array.isArray(manager && manager.callTypes) && manager.callTypes[0]
+    ? manager.callTypes[0]
+    : null;
+  return [
+    manager && manager.extension ? `вн. ${manager.extension}` : "",
+    manager && manager.pbxName || "",
+    callType ? `${callType.label || callType.type}: ${formatNumber(callType.count || 0)}` : ""
+  ].filter(Boolean).join(" · ") || "Без додаткових даних";
+}
+
+function createManagerRatingChip(label, value) {
+  const chip = document.createElement("span");
+  const labelElement = document.createElement("small");
+  labelElement.textContent = label;
+  const valueElement = document.createElement("strong");
+  valueElement.textContent = value;
+  chip.append(labelElement, valueElement);
+  return chip;
+}
+
+function createManagerRatingCell(item, options = {}) {
+  const percent = managerRatingPercentValue(item);
+  const cell = document.createElement("div");
+  cell.className = `manager-rating-cell ${managerRatingScoreClass(percent)}`;
+  cell.style.setProperty("--metric-color", safeMetricColor(item && item.color));
+  const pointLabel = managerRatingPointLabel(item);
+  const countLabel = options.total
+    ? `${formatNumber(item && item.ratedCallCount || 0)} дзв.`
+    : managerRatingCountLabel(item);
+  cell.title = `${managerRatingPercent(percent)} · ${pointLabel} · ${countLabel}`;
+  cell.setAttribute("aria-label", cell.title);
+
+  const score = document.createElement("strong");
+  score.className = "manager-rating-cell-score";
+  score.textContent = managerRatingPercent(percent);
+
+  cell.append(score);
+  return cell;
+}
+
+function createEmptyManagerRatingCell() {
+  const cell = document.createElement("div");
+  cell.className = "manager-rating-cell quality-empty";
+  cell.title = "Немає оцінок";
+  cell.setAttribute("aria-label", "Немає оцінок");
+  const score = document.createElement("strong");
+  score.className = "manager-rating-cell-score";
+  score.textContent = "—";
+  cell.append(score);
+  return cell;
+}
+
+function showManagerRatingModalDialog() {
+  if (!elements.managerRatingModal) {
+    return;
+  }
+
+  if (typeof elements.managerRatingModal.showModal === "function") {
+    elements.managerRatingModal.showModal();
+    return;
+  }
+
+  elements.managerRatingModal.setAttribute("open", "");
+}
+
+function closeManagerRatingModal() {
+  if (!elements.managerRatingModal) {
+    return;
+  }
+
+  if (elements.managerRatingModal.open && typeof elements.managerRatingModal.close === "function") {
+    elements.managerRatingModal.close();
+    return;
+  }
+
+  elements.managerRatingModal.removeAttribute("open");
+}
+
+function appendManagerModalSummary(label, value, detail = "") {
+  const item = document.createElement("div");
+  item.className = "manager-rating-modal-stat";
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+  const valueElement = document.createElement("strong");
+  valueElement.textContent = value;
+  item.append(labelElement, valueElement);
+  if (detail) {
+    const detailElement = document.createElement("small");
+    detailElement.textContent = detail;
+    item.append(detailElement);
+  }
+  elements.managerRatingModalSummary.append(item);
+}
+
+function appendManagerModalMetric(metric) {
+  const item = document.createElement("article");
+  const percent = managerRatingPercentValue(metric);
+  item.className = `manager-rating-modal-metric ${managerRatingScoreClass(percent)}`;
+  item.style.setProperty("--metric-color", safeMetricColor(metric && metric.color));
+
+  const head = document.createElement("div");
+  head.className = "manager-rating-modal-metric-head";
+  const title = document.createElement("div");
+  const label = document.createElement("strong");
+  label.textContent = managerMetricLabel(metric);
+  title.append(label);
+  if (metric && metric.group) {
+    const group = document.createElement("small");
+    group.textContent = metric.group;
+    title.append(group);
+  }
+  const score = document.createElement("span");
+  score.textContent = managerRatingPercent(percent);
+  head.append(title, score);
+
+  const facts = document.createElement("dl");
+  facts.className = "manager-rating-modal-metric-facts";
+  const addFact = (factLabel, factValue) => {
+    const wrap = document.createElement("div");
+    const dt = document.createElement("dt");
+    dt.textContent = factLabel;
+    const dd = document.createElement("dd");
+    dd.textContent = factValue;
+    wrap.append(dt, dd);
+    facts.append(wrap);
+  };
+
+  addFact("Бали", managerRatingPointLabel(metric));
+  addFact("Оцінок", managerRatingCountLabel(metric, "0 оц."));
+  addFact("Середнє", Number.isFinite(Number(metric && metric.averageScore))
+    ? `${formatMetricNumber(metric.averageScore)}/${formatMetricNumber(metric.averageMaxScore)}`
+    : "—");
+
+  item.append(head, facts);
+  elements.managerRatingModalMetrics.append(item);
+}
+
+function openManagerRatingModal(managerIndex) {
+  const managers = Array.isArray(currentManagerRating && currentManagerRating.managers)
+    ? currentManagerRating.managers
+    : [];
+  const manager = managers[Number(managerIndex)];
+  if (!manager) {
+    return;
+  }
+
+  const percent = managerRatingPercentValue(manager);
+  elements.managerRatingModalTitle.textContent = manager.label || "Оператор не визначений";
+  elements.managerRatingModalSubtitle.textContent = managerRatingMeta(manager);
+  elements.managerRatingModalSummary.replaceChildren();
+  elements.managerRatingModalMetrics.replaceChildren();
+
+  appendManagerModalSummary(
+    "Загальна оцінка",
+    managerRatingPercent(percent),
+    `${managerRatingPointLabel(manager)} сумарно`
+  );
+  appendManagerModalSummary(
+    "Дзвінків",
+    formatNumber(manager.ratedCallCount || 0),
+    "з оціненими метриками"
+  );
+  appendManagerModalSummary(
+    "Метрик",
+    formatNumber(manager.scoredMetricCount || 0),
+    "враховано в рейтингу"
+  );
+  appendManagerModalSummary(
+    "Останній дзвінок",
+    manager.lastCallAt ? formatDateTime(manager.lastCallAt) : "—"
+  );
+
+  const metrics = Array.isArray(manager.metrics) ? manager.metrics : [];
+  if (!metrics.length) {
+    const message = document.createElement("p");
+    message.className = "no-data";
+    message.textContent = "По цьому менеджеру ще немає оцінених метрик.";
+    elements.managerRatingModalMetrics.append(message);
+  } else {
+    for (const metric of metrics) {
+      appendManagerModalMetric(metric);
+    }
+  }
+
+  showManagerRatingModalDialog();
+}
+
+function renderManagerRating(rating) {
+  const managers = Array.isArray(rating && rating.managers)
+    ? rating.managers
+    : [];
+  const metricColumns = managerRatingColumnMetrics(rating, managers);
+  currentManagerRating = {
+    ...(rating || {}),
+    managers
+  };
+
+  if (elements.managerRatingSummary) {
+    elements.managerRatingSummary.replaceChildren();
+  }
+  if (elements.managerRatingTable) {
+    elements.managerRatingTable.replaceChildren();
+  }
+  if (elements.managerRatingEmpty) {
+    elements.managerRatingEmpty.classList.toggle("hidden", managers.length > 0);
+  }
+
+  if (!elements.managerRatingTable || !elements.managerRatingSummary) {
+    return;
+  }
+
+  const summaryItems = [
+    ["Менеджерів", formatNumber(rating && rating.managerCount || managers.length)],
+    ["Дзвінків з оцінками", formatNumber(rating && rating.ratedCalls || 0)],
+    ["Метрик у таблиці", formatNumber(metricColumns.length)],
+    ["Середня якість", managerRatingPercent(managerRatingPercentValue(rating))]
+  ];
+  for (const [label, value] of summaryItems) {
+    elements.managerRatingSummary.append(createManagerRatingChip(label, value));
+  }
+
+  if (!managers.length) {
+    return;
+  }
+
+  const table = document.createElement("table");
+  table.className = "manager-rating-matrix";
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+
+  const managerHead = document.createElement("th");
+  managerHead.className = "manager-rating-sticky manager-rating-manager-head";
+  managerHead.scope = "col";
+  managerHead.textContent = "Менеджер";
+  headRow.append(managerHead);
+
+  const totalHead = document.createElement("th");
+  totalHead.className = "manager-rating-total-head";
+  totalHead.scope = "col";
+  totalHead.textContent = "Загальна";
+  headRow.append(totalHead);
+
+  for (const metric of metricColumns) {
+    const metricHead = document.createElement("th");
+    metricHead.className = "manager-rating-metric-head";
+    metricHead.scope = "col";
+    metricHead.title = metric.group
+      ? `${metric.label} · ${metric.group}`
+      : metric.label;
+    metricHead.style.setProperty("--metric-color", safeMetricColor(metric.color));
+    const label = document.createElement("strong");
+    label.textContent = metric.label;
+    metricHead.append(label);
+    if (metric.group) {
+      const group = document.createElement("small");
+      group.textContent = metric.group;
+      metricHead.append(group);
+    }
+    headRow.append(metricHead);
+  }
+  thead.append(headRow);
+
+  const tbody = document.createElement("tbody");
+  managers.forEach((manager, index) => {
+    const row = document.createElement("tr");
+    row.className = "manager-rating-matrix-row";
+
+    const managerCell = document.createElement("th");
+    managerCell.className = "manager-rating-sticky manager-rating-manager-cell";
+    managerCell.scope = "row";
+    const managerButton = document.createElement("button");
+    managerButton.className = "manager-rating-person-button";
+    managerButton.type = "button";
+    managerButton.dataset.managerRatingIndex = String(index);
+
+    const rank = document.createElement("span");
+    rank.className = "manager-rating-rank";
+    rank.textContent = formatNumber(manager.rank || index + 1);
+    const person = document.createElement("span");
+    person.className = "manager-rating-person";
+    const name = document.createElement("strong");
+    name.textContent = manager.label || "Оператор не визначений";
+    const meta = document.createElement("small");
+    meta.textContent = managerRatingMeta(manager);
+    person.append(name, meta);
+    managerButton.append(rank, person);
+    managerCell.append(managerButton);
+    row.append(managerCell);
+
+    const totalCell = document.createElement("td");
+    totalCell.className = "manager-rating-total-cell";
+    totalCell.append(createManagerRatingCell(manager, { total: true }));
+    row.append(totalCell);
+
+    const metricMap = managerMetricMap(manager);
+    for (const column of metricColumns) {
+      const cell = document.createElement("td");
+      const metric = metricMap.get(column.key);
+      cell.append(metric ? createManagerRatingCell(metric) : createEmptyManagerRatingCell());
+      row.append(cell);
+    }
+
+    tbody.append(row);
+  });
+
+  table.append(thead, tbody);
+  elements.managerRatingTable.append(table);
+}
+
 function renderCallTypeAnalytics(payload) {
   const categories = Array.isArray(payload && payload.categories)
     ? payload.categories
@@ -3397,6 +7159,7 @@ function renderCallTypeAnalytics(payload) {
   const questions = Array.isArray(payload && payload.questions)
     ? payload.questions
     : [];
+  const managerRating = payload && payload.managerRating;
   const usage = (payload && payload.usage) || {};
   const openAiSummary = usage.openAiSummary || {};
   const transcription = usage.transcription || {};
@@ -3410,6 +7173,7 @@ function renderCallTypeAnalytics(payload) {
   const topType = categories[0] || null;
   const questionTotal = questions.reduce((total, item) => total + Number(item.count || 0), 0);
   const highRiskCount = ((churnRisk.levels || []).find((item) => item.type === "high") || {}).count || 0;
+  renderManagerRating(managerRating);
 
   elements.analyticsAnalyzed.textContent = String(analyzedCalls);
   elements.analyticsAnalyzedCaption.textContent =
@@ -3533,6 +7297,1239 @@ async function loadAnalyticsPage(showLoading = true) {
   }
 }
 
+function callStatsValue(value) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+function callStatsPercent(value) {
+  return `${new Intl.NumberFormat("uk-UA", {
+    maximumFractionDigits: Number(value) % 1 === 0 ? 0 : 1
+  }).format(callStatsValue(value))}%`;
+}
+
+function callStatsDecimal(value, maximumFractionDigits = 1) {
+  return new Intl.NumberFormat("uk-UA", {
+    maximumFractionDigits
+  }).format(callStatsValue(value));
+}
+
+function callStatsShare(part, total) {
+  const whole = callStatsValue(total);
+  return whole ? Math.round((callStatsValue(part) / whole) * 1000) / 10 : 0;
+}
+
+function callStatsAnswerTone(answered, total) {
+  if (!callStatsValue(total)) {
+    return "";
+  }
+  return callStatsShare(answered, total) < 85 ? "warning" : "good";
+}
+
+function callStatsRateTone(rate, total) {
+  if (!callStatsValue(total)) {
+    return "";
+  }
+  return callStatsValue(rate) < 85 ? "warning" : "good";
+}
+
+function callStatsDateLabel(value) {
+  if (!value) {
+    return "—";
+  }
+
+  return formatDate(value, { short: true });
+}
+
+function callStatsRangeText(payload) {
+  const period = (payload && payload.period) || {};
+  const summary = (payload && payload.summary) || {};
+  const first = period.from || summary.firstCallAt;
+  const rawTo = period.to || summary.lastCallAt;
+  const to = period.to
+    ? new Date(new Date(period.to).getTime() - 1).toISOString()
+    : rawTo;
+
+  if (!first && !to) {
+    return "Дані ще не накопичені";
+  }
+
+  if (!first) {
+    return `до ${callStatsDateLabel(to)}`;
+  }
+
+  if (!to) {
+    return `від ${callStatsDateLabel(first)}`;
+  }
+
+  return `${callStatsDateLabel(first)} - ${callStatsDateLabel(to)}`;
+}
+
+function callStatsCssVar(name, fallback) {
+  return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
+}
+
+function callStatsChartPalette() {
+  return {
+    text: callStatsCssVar("--text", "#e7edf1"),
+    muted: callStatsCssVar("--muted", "#9aabb4"),
+    line: callStatsCssVar("--line", "#2d3c45"),
+    accent: callStatsCssVar("--accent", "#4fb4d2"),
+    incoming: callStatsCssVar("--call-incoming", "#53c58e"),
+    outgoing: callStatsCssVar("--call-outgoing", "#7acfe8"),
+    warning: callStatsCssVar("--warning", "#e2a73f"),
+    danger: callStatsCssVar("--danger", "#f06b6b"),
+    panel: callStatsCssVar("--panel-soft", "#1f2b33")
+  };
+}
+
+function destroyCallStatsCharts() {
+  for (const chart of callStatsCharts.values()) {
+    chart.destroy();
+  }
+  callStatsCharts.clear();
+}
+
+function renderCallStatsChart(key, canvas, config) {
+  if (!canvas || !window.Chart) {
+    return;
+  }
+
+  const existing = callStatsCharts.get(key);
+  if (existing) {
+    existing.destroy();
+  }
+
+  callStatsCharts.set(key, new window.Chart(canvas, config));
+}
+
+function callStatsMetric(label, value, tone = "") {
+  return { label, value, tone };
+}
+
+function setCallStatsFocus(focus = {}) {
+  if (!elements.callStatsFocus) {
+    return;
+  }
+
+  setCallStatsText(elements.callStatsFocusTitle, focus.title || "Загальна вибірка");
+  setCallStatsText(elements.callStatsFocusSubtitle, focus.subtitle || "—");
+  elements.callStatsFocus.dataset.tone = focus.tone || "neutral";
+
+  if (!elements.callStatsFocusMetrics) {
+    return;
+  }
+
+  elements.callStatsFocusMetrics.replaceChildren();
+  const metrics = Array.isArray(focus.metrics) ? focus.metrics : [];
+  if (!metrics.length) {
+    const empty = document.createElement("span");
+    empty.className = "call-stats-focus-chip";
+    const value = document.createElement("b");
+    value.textContent = "—";
+    empty.append(value);
+    elements.callStatsFocusMetrics.append(empty);
+    return;
+  }
+
+  for (const metric of metrics) {
+    const chip = document.createElement("span");
+    chip.className = "call-stats-focus-chip";
+    if (metric.tone) {
+      chip.dataset.tone = metric.tone;
+    }
+    const label = document.createElement("em");
+    label.textContent = metric.label || "";
+    const value = document.createElement("b");
+    value.textContent = metric.value || "—";
+    chip.append(label, value);
+    elements.callStatsFocusMetrics.append(chip);
+  }
+}
+
+function clearCallStatsSelection() {
+  document
+    .querySelectorAll(".call-stats-is-selected")
+    .forEach((item) => item.classList.remove("call-stats-is-selected"));
+}
+
+function selectCallStatsElement(element) {
+  clearCallStatsSelection();
+  if (element) {
+    element.classList.add("call-stats-is-selected");
+  }
+}
+
+function makeCallStatsInteractive(element, focus) {
+  if (!element || !focus) {
+    return;
+  }
+
+  element.classList.add("call-stats-interactive");
+  element.tabIndex = 0;
+  if (element.tagName !== "BUTTON") {
+    element.setAttribute("role", "button");
+  }
+  element.title = [focus.title, focus.subtitle].filter(Boolean).join(" · ");
+
+  const activate = () => {
+    selectCallStatsElement(element);
+    setCallStatsFocus(focus);
+  };
+
+  element.onclick = activate;
+  element.onfocus = activate;
+  element.onpointerenter = () => setCallStatsFocus(focus);
+  element.onkeydown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      activate();
+    }
+  };
+}
+
+function callStatsChartInteraction(rows, focusBuilder) {
+  return {
+    onHover(event, activeItems) {
+      const target = event && event.native && event.native.target;
+      if (target) {
+        target.style.cursor = activeItems && activeItems.length ? "pointer" : "default";
+      }
+    },
+    onClick(event, activeItems, chart) {
+      const active = activeItems && activeItems[0];
+      if (!active) {
+        return;
+      }
+
+      const row = rows[active.index];
+      if (!row) {
+        return;
+      }
+
+      const dataset = chart && chart.data && chart.data.datasets
+        ? chart.data.datasets[active.datasetIndex]
+        : null;
+      setCallStatsFocus(focusBuilder(row, active, dataset) || {});
+    }
+  };
+}
+
+function getCallStatsHeatmapTooltipElement() {
+  if (callStatsHeatmapTooltipElement) {
+    return callStatsHeatmapTooltipElement;
+  }
+
+  callStatsHeatmapTooltipElement = document.createElement("div");
+  callStatsHeatmapTooltipElement.className = "call-stats-heatmap-tooltip";
+  callStatsHeatmapTooltipElement.setAttribute("role", "tooltip");
+  callStatsHeatmapTooltipElement.hidden = true;
+  document.body.append(callStatsHeatmapTooltipElement);
+  return callStatsHeatmapTooltipElement;
+}
+
+function getCallStatsHeatmapTooltipTrigger(target) {
+  return target instanceof Element
+    ? target.closest(".call-stats-heatmap-cell[data-tooltip]")
+    : null;
+}
+
+function positionCallStatsHeatmapTooltip(
+  trigger = activeCallStatsHeatmapTooltipTrigger
+) {
+  if (!trigger || !document.body.contains(trigger)) {
+    hideCallStatsHeatmapTooltip();
+    return;
+  }
+
+  const tooltip = getCallStatsHeatmapTooltipElement();
+  if (tooltip.hidden) {
+    return;
+  }
+
+  const margin = 10;
+  const gap = 10;
+  const triggerRect = trigger.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  let left = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
+  left = Math.max(margin, Math.min(left, viewportWidth - tooltipRect.width - margin));
+  let top = triggerRect.top - tooltipRect.height - gap;
+  let placement = "top";
+
+  if (top < margin) {
+    top = triggerRect.bottom + gap;
+    placement = "bottom";
+  }
+  if (top + tooltipRect.height > viewportHeight - margin) {
+    top = Math.max(margin, viewportHeight - tooltipRect.height - margin);
+    placement = "clamped";
+  }
+
+  tooltip.dataset.placement = placement;
+  tooltip.style.left = `${Math.round(left)}px`;
+  tooltip.style.top = `${Math.round(top)}px`;
+}
+
+function showCallStatsHeatmapTooltip(trigger) {
+  if (!trigger) {
+    return;
+  }
+
+  const text = String(trigger.dataset.tooltip || "").trim();
+  if (!text) {
+    return;
+  }
+
+  const tooltip = getCallStatsHeatmapTooltipElement();
+  activeCallStatsHeatmapTooltipTrigger = trigger;
+  tooltip.textContent = text;
+  tooltip.style.left = "0px";
+  tooltip.style.top = "0px";
+  tooltip.hidden = false;
+  tooltip.classList.add("is-visible");
+  positionCallStatsHeatmapTooltip(trigger);
+}
+
+function hideCallStatsHeatmapTooltip(trigger = null) {
+  if (trigger && trigger !== activeCallStatsHeatmapTooltipTrigger) {
+    return;
+  }
+
+  const tooltip = getCallStatsHeatmapTooltipElement();
+  activeCallStatsHeatmapTooltipTrigger = null;
+  tooltip.classList.remove("is-visible");
+  tooltip.hidden = true;
+}
+
+function initCallStatsHeatmapTooltips() {
+  if (callStatsHeatmapTooltipsReady) {
+    return;
+  }
+
+  callStatsHeatmapTooltipsReady = true;
+  document.addEventListener("mouseover", (event) => {
+    const trigger = getCallStatsHeatmapTooltipTrigger(event.target);
+    if (trigger) {
+      showCallStatsHeatmapTooltip(trigger);
+    }
+  });
+  document.addEventListener("mouseout", (event) => {
+    const trigger = getCallStatsHeatmapTooltipTrigger(event.target);
+    const relatedTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;
+    if (!trigger || (relatedTarget && trigger.contains(relatedTarget))) {
+      return;
+    }
+    hideCallStatsHeatmapTooltip(trigger);
+  });
+  document.addEventListener("focusin", (event) => {
+    const trigger = getCallStatsHeatmapTooltipTrigger(event.target);
+    if (trigger) {
+      showCallStatsHeatmapTooltip(trigger);
+    }
+  });
+  document.addEventListener("focusout", (event) => {
+    const trigger = getCallStatsHeatmapTooltipTrigger(event.target);
+    if (trigger) {
+      hideCallStatsHeatmapTooltip(trigger);
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      hideCallStatsHeatmapTooltip();
+    }
+  });
+  window.addEventListener("resize", () => positionCallStatsHeatmapTooltip());
+  window.addEventListener("scroll", () => positionCallStatsHeatmapTooltip(), true);
+}
+
+function callStatsBaseChartOptions(extra = {}) {
+  const colors = callStatsChartPalette();
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      intersect: false,
+      mode: "index"
+    },
+    plugins: {
+      legend: {
+        labels: {
+          color: colors.muted,
+          boxWidth: 12,
+          boxHeight: 12,
+          font: {
+            family: "Montserrat, Segoe UI, sans-serif",
+            weight: 800
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: colors.panel,
+        borderColor: colors.line,
+        borderWidth: 1,
+        titleColor: colors.text,
+        bodyColor: colors.muted,
+        padding: 12
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: colors.muted,
+          maxRotation: 0,
+          font: {
+            family: "Montserrat, Segoe UI, sans-serif",
+            weight: 800
+          }
+        },
+        grid: {
+          color: colors.line
+        }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          color: colors.muted,
+          precision: 0,
+          font: {
+            family: "Montserrat, Segoe UI, sans-serif",
+            weight: 800
+          }
+        },
+        grid: {
+          color: colors.line
+        }
+      }
+    },
+    ...extra
+  };
+}
+
+function setCallStatsText(element, value) {
+  if (element) {
+    element.textContent = value;
+  }
+}
+
+function callStatsOverviewFocus(payload) {
+  const summary = (payload && payload.summary) || {};
+  const totalCalls = callStatsValue(summary.totalCalls);
+  const incomingCalls = callStatsValue(summary.incomingCalls);
+  const outgoingCalls = callStatsValue(summary.outgoingCalls);
+  const missedCalls = callStatsValue(summary.missedCalls);
+
+  return {
+    title: "Загальна вибірка",
+    subtitle: callStatsRangeText(payload),
+    metrics: [
+      callStatsMetric("Дзвінки", formatNumber(totalCalls)),
+      callStatsMetric("Вхідні", `${formatNumber(incomingCalls)} · ${callStatsPercent(summary.incomingShare)}`),
+      callStatsMetric("Вихідні", `${formatNumber(outgoingCalls)} · ${callStatsPercent(summary.outgoingShare)}`),
+      callStatsMetric("Відповіді", callStatsPercent(summary.answerRate), callStatsRateTone(summary.answerRate, totalCalls)),
+      callStatsMetric("Пропущені", formatNumber(missedCalls), missedCalls ? "warning" : "good")
+    ]
+  };
+}
+
+function callStatsSummaryFocuses(payload) {
+  const summary = (payload && payload.summary) || {};
+  const totalCalls = callStatsValue(summary.totalCalls);
+  const incomingCalls = callStatsValue(summary.incomingCalls);
+  const outgoingCalls = callStatsValue(summary.outgoingCalls);
+  const answeredCalls = callStatsValue(summary.answeredCalls);
+  const missedCalls = callStatsValue(summary.missedCalls);
+  const uniqueCustomers = callStatsValue(summary.uniqueCustomers);
+  const recordingCalls = callStatsValue(summary.recordingCalls);
+  const avgBillSec = callStatsValue(summary.avgBillSec);
+  const avgWaitSec = callStatsValue(summary.avgWaitSec);
+  const recordingShare = callStatsShare(recordingCalls, totalCalls);
+  const callsPerCustomer = uniqueCustomers ? totalCalls / uniqueCustomers : 0;
+
+  return [
+    {
+      title: "Усі дзвінки",
+      subtitle: callStatsRangeText(payload),
+      metrics: [
+        callStatsMetric("Усього", formatNumber(totalCalls)),
+        callStatsMetric("Середньо/день", callStatsDecimal(summary.avgCallsPerDay || 0)),
+        callStatsMetric("Розмови", formatDuration(summary.totalBillSec || 0))
+      ]
+    },
+    {
+      title: "Вхідні дзвінки",
+      subtitle: `${callStatsPercent(summary.incomingShare)} від усіх дзвінків`,
+      metrics: [
+        callStatsMetric("Вхідні", formatNumber(incomingCalls)),
+        callStatsMetric("Пропущено", formatNumber(missedCalls), missedCalls ? "warning" : "good"),
+        callStatsMetric("Пропущені %", callStatsPercent(callStatsShare(missedCalls, incomingCalls)), missedCalls ? "warning" : "good")
+      ]
+    },
+    {
+      title: "Вихідні дзвінки",
+      subtitle: `${callStatsPercent(summary.outgoingShare)} від усіх дзвінків`,
+      metrics: [
+        callStatsMetric("Вихідні", formatNumber(outgoingCalls)),
+        callStatsMetric("Частка", callStatsPercent(summary.outgoingShare)),
+        callStatsMetric("Вхідні/вихідні", outgoingCalls ? callStatsDecimal(incomingCalls / outgoingCalls) : "—")
+      ]
+    },
+    {
+      title: "Відповіді",
+      subtitle: `${formatNumber(answeredCalls)} відповіли · ${formatNumber(missedCalls)} пропущено`,
+      metrics: [
+        callStatsMetric("Рівень", callStatsPercent(summary.answerRate), callStatsRateTone(summary.answerRate, totalCalls)),
+        callStatsMetric("Відповіли", formatNumber(answeredCalls)),
+        callStatsMetric("Пропущено", formatNumber(missedCalls), missedCalls ? "warning" : "good")
+      ]
+    },
+    {
+      title: "Розмови",
+      subtitle: `${formatNumber(summary.talkHours || 0)} год загалом`,
+      metrics: [
+        callStatsMetric("Сумарно", formatDuration(summary.totalBillSec || 0)),
+        callStatsMetric("Середня", avgBillSec ? formatDuration(avgBillSec) : "—"),
+        callStatsMetric("Дзвінків", formatNumber(totalCalls))
+      ]
+    },
+    {
+      title: "Середня розмова",
+      subtitle: `очікування ${avgWaitSec ? formatDuration(avgWaitSec) : "—"}`,
+      metrics: [
+        callStatsMetric("Розмова", avgBillSec ? formatDuration(avgBillSec) : "—"),
+        callStatsMetric("Очікування", avgWaitSec ? formatDuration(avgWaitSec) : "—"),
+        callStatsMetric("Відповіді", callStatsPercent(summary.answerRate))
+      ]
+    },
+    {
+      title: "Клієнти",
+      subtitle: "унікальні номери у вибірці",
+      metrics: [
+        callStatsMetric("Унікальні", formatNumber(uniqueCustomers)),
+        callStatsMetric("Дзв./клієнт", callsPerCustomer ? callStatsDecimal(callsPerCustomer) : "—"),
+        callStatsMetric("Усього дзв.", formatNumber(totalCalls))
+      ]
+    },
+    {
+      title: "Записи",
+      subtitle: "дзвінки з записом або локальним кешем",
+      metrics: [
+        callStatsMetric("Записів", formatNumber(recordingCalls)),
+        callStatsMetric("Покриття", callStatsPercent(recordingShare), recordingShare < 90 ? "warning" : "good"),
+        callStatsMetric("Без запису", formatNumber(Math.max(0, totalCalls - recordingCalls)), recordingShare < 90 ? "warning" : "")
+      ]
+    }
+  ];
+}
+
+function wireCallStatsSummaryCards(payload) {
+  const cards = elements.callStatsPage
+    ? [...elements.callStatsPage.querySelectorAll(".call-stats-summary > div")]
+    : [];
+  const focuses = callStatsSummaryFocuses(payload);
+  cards.forEach((card, index) => makeCallStatsInteractive(card, focuses[index]));
+}
+
+function renderCallStatsSummary(payload) {
+  const summary = (payload && payload.summary) || {};
+  const totalCalls = callStatsValue(summary.totalCalls);
+  const incomingCalls = callStatsValue(summary.incomingCalls);
+  const outgoingCalls = callStatsValue(summary.outgoingCalls);
+  const answeredCalls = callStatsValue(summary.answeredCalls);
+  const missedCalls = callStatsValue(summary.missedCalls);
+  const totalBillSec = callStatsValue(summary.totalBillSec);
+  const avgBillSec = callStatsValue(summary.avgBillSec);
+  const avgWaitSec = callStatsValue(summary.avgWaitSec);
+
+  setCallStatsText(elements.callStatsRange, callStatsRangeText(payload));
+  setCallStatsText(elements.callStatsTotal, formatNumber(totalCalls));
+  setCallStatsText(
+    elements.callStatsTotalCaption,
+    `${formatNumber(summary.avgCallsPerDay || 0)} дзвінків / день`
+  );
+  setCallStatsText(elements.callStatsIncoming, formatNumber(incomingCalls));
+  setCallStatsText(elements.callStatsIncomingCaption, `${callStatsPercent(summary.incomingShare)} від усіх`);
+  setCallStatsText(elements.callStatsOutgoing, formatNumber(outgoingCalls));
+  setCallStatsText(elements.callStatsOutgoingCaption, `${callStatsPercent(summary.outgoingShare)} від усіх`);
+  setCallStatsText(elements.callStatsAnswerRate, callStatsPercent(summary.answerRate));
+  setCallStatsText(elements.callStatsAnswerCaption, `${formatNumber(answeredCalls)} відповіли · ${formatNumber(missedCalls)} пропущено`);
+  setCallStatsText(elements.callStatsTalkTime, formatDuration(totalBillSec));
+  setCallStatsText(elements.callStatsTalkCaption, `${formatNumber(summary.talkHours || 0)} год загалом`);
+  setCallStatsText(elements.callStatsAvgDuration, avgBillSec ? formatDuration(avgBillSec) : "—");
+  setCallStatsText(elements.callStatsAvgWait, `очікування ${avgWaitSec ? formatDuration(avgWaitSec) : "—"}`);
+  setCallStatsText(elements.callStatsCustomers, formatNumber(summary.uniqueCustomers || 0));
+  setCallStatsText(elements.callStatsCustomersCaption, "унікальні номери");
+  setCallStatsText(elements.callStatsRecordings, formatNumber(summary.recordingCalls || 0));
+  setCallStatsText(elements.callStatsRecordingsCaption, "мають запис/кеш");
+  wireCallStatsSummaryCards(payload);
+}
+
+function callStatsDailyFocus(row, dataset) {
+  const total = callStatsValue(row.totalCalls);
+  return {
+    title: callStatsDateLabel(row.dayStartedAt || row.dayKey),
+    subtitle: dataset && dataset.label ? `Графік: ${dataset.label}` : "Дзвінки по днях",
+    metrics: [
+      callStatsMetric("Усього", formatNumber(total)),
+      callStatsMetric("Вхідні", formatNumber(row.incomingCalls || 0)),
+      callStatsMetric("Вихідні", formatNumber(row.outgoingCalls || 0)),
+      callStatsMetric("Відповіли", formatNumber(row.answeredCalls || 0), callStatsAnswerTone(row.answeredCalls, total)),
+      callStatsMetric("Пропущено", formatNumber(row.missedCalls || 0), row.missedCalls ? "warning" : "good"),
+      callStatsMetric("Розмови", formatDuration(row.totalBillSec || 0))
+    ]
+  };
+}
+
+function callStatsHourlyFocus(row) {
+  const total = callStatsValue(row.totalCalls);
+  return {
+    title: `${String(row.hour).padStart(2, "0")}:00`,
+    subtitle: "Навантаження за годинами",
+    metrics: [
+      callStatsMetric("Дзвінки", formatNumber(total)),
+      callStatsMetric("Відповіли", formatNumber(row.answeredCalls || 0), callStatsAnswerTone(row.answeredCalls, total)),
+      callStatsMetric("Розмови", formatDuration(row.totalBillSec || 0)),
+      callStatsMetric("Середня", total ? formatDuration(Math.round(callStatsValue(row.totalBillSec) / total)) : "—")
+    ]
+  };
+}
+
+function callStatsCompactFocus(row, titleFallback, subtitle) {
+  const total = callStatsValue(row.totalCalls);
+  const metrics = [
+    callStatsMetric("Дзвінки", formatNumber(total)),
+    callStatsMetric(
+      "Частка",
+      callStatsPercent(callStatsShare(total, currentCallStats && currentCallStats.summary && currentCallStats.summary.totalCalls))
+    )
+  ];
+  if (callStatsValue(row.incomingCalls) || callStatsValue(row.outgoingCalls)) {
+    metrics.push(
+      callStatsMetric("Вхідні", formatNumber(row.incomingCalls || 0)),
+      callStatsMetric("Вихідні", formatNumber(row.outgoingCalls || 0))
+    );
+  }
+  if (row.answeredCalls !== undefined) {
+    metrics.push(
+      callStatsMetric("Відповіли", formatNumber(row.answeredCalls || 0), callStatsAnswerTone(row.answeredCalls, total))
+    );
+  }
+  if (row.totalBillSec !== undefined) {
+    metrics.push(callStatsMetric("Розмови", formatDuration(row.totalBillSec || 0)));
+  }
+
+  return {
+    title: row.label || titleFallback || "—",
+    subtitle,
+    metrics
+  };
+}
+
+function callStatsDurationFocus(row) {
+  const total = callStatsValue(row.totalCalls);
+  const allCalls = currentCallStats && currentCallStats.summary
+    ? currentCallStats.summary.totalCalls
+    : 0;
+  return {
+    title: row.label || row.bucket || "—",
+    subtitle: "Сегмент тривалості розмов",
+    metrics: [
+      callStatsMetric("Дзвінки", formatNumber(total)),
+      callStatsMetric("Частка", callStatsPercent(callStatsShare(total, allCalls))),
+      callStatsMetric("Сегмент", row.bucket || "—")
+    ]
+  };
+}
+
+function renderCallStatsCharts(payload) {
+  destroyCallStatsCharts();
+
+  const colors = callStatsChartPalette();
+  const daily = Array.isArray(payload && payload.daily) ? payload.daily : [];
+  renderCallStatsChart("daily", elements.callStatsDailyChart, {
+    type: "line",
+    data: {
+      labels: daily.map((item) => item.dayKey || callStatsDateLabel(item.dayStartedAt)),
+      datasets: [
+        {
+          label: "Усі",
+          data: daily.map((item) => callStatsValue(item.totalCalls)),
+          borderColor: colors.accent,
+          backgroundColor: "rgba(79, 180, 210, 0.16)",
+          tension: 0.34,
+          fill: true,
+          pointRadius: 3
+        },
+        {
+          label: "Вхідні",
+          data: daily.map((item) => callStatsValue(item.incomingCalls)),
+          borderColor: colors.incoming,
+          backgroundColor: "rgba(83, 197, 142, 0.12)",
+          tension: 0.34
+        },
+        {
+          label: "Вихідні",
+          data: daily.map((item) => callStatsValue(item.outgoingCalls)),
+          borderColor: colors.outgoing,
+          backgroundColor: "rgba(122, 207, 232, 0.12)",
+          tension: 0.34
+        }
+      ]
+    },
+    options: callStatsBaseChartOptions({
+      ...callStatsChartInteraction(daily, (row, active, dataset) =>
+        callStatsDailyFocus(row, dataset)
+      )
+    })
+  });
+
+  const hourlyMap = new Map((payload.hourly || []).map((item) => [Number(item.hour), item]));
+  const hours = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    ...(hourlyMap.get(hour) || {})
+  }));
+  renderCallStatsChart("hourly", elements.callStatsHourlyChart, {
+    type: "bar",
+    data: {
+      labels: hours.map((item) => String(item.hour).padStart(2, "0")),
+      datasets: [
+        {
+          label: "Дзвінки",
+          data: hours.map((item) => callStatsValue(item.totalCalls)),
+          backgroundColor: colors.accent,
+          borderRadius: 7
+        }
+      ]
+    },
+    options: callStatsBaseChartOptions({
+      ...callStatsChartInteraction(hours, (row) => callStatsHourlyFocus(row)),
+      plugins: {
+        ...callStatsBaseChartOptions().plugins,
+        legend: {
+          display: false
+        }
+      }
+    })
+  });
+
+  const directions = Array.isArray(payload.directions) ? payload.directions : [];
+  renderCallStatsChart("direction", elements.callStatsDirectionChart, {
+    type: "doughnut",
+    data: {
+      labels: directions.map((item) => item.label || item.direction || "—"),
+      datasets: [
+        {
+          data: directions.map((item) => callStatsValue(item.totalCalls)),
+          backgroundColor: [colors.incoming, colors.outgoing, colors.warning],
+          borderColor: colors.panel,
+          borderWidth: 3
+        }
+      ]
+    },
+    options: callStatsBaseChartOptions({
+      ...callStatsChartInteraction(directions, (row) =>
+        callStatsCompactFocus(row, row.direction || "Напрямок", "Вхідні / вихідні")
+      ),
+      cutout: "64%",
+      scales: {},
+      plugins: {
+        ...callStatsBaseChartOptions().plugins,
+        legend: {
+          position: "bottom",
+          labels: callStatsBaseChartOptions().plugins.legend.labels
+        }
+      }
+    })
+  });
+
+  const dispositions = (payload.dispositions || []).slice(0, 8);
+  renderCallStatsChart("disposition", elements.callStatsDispositionChart, {
+    type: "bar",
+    data: {
+      labels: dispositions.map((item) => item.label || "—"),
+      datasets: [
+        {
+          label: "Дзвінки",
+          data: dispositions.map((item) => callStatsValue(item.totalCalls)),
+          backgroundColor: dispositions.map((_, index) =>
+            [colors.incoming, colors.accent, colors.warning, colors.danger][index % 4]
+          ),
+          borderRadius: 7
+        }
+      ]
+    },
+    options: callStatsBaseChartOptions({
+      ...callStatsChartInteraction(dispositions, (row) =>
+        callStatsCompactFocus(row, "Статус", "Результати дзвінків")
+      ),
+      indexAxis: "y",
+      plugins: {
+        ...callStatsBaseChartOptions().plugins,
+        legend: {
+          display: false
+        }
+      }
+    })
+  });
+
+  const buckets = Array.isArray(payload.durationBuckets) ? payload.durationBuckets : [];
+  renderCallStatsChart("duration", elements.callStatsDurationChart, {
+    type: "bar",
+    data: {
+      labels: buckets.map((item) => item.label || item.bucket || "—"),
+      datasets: [
+        {
+          label: "Дзвінки",
+          data: buckets.map((item) => callStatsValue(item.totalCalls)),
+          backgroundColor: colors.outgoing,
+          borderRadius: 7
+        }
+      ]
+    },
+    options: callStatsBaseChartOptions({
+      ...callStatsChartInteraction(buckets, (row) => callStatsDurationFocus(row)),
+      plugins: {
+        ...callStatsBaseChartOptions().plugins,
+        legend: {
+          display: false
+        }
+      }
+    })
+  });
+}
+
+function renderCallStatsHeatmap(payload) {
+  if (!elements.callStatsHeatmap) {
+    return;
+  }
+
+  elements.callStatsHeatmap.replaceChildren();
+  const rows = Array.isArray(payload && payload.heatmap) ? payload.heatmap : [];
+  const maxCalls = Math.max(1, ...rows.map((row) => callStatsValue(row.totalCalls)));
+  const byKey = new Map(rows.map((row) => [`${row.weekday}:${row.hour}`, row]));
+  const hourHeader = document.createElement("div");
+  hourHeader.className = "call-stats-heatmap-hours";
+  hourHeader.innerHTML = `<span></span>${Array.from({ length: 24 }, (_, hour) =>
+    `<b>${hour % 3 === 0 ? String(hour).padStart(2, "0") : ""}</b>`
+  ).join("")}`;
+  elements.callStatsHeatmap.append(hourHeader);
+
+  for (let weekday = 1; weekday <= 7; weekday += 1) {
+    const row = document.createElement("div");
+    row.className = "call-stats-heatmap-row";
+    const label = document.createElement("span");
+    label.textContent = CALL_STATS_WEEKDAYS[weekday - 1];
+    row.append(label);
+
+    for (let hour = 0; hour < 24; hour += 1) {
+      const value = byKey.get(`${weekday}:${hour}`);
+      const total = callStatsValue(value && value.totalCalls);
+      const billSec = callStatsValue(value && value.totalBillSec);
+      const intensity = Math.min(1, total / maxCalls);
+      const hourLabel = `${CALL_STATS_WEEKDAYS[weekday - 1]} ${String(hour).padStart(2, "0")}:00`;
+      const tooltip = [
+        hourLabel,
+        `${formatNumber(total)} дзвінків`,
+        `Розмови: ${formatDuration(billSec)}`,
+        `Середня: ${total ? formatDuration(Math.round(billSec / total)) : "—"}`
+      ].join("\n");
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "call-stats-heatmap-cell";
+      cell.style.setProperty("--heatmap-intensity", intensity.toFixed(3));
+      cell.dataset.tooltip = tooltip;
+      cell.setAttribute("aria-label", tooltip);
+      makeCallStatsInteractive(cell, {
+        title: hourLabel,
+        subtitle: "Активність по днях і годинах",
+        metrics: [
+          callStatsMetric("Дзвінки", formatNumber(total)),
+          callStatsMetric("Розмови", formatDuration(billSec)),
+          callStatsMetric("Середня", total ? formatDuration(Math.round(billSec / total)) : "—")
+        ]
+      });
+      cell.removeAttribute("title");
+      row.append(cell);
+    }
+
+    elements.callStatsHeatmap.append(row);
+  }
+}
+
+function renderCallStatsManagers(payload) {
+  const table = elements.callStatsManagers;
+  if (!table) {
+    return;
+  }
+
+  table.replaceChildren();
+  const managers = Array.isArray(payload && payload.managers) ? payload.managers : [];
+  const head = document.createElement("thead");
+  head.innerHTML = `
+    <tr>
+      <th>Менеджер</th>
+      <th>Усі</th>
+      <th>Вхідні</th>
+      <th>Вихідні</th>
+      <th>Відповіді</th>
+      <th>Пропущено</th>
+      <th>Розмова</th>
+      <th>Очікування</th>
+      <th>Клієнти</th>
+      <th>Останній</th>
+    </tr>`;
+  table.append(head);
+
+  const body = document.createElement("tbody");
+  if (!managers.length) {
+    body.innerHTML = `<tr><td colspan="10" class="call-stats-empty-cell">За цей період немає дзвінків.</td></tr>`;
+    table.append(body);
+    return;
+  }
+
+  for (const manager of managers) {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>
+        <strong>${escapeHtml(manager.label || "Оператор не визначений")}</strong>
+        <span>${escapeHtml([manager.internalNumber, manager.pbxName].filter(Boolean).join(" · ") || "без внутрішнього номера")}</span>
+      </td>
+      <td>${formatNumber(manager.totalCalls)}</td>
+      <td>${formatNumber(manager.incomingCalls)}</td>
+      <td>${formatNumber(manager.outgoingCalls)}</td>
+      <td>
+        <strong>${callStatsPercent(manager.answerRate)}</strong>
+        <span>${formatNumber(manager.answeredCalls)} дзв.</span>
+      </td>
+      <td>${formatNumber(manager.missedCalls)}</td>
+      <td>${formatDuration(manager.avgBillSec || 0)}</td>
+      <td>${formatDuration(manager.avgWaitSec || 0)}</td>
+      <td>${formatNumber(manager.uniqueCustomers)}</td>
+      <td>${formatDateTime(manager.lastCallAt)}</td>`;
+    makeCallStatsInteractive(row, {
+      title: manager.label || "Оператор не визначений",
+      subtitle: [manager.internalNumber, manager.pbxName].filter(Boolean).join(" · ") || "без внутрішнього номера",
+      metrics: [
+        callStatsMetric("Дзвінки", formatNumber(manager.totalCalls || 0)),
+        callStatsMetric("Відповіді", callStatsPercent(manager.answerRate), callStatsRateTone(manager.answerRate, manager.totalCalls)),
+        callStatsMetric("Пропущено", formatNumber(manager.missedCalls || 0), manager.missedCalls ? "warning" : "good"),
+        callStatsMetric("Середня розмова", formatDuration(manager.avgBillSec || 0)),
+        callStatsMetric("Клієнти", formatNumber(manager.uniqueCustomers || 0)),
+        callStatsMetric("Останній", formatDateTime(manager.lastCallAt))
+      ]
+    });
+    body.append(row);
+  }
+  table.append(body);
+}
+
+function renderCallStatsList(container, items, options = {}) {
+  if (!container) {
+    return;
+  }
+
+  container.replaceChildren();
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) {
+    const empty = document.createElement("p");
+    empty.className = "no-data";
+    empty.textContent = "Немає даних за вибраний період.";
+    container.append(empty);
+    return;
+  }
+
+  const maxCalls = Math.max(1, ...list.map((item) => callStatsValue(item.totalCalls)));
+  for (const item of list.slice(0, 12)) {
+    const total = callStatsValue(item.totalCalls);
+    const row = document.createElement("article");
+    row.className = "call-stats-list-row";
+    row.style.setProperty("--bar-width", `${Math.round((total / maxCalls) * 100)}%`);
+    const title = options.kind === "phone"
+      ? formatCallPhone(item.phone || item.externalDigits)
+      : item.label || item.number || item.internalNumber || "—";
+    const subtitle = options.kind === "phone"
+      ? `вх. ${formatNumber(item.incomingCalls)} · вих. ${formatNumber(item.outgoingCalls)} · останній ${formatDateTime(item.lastCallAt)}`
+      : [item.number, item.internalNumber]
+          .filter(Boolean)
+          .join(" · ") || `вх. ${formatNumber(item.incomingCalls)} · вих. ${formatNumber(item.outgoingCalls)}`;
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(subtitle)}</span>
+      </div>
+      <b>${formatNumber(total)}</b>`;
+    makeCallStatsInteractive(
+      row,
+      typeof options.focusBuilder === "function"
+        ? options.focusBuilder(item, title, subtitle)
+        : {
+            title,
+            subtitle,
+            metrics: [
+              callStatsMetric("Дзвінки", formatNumber(total)),
+              callStatsMetric("Вхідні", formatNumber(item.incomingCalls || 0)),
+              callStatsMetric("Вихідні", formatNumber(item.outgoingCalls || 0)),
+              callStatsMetric("Розмови", formatDuration(item.totalBillSec || 0))
+            ]
+          }
+    );
+    container.append(row);
+  }
+}
+
+function callStatsMaxBy(items, valueGetter) {
+  return (Array.isArray(items) ? items : []).reduce((best, item) => {
+    if (!best) {
+      return item;
+    }
+    return callStatsValue(valueGetter(item)) > callStatsValue(valueGetter(best))
+      ? item
+      : best;
+  }, null);
+}
+
+function callStatsInsightRows(payload) {
+  const summary = (payload && payload.summary) || {};
+  const totalCalls = callStatsValue(summary.totalCalls);
+  const incomingCalls = callStatsValue(summary.incomingCalls);
+  const missedCalls = callStatsValue(summary.missedCalls);
+  const uniqueCustomers = callStatsValue(summary.uniqueCustomers);
+  const recordingCalls = callStatsValue(summary.recordingCalls);
+  const missedIncomingShare = callStatsShare(missedCalls, incomingCalls);
+  const recordingShare = callStatsShare(recordingCalls, totalCalls);
+  const buckets = Array.isArray(payload && payload.durationBuckets) ? payload.durationBuckets : [];
+  const shortCalls = buckets
+    .filter((item) => item.bucket === "0" || item.bucket === "1-30")
+    .reduce((sum, item) => sum + callStatsValue(item.totalCalls), 0);
+  const shortShare = callStatsShare(shortCalls, totalCalls);
+  const peak = callStatsMaxBy(payload && payload.heatmap, (item) => item.totalCalls) || {};
+  const peakWeekday = peak.weekday ? CALL_STATS_WEEKDAYS[peak.weekday - 1] : "—";
+  const peakHour = Number.isFinite(Number(peak.hour))
+    ? `${String(peak.hour).padStart(2, "0")}:00`
+    : "—";
+  const topManager = Array.isArray(payload && payload.managers) && payload.managers.length
+    ? payload.managers[0]
+    : null;
+  const topManagerShare = topManager ? callStatsShare(topManager.totalCalls, totalCalls) : 0;
+  const callsPerCustomer = uniqueCustomers ? totalCalls / uniqueCustomers : 0;
+
+  return [
+    {
+      title: "Пропущені вхідні",
+      subtitle: `${callStatsPercent(missedIncomingShare)} від вхідних`,
+      value: formatNumber(missedCalls),
+      score: missedIncomingShare,
+      tone: missedCalls ? "warning" : "good",
+      focus: {
+        title: "Пропущені вхідні",
+        subtitle: "Ризик втрати контакту на першому вході",
+        metrics: [
+          callStatsMetric("Пропущено", formatNumber(missedCalls), missedCalls ? "warning" : "good"),
+          callStatsMetric("Вхідні", formatNumber(incomingCalls)),
+          callStatsMetric("Частка", callStatsPercent(missedIncomingShare), missedCalls ? "warning" : "good")
+        ]
+      }
+    },
+    {
+      title: "Короткі контакти",
+      subtitle: `0-30 с · ${callStatsPercent(shortShare)} від усіх`,
+      value: formatNumber(shortCalls),
+      score: shortShare,
+      tone: shortShare > 20 ? "warning" : "",
+      focus: {
+        title: "Короткі контакти",
+        subtitle: "Дзвінки, де розмова майже не відбулась",
+        metrics: [
+          callStatsMetric("0-30 с", formatNumber(shortCalls), shortShare > 20 ? "warning" : ""),
+          callStatsMetric("Частка", callStatsPercent(shortShare), shortShare > 20 ? "warning" : ""),
+          callStatsMetric("Усього", formatNumber(totalCalls))
+        ]
+      }
+    },
+    {
+      title: "Пікова година",
+      subtitle: `${peakWeekday} · ${formatNumber(peak.totalCalls || 0)} дзвінків`,
+      value: peakHour,
+      score: 100,
+      tone: "info",
+      focus: {
+        title: `Пік: ${peakWeekday} ${peakHour}`,
+        subtitle: "Найбільше навантаження в тепловій карті",
+        metrics: [
+          callStatsMetric("Дзвінки", formatNumber(peak.totalCalls || 0)),
+          callStatsMetric("Розмови", formatDuration(peak.totalBillSec || 0)),
+          callStatsMetric("Середня", peak.totalCalls ? formatDuration(Math.round(callStatsValue(peak.totalBillSec) / callStatsValue(peak.totalCalls))) : "—")
+        ]
+      }
+    },
+    {
+      title: "Покриття записами",
+      subtitle: `${formatNumber(recordingCalls)} з ${formatNumber(totalCalls)} дзвінків`,
+      value: callStatsPercent(recordingShare),
+      score: recordingShare,
+      tone: recordingShare < 90 ? "warning" : "good",
+      focus: {
+        title: "Покриття записами",
+        subtitle: "Скільки дзвінків доступні для прослуховування та AI-аналізу",
+        metrics: [
+          callStatsMetric("Покриття", callStatsPercent(recordingShare), recordingShare < 90 ? "warning" : "good"),
+          callStatsMetric("Є запис", formatNumber(recordingCalls)),
+          callStatsMetric("Без запису", formatNumber(Math.max(0, totalCalls - recordingCalls)), recordingShare < 90 ? "warning" : "")
+        ]
+      }
+    },
+    {
+      title: "Навантаження топ-менеджера",
+      subtitle: topManager ? topManager.label || "Оператор не визначений" : "немає даних",
+      value: callStatsPercent(topManagerShare),
+      score: topManagerShare,
+      tone: topManagerShare > 45 ? "warning" : "",
+      focus: {
+        title: "Навантаження топ-менеджера",
+        subtitle: topManager ? topManager.label || "Оператор не визначений" : "немає даних",
+        metrics: [
+          callStatsMetric("Частка", callStatsPercent(topManagerShare), topManagerShare > 45 ? "warning" : ""),
+          callStatsMetric("Дзвінки", formatNumber(topManager && topManager.totalCalls || 0)),
+          callStatsMetric("Відповіді", topManager ? callStatsPercent(topManager.answerRate) : "—", topManager ? callStatsRateTone(topManager.answerRate, topManager.totalCalls) : "")
+        ]
+      }
+    },
+    {
+      title: "Дзвінків на клієнта",
+      subtitle: `${formatNumber(uniqueCustomers)} унікальних номерів`,
+      value: callsPerCustomer ? callStatsDecimal(callsPerCustomer) : "—",
+      score: Math.min(100, callsPerCustomer * 25),
+      tone: callsPerCustomer > 2.5 ? "info" : "",
+      focus: {
+        title: "Дзвінків на клієнта",
+        subtitle: "Щільність повторних контактів без списку персональних номерів",
+        metrics: [
+          callStatsMetric("Дзв./клієнт", callsPerCustomer ? callStatsDecimal(callsPerCustomer) : "—"),
+          callStatsMetric("Клієнти", formatNumber(uniqueCustomers)),
+          callStatsMetric("Усього дзв.", formatNumber(totalCalls))
+        ]
+      }
+    }
+  ];
+}
+
+function renderCallStatsInsights(payload) {
+  const container = elements.callStatsInsights;
+  if (!container) {
+    return;
+  }
+
+  container.replaceChildren();
+  for (const insight of callStatsInsightRows(payload)) {
+    const row = document.createElement("article");
+    row.className = "call-stats-list-row";
+    if (insight.tone) {
+      row.dataset.tone = insight.tone;
+    }
+    row.style.setProperty("--bar-width", `${Math.max(4, Math.min(100, Math.round(callStatsValue(insight.score))))}%`);
+
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = insight.title;
+    const subtitle = document.createElement("span");
+    subtitle.textContent = insight.subtitle;
+    content.append(title, subtitle);
+
+    const value = document.createElement("b");
+    value.textContent = insight.value;
+    row.append(content, value);
+    makeCallStatsInteractive(row, insight.focus);
+    container.append(row);
+  }
+}
+
+function renderCallStats(payload) {
+  currentCallStats = payload || {};
+  clearCallStatsSelection();
+  renderCallStatsSummary(currentCallStats);
+  setCallStatsFocus(callStatsOverviewFocus(currentCallStats));
+  renderCallStatsCharts(currentCallStats);
+  renderCallStatsHeatmap(currentCallStats);
+  renderCallStatsManagers(currentCallStats);
+  renderCallStatsList(elements.callStatsLines, currentCallStats.lines, { kind: "line" });
+  renderCallStatsInsights(currentCallStats);
+}
+
+function renderCallStatsError(message) {
+  destroyCallStatsCharts();
+  renderCallStats({
+    period: {},
+    summary: {},
+    daily: [],
+    hourly: [],
+    directions: [],
+    dispositions: [],
+    durationBuckets: [],
+    managers: [],
+    lines: [],
+    topExternalNumbers: [],
+    heatmap: []
+  });
+  setCallStatsText(elements.callStatsRange, message || "Не вдалося завантажити статистику.");
+}
+
+function updateCallStatsCustomFields() {
+  const isCustom = elements.callStatsPeriod && elements.callStatsPeriod.value === "custom";
+  if (elements.callStatsFilter) {
+    elements.callStatsFilter.dataset.custom = String(isCustom);
+  }
+  if (elements.callStatsFrom) {
+    elements.callStatsFrom.disabled = !isCustom;
+  }
+  if (elements.callStatsTo) {
+    elements.callStatsTo.disabled = !isCustom;
+  }
+}
+
+function callStatsApiUrl() {
+  const params = new URLSearchParams();
+  const period = elements.callStatsPeriod ? elements.callStatsPeriod.value : "30";
+  params.set("period", period);
+  if (period === "custom") {
+    if (elements.callStatsFrom && elements.callStatsFrom.value) {
+      params.set("from", elements.callStatsFrom.value);
+    }
+    if (elements.callStatsTo && elements.callStatsTo.value) {
+      params.set("to", elements.callStatsTo.value);
+    }
+  }
+  return `/api/binotel-monitor/call-statistics?${params.toString()}`;
+}
+
+async function loadCallStatsPage(showLoading = true) {
+  clearTimeout(summaryPollTimer);
+  clearTimeout(monitorPollTimer);
+  clearTimeout(detailPollTimer);
+  currentSummaryCallId = "";
+  currentPhone = "";
+  updateCallStatsCustomFields();
+
+  if (showLoading) {
+    setState("loading");
+  }
+
+  try {
+    const response = await apiFetch(callStatsApiUrl(), {
+      headers: { Accept: "application/json" }
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося завантажити статистику дзвінків");
+    }
+    renderCallStats(payload);
+    setState("callStats");
+  } catch (error) {
+    renderCallStatsError(error.message);
+    setState("callStats");
+  }
+}
+
 function renderMonitorCalls(payload) {
   const calls = Array.isArray(payload && payload.calls) ? payload.calls : [];
   const total = Number(payload && payload.total) || 0;
@@ -3543,6 +8540,7 @@ function renderMonitorCalls(payload) {
   monitorPage = Math.floor(offset / Math.max(1, limit)) + 1;
   if (elements.monitorPageSize && String(elements.monitorPageSize.value) !== String(limit)) {
     elements.monitorPageSize.value = String(limit);
+    syncCustomSelect(elements.monitorPageSize);
   }
   const totalPages = Math.max(1, Math.ceil(total / Math.max(1, limit)));
   if (total > 0 && monitorPage > totalPages) {
@@ -3551,8 +8549,14 @@ function renderMonitorCalls(payload) {
     return;
   }
   elements.monitorList.replaceChildren();
+  const maxStoredCalls = Number(payload && payload.maxStoredCalls) || 0;
+  const historyLimited = Boolean(payload && payload.historyLimited);
+  const displayedTotal = total || calls.length;
+  const countPrefix = historyLimited && maxStoredCalls > 0 && displayedTotal >= maxStoredCalls
+    ? `останні ${displayedTotal}`
+    : `${displayedTotal}`;
   elements.monitorCountLabel.textContent =
-    `${payload.total || calls.length} дзвінків у локальній історії`;
+    `${countPrefix} дзвінків у локальній історії`;
 
   if (!calls.length) {
     const message = document.createElement("p");
@@ -3634,15 +8638,73 @@ function renderMonitorPagination() {
   }
 }
 
+function isEscalationProblem(escalation) {
+  return Boolean(escalation && escalation.needed && escalation.level !== "none");
+}
+
+function isChurnRiskProblem(churnRisk) {
+  const level = String(churnRisk && churnRisk.level || "").toLowerCase();
+  return level === "medium" || level === "high";
+}
+
+function appendMonitorAlertBadge(container, textValue, tone, title) {
+  const badge = document.createElement("span");
+  badge.className = "monitor-alert-badge";
+  badge.dataset.tone = tone || "warning";
+  badge.textContent = textValue;
+  if (title) {
+    badge.title = title;
+  }
+  container.append(badge);
+}
+
+function renderMonitorProblemBadges(container, summary) {
+  if (!container) {
+    return 0;
+  }
+
+  container.replaceChildren();
+  const escalation = summary && summary.escalation;
+  const churnRisk = summary && summary.churnRisk;
+  let count = 0;
+
+  if (isEscalationProblem(escalation)) {
+    const level = ESCALATION_LEVEL_LABELS[escalation.level] || escalation.level || "";
+    appendMonitorAlertBadge(
+      container,
+      ["Ескалація", level].filter(Boolean).join(": "),
+      escalationToneValue(escalation),
+      escalationText(escalation)
+    );
+    count += 1;
+  }
+
+  if (isChurnRiskProblem(churnRisk)) {
+    const level = CHURN_RISK_LABELS[churnRisk.level] || churnRisk.level || "";
+    appendMonitorAlertBadge(
+      container,
+      ["Ризик", level].filter(Boolean).join(": "),
+      churnRiskToneValue(churnRisk),
+      churnRiskText(churnRisk)
+    );
+    count += 1;
+  }
+
+  container.hidden = count === 0;
+  return count;
+}
+
 function appendMonitorCall(container, call) {
   const fragment = elements.monitorCallTemplate.content.cloneNode(true);
   const ai = call.ai || {};
+  const summary = ai.summary || null;
   const direction = callDirectionInfo(call);
   const disposition = callDispositionInfo(call);
-  const typeLabel = callTypeLabel(ai.summary);
-  const typeKey = ai.summary && ai.summary.callType;
+  const typeLabel = callTypeLabel(summary);
+  const typeKey = summary && summary.callType;
   const detailLink = fragment.querySelector('[data-field="detail-link"]');
   const typeElement = fragment.querySelector('[data-field="type"]');
+  const alertsElement = fragment.querySelector('[data-field="alerts"]');
   const detailUrl = callDetailUrl(call);
   if (detailUrl) {
     detailLink.href = detailUrl;
@@ -3661,6 +8723,8 @@ function appendMonitorCall(container, call) {
   if (typeKey && CALL_TYPE_COLORS[typeKey]) {
     typeElement.style.setProperty("--call-type-color", CALL_TYPE_COLORS[typeKey]);
   }
+  const alertCount = renderMonitorProblemBadges(alertsElement, summary);
+  detailLink.classList.toggle("is-problem", alertCount > 0);
   fragment.querySelector('[data-field="time"]').textContent =
     formatDateTime(call.startedAt);
   fragment.querySelector('[data-field="operator"]').textContent =
@@ -4821,9 +9885,21 @@ async function loadCallDetail(callIdValue, showLoading = true, preservePlayback 
   }
 }
 
-async function reanalyzeCurrentCall() {
+async function reanalyzeCurrentCall(anchor = null) {
   const id = String(currentDetailCallId || "").trim();
   if (!id || !elements.detailReanalyzeAi || elements.detailReanalyzeAi.disabled) {
+    return;
+  }
+
+  const confirmed = await showUiConfirmDialog({
+    title: "Запустити AI-аналіз заново?",
+    message: "Дзвінок буде поставлено в чергу повторної обробки. Новий результат може замінити поточний підсумок і оцінки.",
+    confirmLabel: "Запустити",
+    cancelLabel: "Скасувати",
+    tone: "warning",
+    anchor
+  });
+  if (!confirmed) {
     return;
   }
 
@@ -4887,13 +9963,32 @@ async function loadMonitor(showLoading = true, preservePlayback = false) {
 
   try {
     const query = elements.monitorQuery ? elements.monitorQuery.value.trim() : "";
+    const callTypeFilter = elements.monitorCallTypeFilter
+      ? elements.monitorCallTypeFilter.value
+      : "";
+    const problemFilter = elements.monitorProblemFilter
+      ? elements.monitorProblemFilter.value
+      : "";
     const limit = Number(elements.monitorPageSize && elements.monitorPageSize.value) || monitorPageSize || 10;
     monitorPageSize = limit;
     const offset = Math.max(0, (Math.max(1, monitorPage) - 1) * limit);
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset)
+    });
+    if (query) {
+      params.set("q", query);
+    }
+    if (callTypeFilter) {
+      params.set("callType", callTypeFilter);
+    }
+    if (problemFilter) {
+      params.set("problem", problemFilter);
+    }
     const [statusResponse, callsResponse] = await Promise.all([
       apiFetch("/api/binotel-monitor/status", { headers: { Accept: "application/json" } }),
       apiFetch(
-        `/api/binotel-monitor/calls?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}&q=${encodeURIComponent(query)}`,
+        `/api/binotel-monitor/calls?${params.toString()}`,
         { headers: { Accept: "application/json" } }
       )
     ]);
@@ -4929,7 +10024,7 @@ async function loadMonitor(showLoading = true, preservePlayback = false) {
 
 if (elements.detailReanalyzeAi) {
   elements.detailReanalyzeAi.addEventListener("click", () => {
-    void reanalyzeCurrentCall();
+    void reanalyzeCurrentCall(elements.detailReanalyzeAi);
   });
 }
 
@@ -5047,12 +10142,17 @@ elements.detailAudioSpeed.addEventListener("click", () => {
 });
 
 window.addEventListener("resize", () => {
+  syncDetailPanelHeights();
   resizeDetailAudioCanvas(true);
   if (elements.detailAudio.src) {
     buildSyntheticDetailPeaks();
   }
   drawDetailAudioCanvas();
 });
+
+populateMonitorCallTypeFilter();
+enhanceCustomSelects();
+initCallStatsHeatmapTooltips();
 
 elements.searchForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -5067,6 +10167,28 @@ elements.monitorSearchForm.addEventListener("submit", (event) => {
 
 elements.monitorRefresh.addEventListener("click", () => {
   loadMonitor();
+});
+
+elements.monitorCallTypeFilter?.addEventListener("change", () => {
+  monitorPage = 1;
+  loadMonitor(false);
+});
+
+elements.monitorProblemFilter?.addEventListener("change", () => {
+  monitorPage = 1;
+  loadMonitor(false);
+});
+
+elements.callStatsFilter?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  loadCallStatsPage(false);
+});
+
+elements.callStatsPeriod?.addEventListener("change", () => {
+  updateCallStatsCustomFields();
+  if (elements.callStatsPeriod.value !== "custom") {
+    loadCallStatsPage(false);
+  }
 });
 
 elements.monitorAnalyticsPeriod.addEventListener("change", () => {
@@ -5148,13 +10270,26 @@ document.addEventListener("click", (event) => {
   if (elements.profileMenu && !elements.profileMenu.contains(event.target)) {
     setProfileMenuOpen(false);
   }
+  if (!event.target.closest || !event.target.closest(".custom-select")) {
+    closeCustomSelects();
+  }
+  if (
+    elements.telegramAccountDropdown &&
+    !elements.telegramAccountDropdown.contains(event.target)
+  ) {
+    setTelegramAccountDropdownOpen(false);
+  }
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    closeCustomSelects();
     setProfileMenuOpen(false);
+    setTelegramAccountDropdownOpen(false);
     closeChangePasswordModal();
     closeAdminUserModal();
+    closeTelegramPhotoModal();
+    closeManagerRatingModal();
   }
 });
 
@@ -5169,7 +10304,15 @@ elements.changePasswordModal?.addEventListener("click", (event) => {
 });
 
 elements.adminAddUser?.addEventListener("click", () => openAdminUserModal());
+elements.adminTabs?.addEventListener("click", handleAdminTabsClick);
 elements.adminUsersList?.addEventListener("click", handleAdminUsersClick);
+elements.adminAnalysisNumbersList?.addEventListener("change", handleAdminAnalysisNumbersChange);
+elements.adminAnalysisEnableAll?.addEventListener("click", () => setAllAdminAnalysisNumbers(true));
+elements.adminAnalysisDisableAll?.addEventListener("click", () => setAllAdminAnalysisNumbers(false));
+elements.adminAnalysisNumbersSave?.addEventListener("click", saveAdminAnalysisNumbers);
+elements.adminTelegramForm?.addEventListener("submit", handleAdminTelegramSubmit);
+elements.adminTelegramList?.addEventListener("click", handleAdminTelegramClick);
+elements.adminTelegramList?.addEventListener("submit", handleAdminTelegramConfirm);
 elements.adminUserForm?.addEventListener("submit", handleAdminUserSubmit);
 elements.adminUserClose?.addEventListener("click", closeAdminUserModal);
 elements.adminUserCancel?.addEventListener("click", closeAdminUserModal);
@@ -5193,6 +10336,15 @@ elements.logoutButton?.addEventListener("click", async () => {
 
 elements.ticketsModalClose.addEventListener("click", closeTicketsModal);
 
+elements.ticketsModal.addEventListener("cancel", (event) => {
+  if (!ticketsModalBackView) {
+    return;
+  }
+
+  event.preventDefault();
+  closeTicketsModal();
+});
+
 elements.ticketsModal.addEventListener("click", (event) => {
   if (event.target === elements.ticketsModal) {
     closeTicketsModal();
@@ -5207,6 +10359,110 @@ elements.callsModal.addEventListener("click", (event) => {
   }
 });
 
+elements.telegramPhotoModalClose?.addEventListener("click", closeTelegramPhotoModal);
+
+elements.telegramPhotoModal?.addEventListener("click", (event) => {
+  if (event.target === elements.telegramPhotoModal) {
+    closeTelegramPhotoModal();
+  }
+});
+
+elements.telegramPhotoModal?.addEventListener("close", () => {
+  if (elements.telegramPhotoModalImage) {
+    elements.telegramPhotoModalImage.removeAttribute("src");
+    elements.telegramPhotoModalImage.alt = "Telegram фото";
+  }
+});
+
+elements.telegramRefresh?.addEventListener("click", () => {
+  void reloadCurrentTelegram(selectedTelegramAccountId, { force: true });
+});
+
+elements.messagingTabs?.addEventListener("click", handleMessagingTabsClick);
+
+elements.viberRefresh?.addEventListener("click", () => {
+  void reloadCurrentViber();
+});
+
+elements.telegramAccountTrigger?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  if (elements.telegramAccountTrigger.disabled) {
+    return;
+  }
+  setTelegramAccountDropdownOpen(!telegramAccountDropdownOpen);
+});
+
+elements.telegramAccountMenu?.addEventListener("click", handleTelegramAccountMenuClick);
+elements.telegramCompose?.addEventListener("submit", handleTelegramSend);
+elements.telegramMessage?.addEventListener("keydown", handleTelegramMessageKeydown);
+elements.telegramReplyCancel?.addEventListener("click", clearTelegramReplyTarget);
+elements.telegramChat?.addEventListener("click", handleTelegramChatClick);
+
+elements.managerRatingTable?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-manager-rating-index]");
+  if (!button) {
+    return;
+  }
+  openManagerRatingModal(button.dataset.managerRatingIndex);
+});
+
+elements.managerRatingModalClose?.addEventListener("click", closeManagerRatingModal);
+
+elements.managerRatingModal?.addEventListener("click", (event) => {
+  if (event.target === elements.managerRatingModal) {
+    closeManagerRatingModal();
+  }
+});
+
+elements.notesList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-note-action]");
+  if (!button) {
+    return;
+  }
+
+  const noteItem = button.closest(".note");
+  const noteId = noteItem && noteItem.dataset.noteId;
+  if (!noteId) {
+    return;
+  }
+
+  const action = button.dataset.noteAction;
+  if (action === "edit") {
+    editingNoteId = noteId;
+    setNoteFormMessage("");
+    renderNotes(currentCard && currentCard.notes ? currentCard.notes : []);
+    return;
+  }
+
+  if (action === "cancel") {
+    editingNoteId = "";
+    setNoteFormMessage("");
+    renderNotes(currentCard && currentCard.notes ? currentCard.notes : []);
+    return;
+  }
+
+  if (action === "save") {
+    saveNoteEdit(noteId, noteItem.querySelector(".note-edit-input"));
+    return;
+  }
+
+  if (action === "delete") {
+    editingNoteId = "";
+    setNoteFormMessage("");
+    const confirmed = await showUiConfirmDialog({
+      title: "Видалити примітку?",
+      message: "Примітка зникне з картки клієнта. Цю дію не можна скасувати.",
+      confirmLabel: "Видалити",
+      cancelLabel: "Скасувати",
+      tone: "danger",
+      anchor: button
+    });
+    if (confirmed) {
+      deleteNote(noteId);
+    }
+  }
+});
+
 elements.noteForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const noteText = elements.noteText.value.trim();
@@ -5215,7 +10471,7 @@ elements.noteForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  elements.noteMessage.textContent = "Зберігаємо…";
+  setNoteFormMessage("Зберігаємо…", "neutral");
 
   try {
     const response = await apiFetch("/api/client-notes", {
@@ -5236,10 +10492,17 @@ elements.noteForm.addEventListener("submit", async (event) => {
     }
 
     elements.noteText.value = "";
-    elements.noteMessage.textContent = "";
-    await loadClient(currentPhone);
+    setNoteFormMessage("");
+    appendCurrentNote(payload.note || {
+      id: "",
+      text: noteText,
+      createdBy: "Оператор",
+      createdAt: new Date().toISOString(),
+      source: "postgres"
+    });
+    renderNotes(currentCard && currentCard.notes ? currentCard.notes : []);
   } catch (error) {
-    elements.noteMessage.textContent = error.message;
+    setNoteFormMessage(error.message);
   }
 });
 
@@ -5259,12 +10522,14 @@ async function boot() {
     loadCallDetail(decodeURIComponent(callDetailMatch[1]));
   } else if (window.location.pathname === "/calls-monitor") {
     loadMonitor();
+  } else if (window.location.pathname === "/call-stats") {
+    loadCallStatsPage();
   } else if (window.location.pathname === "/call-analytics") {
     loadAnalyticsPage();
   } else if (window.location.pathname === "/ai-settings") {
     loadAiSettingsPage();
   } else if (window.location.pathname === "/admin") {
-    loadAdminUsers();
+    loadAdminPage();
   } else if (initialPhone) {
     loadClient(initialPhone);
   } else {

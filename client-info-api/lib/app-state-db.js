@@ -10,7 +10,7 @@ const {
   settingsScoringRevision,
   settingsSemanticRevision
 } = require("./ai-analysis-settings");
-const { phoneDigits } = require("./phone");
+const { normalizePhone, phoneDigits } = require("./phone");
 
 function text(value, fallback = "") {
   return value === null || value === undefined ? fallback : String(value).trim();
@@ -45,8 +45,40 @@ function cloneJson(value, fallback = null) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function cachedTelegramReplyPreview(message) {
+  if (!message) {
+    return null;
+  }
+  const media = message.media || null;
+  return {
+    id: message.id,
+    direction: message.direction,
+    text: text(message.text) || (media && media.label ? media.label : "Повідомлення"),
+    mediaType: media && media.type ? media.type : "",
+    mediaLabel: media && media.label ? media.label : ""
+  };
+}
+
+function attachCachedTelegramReplyPreviews(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  const byId = new Map(list.map((message) => [Number(message.id), message]));
+  return list.map((message) => {
+    if (!message || !message.replyToMessageId) {
+      return message;
+    }
+    return {
+      ...message,
+      replyPreview: cachedTelegramReplyPreview(byId.get(Number(message.replyToMessageId)))
+    };
+  });
+}
+
 function nowIso() {
   return new Date().toISOString();
+}
+
+function normalizeLocalNoteId(id) {
+  return text(id).replace(/^local-/, "");
 }
 
 function createAppStatePool(config) {
@@ -143,6 +175,559 @@ class PostgresLocalNotesStore {
     );
 
     return note;
+  }
+
+  async update(noteId, noteText) {
+    const id = normalizeLocalNoteId(noteId);
+    if (!id) {
+      return null;
+    }
+
+    const current = await this.pool.query(
+      "SELECT payload FROM client_notes WHERE id = $1",
+      [id]
+    );
+    if (!current.rows.length) {
+      return null;
+    }
+
+    const previous = current.rows[0].payload || {};
+    const updatedAt = nowIso();
+    const note = {
+      ...previous,
+      id,
+      text: noteText,
+      updatedAt,
+      updatedBy: this.noteAuthor
+    };
+
+    const result = await this.pool.query(
+      `
+        UPDATE client_notes
+        SET
+          note_text = $2,
+          updated_at = $3,
+          payload = $4::jsonb
+        WHERE id = $1
+        RETURNING payload
+      `,
+      [id, text(noteText), updatedAt, JSON.stringify(note)]
+    );
+
+    return result.rows[0] ? result.rows[0].payload : null;
+  }
+
+  async delete(noteId) {
+    const id = normalizeLocalNoteId(noteId);
+    if (!id) {
+      return null;
+    }
+
+    const result = await this.pool.query(
+      "DELETE FROM client_notes WHERE id = $1 RETURNING payload",
+      [id]
+    );
+    return result.rows[0] ? result.rows[0].payload : null;
+  }
+}
+
+function telegramAccountPayload(row, includeSecrets = false) {
+  if (!row) {
+    return null;
+  }
+  const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
+  const account = {
+    id: text(row.id),
+    label: text(row.label),
+    phone: text(row.phone),
+    phoneDigits: text(row.phone_digits),
+    enabled: row.enabled !== false,
+    status: text(row.status, "draft"),
+    isDefault: row.is_default === true,
+    telegramUserId: text(row.telegram_user_id),
+    username: text(row.username),
+    firstName: text(row.first_name),
+    lastName: text(row.last_name),
+    displayName:
+      text(row.label) ||
+      [text(row.first_name), text(row.last_name)].filter(Boolean).join(" ") ||
+      text(row.username) ||
+      text(row.phone),
+    lastError: text(row.last_error),
+    codeSentAt: optionalTimestamp(row.code_sent_at),
+    lastConnectedAt: optionalTimestamp(row.last_connected_at),
+    createdAt: optionalTimestamp(row.created_at),
+    updatedAt: optionalTimestamp(row.updated_at),
+    payload
+  };
+
+  if (includeSecrets) {
+    account.sessionString = text(row.session_string);
+    account.loginSessionString = text(row.login_session_string);
+    account.phoneCodeHash = text(row.phone_code_hash);
+  }
+
+  return account;
+}
+
+function telegramContactPayload(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    accountId: text(row.account_id),
+    phone: text(row.phone),
+    phoneDigits: text(row.phone_digits),
+    found: row.found === true,
+    telegramUserId: text(row.telegram_user_id),
+    accessHash: text(row.access_hash),
+    username: text(row.username),
+    firstName: text(row.first_name),
+    lastName: text(row.last_name),
+    displayName:
+      [text(row.first_name), text(row.last_name)].filter(Boolean).join(" ") ||
+      text(row.username) ||
+      text(row.phone),
+    lastCheckedAt: optionalTimestamp(row.last_checked_at),
+    payload: row.payload && typeof row.payload === "object" ? row.payload : {}
+  };
+}
+
+function nextTelegramAccountStatus(current = {}, enabled = true) {
+  if (enabled === false) {
+    return "disabled";
+  }
+  if (current.status === "disabled") {
+    return current.sessionString ? "connected" : "draft";
+  }
+  return current.status || "draft";
+}
+
+class PostgresTelegramStore {
+  constructor(pool) {
+    this.pool = pool;
+    this.schemaReady = null;
+  }
+
+  async ensureSchema() {
+    if (!this.schemaReady) {
+      this.schemaReady = this.pool.query(`
+        CREATE TABLE IF NOT EXISTS telegram_accounts (
+          id uuid PRIMARY KEY,
+          label text NOT NULL DEFAULT '',
+          phone text NOT NULL,
+          phone_digits text NOT NULL,
+          enabled boolean NOT NULL DEFAULT true,
+          status text NOT NULL DEFAULT 'draft' CHECK (
+            status IN ('draft', 'code_sent', 'password_required', 'connected', 'failed', 'disabled')
+          ),
+          is_default boolean NOT NULL DEFAULT false,
+          session_string text NOT NULL DEFAULT '',
+          login_session_string text NOT NULL DEFAULT '',
+          phone_code_hash text NOT NULL DEFAULT '',
+          code_sent_at timestamptz,
+          telegram_user_id text NOT NULL DEFAULT '',
+          username text NOT NULL DEFAULT '',
+          first_name text NOT NULL DEFAULT '',
+          last_name text NOT NULL DEFAULT '',
+          last_error text NOT NULL DEFAULT '',
+          last_connected_at timestamptz,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+          CONSTRAINT telegram_accounts_phone_digits_uniq UNIQUE (phone_digits)
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS telegram_accounts_single_default_idx
+          ON telegram_accounts (is_default)
+          WHERE is_default;
+        CREATE INDEX IF NOT EXISTS telegram_accounts_enabled_status_idx
+          ON telegram_accounts (enabled, status, updated_at DESC);
+        CREATE TABLE IF NOT EXISTS telegram_contact_cache (
+          account_id uuid NOT NULL REFERENCES telegram_accounts(id) ON DELETE CASCADE ON UPDATE CASCADE,
+          phone text NOT NULL,
+          phone_digits text NOT NULL,
+          found boolean NOT NULL DEFAULT false,
+          telegram_user_id text NOT NULL DEFAULT '',
+          access_hash text NOT NULL DEFAULT '',
+          username text NOT NULL DEFAULT '',
+          first_name text NOT NULL DEFAULT '',
+          last_name text NOT NULL DEFAULT '',
+          last_checked_at timestamptz NOT NULL DEFAULT now(),
+          payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+          PRIMARY KEY (account_id, phone_digits)
+        );
+        CREATE INDEX IF NOT EXISTS telegram_contact_cache_phone_digits_idx
+          ON telegram_contact_cache (phone_digits, last_checked_at DESC);
+        CREATE TABLE IF NOT EXISTS telegram_message_cache (
+          account_id uuid NOT NULL REFERENCES telegram_accounts(id) ON DELETE CASCADE ON UPDATE CASCADE,
+          peer_key text NOT NULL,
+          message_id bigint NOT NULL,
+          phone text NOT NULL,
+          phone_digits text NOT NULL,
+          direction text NOT NULL DEFAULT 'incoming' CHECK (direction IN ('incoming', 'outgoing')),
+          message_text text NOT NULL DEFAULT '',
+          sent_at timestamptz,
+          sender_id text NOT NULL DEFAULT '',
+          payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (account_id, peer_key, message_id)
+        );
+        CREATE INDEX IF NOT EXISTS telegram_message_cache_phone_idx
+          ON telegram_message_cache (phone_digits, sent_at DESC NULLS LAST);
+      `);
+    }
+    await this.schemaReady;
+  }
+
+  async listAccounts(options = {}) {
+    await this.ensureSchema();
+    const clauses = [];
+    const values = [];
+    if (options.connectedOnly) {
+      clauses.push("enabled = true", "status = 'connected'", "session_string <> ''");
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const result = await this.pool.query(
+      `
+        SELECT *
+        FROM telegram_accounts
+        ${where}
+        ORDER BY is_default DESC, enabled DESC, updated_at DESC, created_at DESC
+      `,
+      values
+    );
+    return result.rows.map((row) => telegramAccountPayload(row, options.includeSecrets));
+  }
+
+  async getAccount(id, options = {}) {
+    await this.ensureSchema();
+    const result = await this.pool.query(
+      "SELECT * FROM telegram_accounts WHERE id = $1",
+      [text(id)]
+    );
+    return telegramAccountPayload(result.rows[0], options.includeSecrets);
+  }
+
+  async createAccount(input = {}) {
+    await this.ensureSchema();
+    const phone = normalizePhone(input.phone);
+    if (!phone) {
+      throw new Error("telegram_phone_invalid");
+    }
+    const digits = phoneDigits(phone);
+    const id = crypto.randomUUID();
+    const label = text(input.label) || phone;
+    const payload = {
+      label,
+      phone,
+      createdAt: nowIso()
+    };
+    const result = await this.pool.query(
+      `
+        INSERT INTO telegram_accounts (
+          id, label, phone, phone_digits, enabled, status, payload
+        )
+        VALUES ($1, $2, $3, $4, true, 'draft', $5::jsonb)
+        ON CONFLICT (phone_digits) DO UPDATE SET
+          label = EXCLUDED.label,
+          phone = EXCLUDED.phone,
+          enabled = true,
+          updated_at = now(),
+          payload = telegram_accounts.payload || EXCLUDED.payload
+        RETURNING *
+      `,
+      [id, label, phone, digits, JSON.stringify(payload)]
+    );
+    return telegramAccountPayload(result.rows[0]);
+  }
+
+  async updateAccount(id, input = {}) {
+    await this.ensureSchema();
+    const current = await this.getAccount(id, { includeSecrets: true });
+    if (!current) {
+      return null;
+    }
+    const label = input.label === undefined ? current.label : text(input.label);
+    const enabled = input.enabled === undefined ? current.enabled : input.enabled !== false;
+    const status = nextTelegramAccountStatus(current, enabled);
+    const result = await this.pool.query(
+      `
+        UPDATE telegram_accounts
+        SET label = $2,
+            enabled = $3,
+            status = $4,
+            updated_at = now(),
+            payload = payload || $5::jsonb
+        WHERE id = $1
+        RETURNING *
+      `,
+      [
+        text(id),
+        label,
+        enabled,
+        status,
+        JSON.stringify({
+          label,
+          enabled,
+          updatedAt: nowIso()
+        })
+      ]
+    );
+    return telegramAccountPayload(result.rows[0]);
+  }
+
+  async markLoginCodeSent(id, data = {}) {
+    await this.ensureSchema();
+    const result = await this.pool.query(
+      `
+        UPDATE telegram_accounts
+        SET status = 'code_sent',
+            enabled = true,
+            login_session_string = $2,
+            phone_code_hash = $3,
+            code_sent_at = now(),
+            last_error = '',
+            updated_at = now()
+        WHERE id = $1
+        RETURNING *
+      `,
+      [text(id), text(data.loginSessionString), text(data.phoneCodeHash)]
+    );
+    return telegramAccountPayload(result.rows[0]);
+  }
+
+  async markPasswordRequired(id, data = {}) {
+    await this.ensureSchema();
+    const result = await this.pool.query(
+      `
+        UPDATE telegram_accounts
+        SET status = 'password_required',
+            login_session_string = $2,
+            last_error = '',
+            updated_at = now()
+        WHERE id = $1
+        RETURNING *
+      `,
+      [text(id), text(data.loginSessionString)]
+    );
+    return telegramAccountPayload(result.rows[0]);
+  }
+
+  async markConnected(id, data = {}) {
+    await this.ensureSchema();
+    const result = await this.pool.query(
+      `
+        UPDATE telegram_accounts
+        SET status = 'connected',
+            enabled = true,
+            session_string = $2,
+            login_session_string = '',
+            phone_code_hash = '',
+            telegram_user_id = $3,
+            username = $4,
+            first_name = $5,
+            last_name = $6,
+            last_error = '',
+            last_connected_at = now(),
+            updated_at = now(),
+            payload = payload || $7::jsonb
+        WHERE id = $1
+        RETURNING *
+      `,
+      [
+        text(id),
+        text(data.sessionString),
+        text(data.telegramUserId),
+        text(data.username),
+        text(data.firstName),
+        text(data.lastName),
+        JSON.stringify(cloneJson(data.payload, {}))
+      ]
+    );
+    return telegramAccountPayload(result.rows[0]);
+  }
+
+  async markFailed(id, error) {
+    await this.ensureSchema();
+    const result = await this.pool.query(
+      `
+        UPDATE telegram_accounts
+        SET status = 'failed',
+            last_error = $2,
+            updated_at = now()
+        WHERE id = $1
+        RETURNING *
+      `,
+      [text(id), text(error).slice(0, 1000)]
+    );
+    return telegramAccountPayload(result.rows[0]);
+  }
+
+  async deleteAccount(id) {
+    await this.ensureSchema();
+    const result = await this.pool.query(
+      "DELETE FROM telegram_accounts WHERE id = $1 RETURNING *",
+      [text(id)]
+    );
+    return telegramAccountPayload(result.rows[0]);
+  }
+
+  async cacheContact(accountId, phone, contact = {}) {
+    await this.ensureSchema();
+    const normalized = normalizePhone(phone);
+    const digits = phoneDigits(normalized || phone);
+    const payload = cloneJson(contact.payload, {});
+    const result = await this.pool.query(
+      `
+        INSERT INTO telegram_contact_cache (
+          account_id,
+          phone,
+          phone_digits,
+          found,
+          telegram_user_id,
+          access_hash,
+          username,
+          first_name,
+          last_name,
+          last_checked_at,
+          payload
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10::jsonb)
+        ON CONFLICT (account_id, phone_digits) DO UPDATE SET
+          phone = EXCLUDED.phone,
+          found = EXCLUDED.found,
+          telegram_user_id = EXCLUDED.telegram_user_id,
+          access_hash = EXCLUDED.access_hash,
+          username = EXCLUDED.username,
+          first_name = EXCLUDED.first_name,
+          last_name = EXCLUDED.last_name,
+          last_checked_at = now(),
+          payload = EXCLUDED.payload
+        RETURNING *
+      `,
+      [
+        text(accountId),
+        normalized || text(phone),
+        digits,
+        contact.found === true,
+        text(contact.telegramUserId),
+        text(contact.accessHash),
+        text(contact.username),
+        text(contact.firstName),
+        text(contact.lastName),
+        JSON.stringify(payload)
+      ]
+    );
+    return telegramContactPayload(result.rows[0]);
+  }
+
+  async cacheMessages(accountId, phone, peerKey, messages = []) {
+    await this.ensureSchema();
+    const normalized = normalizePhone(phone);
+    const digits = phoneDigits(normalized || phone);
+    for (const message of messages) {
+      if (!message || !message.id) {
+        continue;
+      }
+      await this.pool.query(
+        `
+          INSERT INTO telegram_message_cache (
+            account_id,
+            peer_key,
+            message_id,
+            phone,
+            phone_digits,
+            direction,
+            message_text,
+            sent_at,
+            sender_id,
+            payload
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+          ON CONFLICT (account_id, peer_key, message_id) DO UPDATE SET
+            direction = EXCLUDED.direction,
+            message_text = EXCLUDED.message_text,
+            sent_at = EXCLUDED.sent_at,
+            sender_id = EXCLUDED.sender_id,
+            payload = EXCLUDED.payload
+        `,
+        [
+          text(accountId),
+          text(peerKey),
+          integer(message.id),
+          normalized || text(phone),
+          digits,
+          message.direction === "outgoing" ? "outgoing" : "incoming",
+          text(message.text),
+          optionalTimestamp(message.sentAt),
+          text(message.senderId),
+          JSON.stringify(cloneJson(message.payload, {}))
+        ]
+      );
+    }
+  }
+
+  async cachedContact(accountId, phone) {
+    await this.ensureSchema();
+    const normalized = normalizePhone(phone);
+    const digits = phoneDigits(normalized || phone);
+    const result = await this.pool.query(
+      `
+        SELECT *
+        FROM telegram_contact_cache
+        WHERE account_id = $1
+          AND phone_digits = $2
+        ORDER BY last_checked_at DESC
+        LIMIT 1
+      `,
+      [text(accountId), digits]
+    );
+    return telegramContactPayload(result.rows[0]);
+  }
+
+  async cachedConversation(accountId, phone, limit = 50) {
+    await this.ensureSchema();
+    const normalized = normalizePhone(phone);
+    const digits = phoneDigits(normalized || phone);
+    const safeLimit = Math.max(1, Math.min(integer(limit, 50), 100));
+    const contact = await this.cachedContact(accountId, phone);
+    const messageResult = await this.pool.query(
+      `
+        SELECT *
+        FROM telegram_message_cache
+        WHERE account_id = $1
+          AND phone_digits = $2
+        ORDER BY sent_at DESC NULLS LAST, message_id DESC
+        LIMIT $3
+      `,
+      [text(accountId), digits, safeLimit]
+    );
+    const messages = attachCachedTelegramReplyPreviews(
+      messageResult.rows
+        .map((row) => {
+          const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
+          const media = payload.media && typeof payload.media === "object"
+            ? cloneJson(payload.media, null)
+            : null;
+          const replyToMessageId = integer(payload.replyToMessageId, 0) || null;
+          return {
+            id: Number(row.message_id) || 0,
+            direction: row.direction === "outgoing" ? "outgoing" : "incoming",
+            text: text(row.message_text),
+            media,
+            replyToMessageId,
+            replyPreview: null,
+            sentAt: optionalTimestamp(row.sent_at),
+            senderId: text(row.sender_id),
+            payload
+          };
+        })
+        .reverse()
+    );
+    return {
+      contact,
+      messages
+    };
   }
 }
 
@@ -986,6 +1571,16 @@ function binotelCallColumns(call, currentPayload, options = {}) {
   };
 }
 
+function analysisInternalNumberEnabledClause(alias) {
+  const prefix = alias ? `${alias}.` : "";
+  return `NOT EXISTS (
+    SELECT 1
+    FROM ai_analysis_internal_numbers analysis_numbers
+    WHERE analysis_numbers.internal_number = ${prefix}internal_number
+      AND analysis_numbers.enabled = false
+  )`;
+}
+
 async function upsertBinotelCall(client, call, currentPayload, options = {}) {
   const columns = binotelCallColumns(call, currentPayload, options);
   if (!columns.callId) {
@@ -1100,7 +1695,178 @@ async function upsertBinotelCall(client, call, currentPayload, options = {}) {
 class PostgresBinotelMonitorStore {
   constructor(pool, options = {}) {
     this.pool = pool;
-    this.maxCalls = Number(options.maxCalls || 2000);
+    this.maxCalls = options.maxCalls === undefined ? 2000 : Number(options.maxCalls);
+    this.analysisInternalNumbersSchemaPromise = null;
+  }
+
+  async ensureAnalysisInternalNumbersSchema() {
+    if (!this.analysisInternalNumbersSchemaPromise) {
+      this.analysisInternalNumbersSchemaPromise = this.pool.query(
+        `
+          CREATE TABLE IF NOT EXISTS ai_analysis_internal_numbers (
+            internal_number text PRIMARY KEY,
+            enabled boolean NOT NULL DEFAULT true,
+            label text NOT NULL DEFAULT '',
+            notes text NOT NULL DEFAULT '',
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+          );
+
+          CREATE INDEX IF NOT EXISTS ai_analysis_internal_numbers_enabled_idx
+            ON ai_analysis_internal_numbers (enabled, internal_number);
+
+          CREATE INDEX IF NOT EXISTS binotel_calls_internal_number_started_at_idx
+            ON binotel_calls (internal_number, started_at DESC NULLS LAST);
+        `
+      ).catch((error) => {
+        this.analysisInternalNumbersSchemaPromise = null;
+        throw error;
+      });
+    }
+
+    return this.analysisInternalNumbersSchemaPromise;
+  }
+
+  async analysisInternalNumbers() {
+    await this.ensureAnalysisInternalNumbersSchema();
+    const result = await this.pool.query(
+      `
+        WITH call_counts AS (
+          SELECT
+            internal_number,
+            COUNT(*)::int AS total_calls,
+            MAX(started_at) AS last_call_at
+          FROM binotel_calls
+          WHERE internal_number <> ''
+          GROUP BY internal_number
+        ),
+        latest_call AS (
+          SELECT DISTINCT ON (internal_number)
+            internal_number,
+            employee_payload,
+            pbx_number_payload
+          FROM binotel_calls
+          WHERE internal_number <> ''
+          ORDER BY internal_number, started_at DESC NULLS LAST, call_id DESC
+        )
+        SELECT
+          COALESCE(call_counts.internal_number, settings.internal_number) AS internal_number,
+          COALESCE(settings.enabled, true) AS enabled,
+          COALESCE(NULLIF(settings.label, ''), '') AS custom_label,
+          COALESCE(NULLIF(settings.notes, ''), '') AS notes,
+          COALESCE(NULLIF(latest_call.employee_payload->>'name', ''), '') AS employee_name,
+          COALESCE(NULLIF(latest_call.pbx_number_payload->>'name', ''), '') AS pbx_name,
+          COALESCE(NULLIF(latest_call.pbx_number_payload->>'number', ''), '') AS pbx_number,
+          COALESCE(call_counts.total_calls, 0)::int AS total_calls,
+          call_counts.last_call_at,
+          settings.updated_at,
+          settings.internal_number IS NOT NULL AS configured
+        FROM call_counts
+        FULL JOIN ai_analysis_internal_numbers settings
+          ON settings.internal_number = call_counts.internal_number
+        LEFT JOIN latest_call
+          ON latest_call.internal_number = COALESCE(call_counts.internal_number, settings.internal_number)
+        ORDER BY internal_number
+      `
+    );
+    const numbers = result.rows
+      .map((row) => {
+        const number = text(row.internal_number);
+        const employeeName = text(row.employee_name);
+        const pbxName = text(row.pbx_name);
+        const customLabel = text(row.custom_label);
+        return {
+          number,
+          label: customLabel || employeeName || pbxName || (number ? `вн. ${number}` : ""),
+          customLabel,
+          employeeName,
+          pbxName,
+          pbxNumber: text(row.pbx_number),
+          notes: text(row.notes),
+          enabled: row.enabled !== false,
+          totalCalls: integer(row.total_calls, 0),
+          lastCallAt: optionalTimestamp(row.last_call_at),
+          updatedAt: optionalTimestamp(row.updated_at),
+          configured: Boolean(row.configured)
+        };
+      })
+      .filter((item) => item.number);
+
+    numbers.sort((a, b) => {
+      const left = Number(a.number);
+      const right = Number(b.number);
+      if (Number.isFinite(left) && Number.isFinite(right) && left !== right) {
+        return left - right;
+      }
+      return a.number.localeCompare(b.number, "uk");
+    });
+
+    return {
+      numbers,
+      enabledCount: numbers.filter((item) => item.enabled).length,
+      disabledCount: numbers.filter((item) => !item.enabled).length
+    };
+  }
+
+  async updateAnalysisInternalNumbers(items = []) {
+    await this.ensureAnalysisInternalNumbersSchema();
+    const rows = Array.isArray(items) ? items : [];
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      for (const item of rows) {
+        const number = text(
+          item && (item.number || item.internalNumber || item.internal_number)
+        );
+        if (!number) {
+          continue;
+        }
+        await client.query(
+          `
+            INSERT INTO ai_analysis_internal_numbers (
+              internal_number,
+              enabled,
+              label,
+              notes,
+              updated_at
+            )
+            VALUES ($1, $2, $3, $4, now())
+            ON CONFLICT (internal_number) DO UPDATE SET
+              enabled = EXCLUDED.enabled,
+              label = EXCLUDED.label,
+              notes = EXCLUDED.notes,
+              updated_at = now()
+          `,
+          [
+            number,
+            item && item.enabled !== false,
+            text(item && (item.customLabel || item.label)),
+            text(item && item.notes)
+          ]
+        );
+      }
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    return this.analysisInternalNumbers();
+  }
+
+  async disabledAnalysisInternalNumbers() {
+    await this.ensureAnalysisInternalNumbersSchema();
+    const result = await this.pool.query(
+      `
+        SELECT internal_number
+        FROM ai_analysis_internal_numbers
+        WHERE enabled = false
+      `
+    );
+    return new Set(result.rows.map((row) => text(row.internal_number)).filter(Boolean));
   }
 
   async syncState() {
@@ -1248,6 +2014,7 @@ class PostgresBinotelMonitorStore {
   }
 
   async list(options = {}) {
+    await this.ensureAnalysisInternalNumbersSchema();
     const limit = Math.max(
       1,
       Math.min(Number(options.limit || 100), this.maxCalls || 5000, 5000)
@@ -1255,12 +2022,24 @@ class PostgresBinotelMonitorStore {
     const offset = Math.max(0, Number(options.offset || 0));
     const query = text(options.query).toLowerCase();
     const queryDigits = query.replace(/\D/g, "");
+    const callType = text(options.callType).toLowerCase();
+    const problem = text(options.problem).toLowerCase();
     const clauses = [];
     const values = [];
+    const callTypeExpression =
+      "COALESCE(NULLIF(summaries.call_type, ''), NULLIF(summaries.summary_payload->>'callType', ''), '')";
+    const escalationProblemClause =
+      "(summaries.summary_payload->'escalation'->>'needed') = 'true'";
+    const churnRiskProblemClause =
+      "lower(COALESCE(summaries.summary_payload->'churnRisk'->>'level', '')) IN ('medium', 'high')";
+
+    if (options.includeDisabledInternalNumbers !== true) {
+      clauses.push(analysisInternalNumberEnabledClause("calls"));
+    }
 
     if (options.since) {
       values.push(optionalTimestamp(options.since));
-      clauses.push(`started_at >= $${values.length}`);
+      clauses.push(`calls.started_at >= $${values.length}`);
     }
 
     if (query) {
@@ -1269,12 +2048,29 @@ class PostgresBinotelMonitorStore {
       values.push(`%${queryDigits}%`);
       const digitsParam = `$${values.length}`;
       clauses.push(`(
-        lower(external_number) LIKE ${textParam}
-        OR lower(internal_number) LIKE ${textParam}
-        OR lower(call_id) LIKE ${textParam}
-        OR lower(employee_payload::text) LIKE ${textParam}
-        OR ($${values.length} <> '%%' AND external_digits LIKE ${digitsParam})
+        lower(calls.external_number) LIKE ${textParam}
+        OR lower(calls.internal_number) LIKE ${textParam}
+        OR lower(calls.call_id) LIKE ${textParam}
+        OR lower(calls.employee_payload::text) LIKE ${textParam}
+        OR (${digitsParam} <> '%%' AND calls.external_digits LIKE ${digitsParam})
       )`);
+    }
+
+    if (callType) {
+      if (callType === "__none") {
+        clauses.push(`${callTypeExpression} = ''`);
+      } else {
+        values.push(callType);
+        clauses.push(`lower(${callTypeExpression}) = $${values.length}`);
+      }
+    }
+
+    if (problem === "problem") {
+      clauses.push(`(${escalationProblemClause} OR ${churnRiskProblemClause})`);
+    } else if (problem === "escalation") {
+      clauses.push(escalationProblemClause);
+    } else if (problem === "churnrisk") {
+      clauses.push(churnRiskProblemClause);
     }
 
     values.push(limit);
@@ -1284,10 +2080,12 @@ class PostgresBinotelMonitorStore {
 
     const result = await this.pool.query(
       `
-        SELECT payload, COUNT(*) OVER ()::int AS total
-        FROM binotel_calls
+        SELECT calls.payload, COUNT(*) OVER ()::int AS total
+        FROM binotel_calls calls
+        LEFT JOIN call_summaries summaries
+          ON summaries.call_id = calls.general_call_id
         ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}
-        ORDER BY started_at DESC NULLS LAST, call_id DESC
+        ORDER BY calls.started_at DESC NULLS LAST, calls.call_id DESC
         LIMIT ${limitParam}
         OFFSET ${offsetParam}
       `,
@@ -1303,6 +2101,7 @@ class PostgresBinotelMonitorStore {
   }
 
   async analytics(options = {}) {
+    await this.ensureAnalysisInternalNumbersSchema();
     const limit = Math.max(
       1,
       Math.min(Number(options.limit || 100), this.maxCalls || 5000, 5000)
@@ -1311,6 +2110,8 @@ class PostgresBinotelMonitorStore {
     const queryDigits = query.replace(/\D/g, "");
     const clauses = [];
     const values = [];
+
+    clauses.push(analysisInternalNumberEnabledClause("calls"));
 
     if (options.since) {
       values.push(optionalTimestamp(options.since));
@@ -1416,6 +2217,433 @@ class PostgresBinotelMonitorStore {
     };
   }
 
+  async callStatistics(options = {}) {
+    await this.ensureAnalysisInternalNumbersSchema();
+    const clauses = [
+      analysisInternalNumberEnabledClause("calls"),
+      "calls.started_at IS NOT NULL"
+    ];
+    const values = [];
+    const query = text(options.query).toLowerCase();
+    const queryDigits = query.replace(/\D/g, "");
+    const timezone = text(options.timezone, "Europe/Kyiv") || "Europe/Kyiv";
+
+    if (options.from) {
+      values.push(optionalTimestamp(options.from));
+      clauses.push(`calls.started_at >= $${values.length}`);
+    }
+
+    if (options.to) {
+      values.push(optionalTimestamp(options.to));
+      clauses.push(`calls.started_at < $${values.length}`);
+    }
+
+    if (query) {
+      values.push(`%${query}%`);
+      const textParam = `$${values.length}`;
+      values.push(`%${queryDigits}%`);
+      const digitsParam = `$${values.length}`;
+      clauses.push(`(
+        lower(calls.external_number) LIKE ${textParam}
+        OR lower(calls.internal_number) LIKE ${textParam}
+        OR lower(calls.call_id) LIKE ${textParam}
+        OR lower(calls.employee_payload::text) LIKE ${textParam}
+        OR lower(calls.pbx_number_payload::text) LIKE ${textParam}
+        OR (${digitsParam} <> '%%' AND calls.external_digits LIKE ${digitsParam})
+      )`);
+    }
+
+    values.push(timezone);
+    const timezoneParam = `$${values.length}`;
+    const whereClause = `WHERE ${clauses.join(" AND ")}`;
+
+    const result = await this.pool.query(
+      `
+        WITH filtered AS (
+          SELECT
+            calls.*,
+            (calls.started_at AT TIME ZONE ${timezoneParam}) AS local_started_at,
+            CASE
+              WHEN lower(calls.call_type) LIKE '%out%' OR lower(calls.type_label) LIKE '%вих%' THEN 'outgoing'
+              ELSE 'incoming'
+            END AS direction,
+            CASE
+              WHEN calls.bill_sec > 0 OR lower(calls.disposition) IN ('answer', 'answered', 'success') THEN true
+              ELSE false
+            END AS answered,
+            COALESCE(NULLIF(calls.employee_payload->>'name', ''), NULLIF(calls.employee_payload->>'fullName', ''), '') AS employee_name,
+            COALESCE(
+              NULLIF(calls.employee_payload->>'id', ''),
+              NULLIF(calls.employee_payload->>'employeeId', ''),
+              NULLIF(calls.employee_payload->>'userId', ''),
+              NULLIF(calls.internal_number, ''),
+              'unknown'
+            ) AS manager_key,
+            COALESCE(NULLIF(calls.pbx_number_payload->>'name', ''), NULLIF(calls.pbx_number_payload->>'number', ''), '') AS pbx_name,
+            COALESCE(NULLIF(calls.pbx_number_payload->>'number', ''), '') AS pbx_number
+          FROM binotel_calls calls
+          ${whereClause}
+        ),
+        enriched AS (
+          SELECT
+            *,
+            COALESCE(NULLIF(employee_name, ''), NULLIF(pbx_name, ''), 'Оператор не визначений') AS manager_label,
+            COALESCE(NULLIF(type_label, ''), CASE WHEN direction = 'outgoing' THEN 'Вихідні' ELSE 'Вхідні' END) AS direction_label,
+            COALESCE(NULLIF(disposition_label, ''), NULLIF(disposition, ''), 'Без статусу') AS disposition_name,
+            to_char(local_started_at, 'YYYY-MM-DD') AS day_key,
+            EXTRACT(ISODOW FROM local_started_at)::int AS weekday,
+            EXTRACT(HOUR FROM local_started_at)::int AS hour
+          FROM filtered
+        ),
+        summary AS (
+          SELECT
+            COUNT(*)::int AS total_calls,
+            COUNT(*) FILTER (WHERE direction = 'incoming')::int AS incoming_calls,
+            COUNT(*) FILTER (WHERE direction = 'outgoing')::int AS outgoing_calls,
+            COUNT(*) FILTER (WHERE answered)::int AS answered_calls,
+            COUNT(*) FILTER (WHERE direction = 'incoming' AND NOT answered)::int AS missed_calls,
+            COUNT(DISTINCT NULLIF(external_digits, ''))::int AS unique_customers,
+            COALESCE(SUM(bill_sec), 0)::int AS total_bill_sec,
+            COALESCE(SUM(wait_sec), 0)::int AS total_wait_sec,
+            COALESCE(ROUND(AVG(NULLIF(bill_sec, 0))), 0)::int AS avg_bill_sec,
+            COALESCE(ROUND(AVG(wait_sec)), 0)::int AS avg_wait_sec,
+            COUNT(*) FILTER (WHERE recording_status <> '' OR recording_cache_status <> '')::int AS recording_calls,
+            MIN(started_at) AS first_call_at,
+            MAX(started_at) AS last_call_at
+          FROM enriched
+        ),
+        by_day AS (
+          SELECT
+            day_key,
+            MIN(started_at) AS day_started_at,
+            COUNT(*)::int AS total_calls,
+            COUNT(*) FILTER (WHERE direction = 'incoming')::int AS incoming_calls,
+            COUNT(*) FILTER (WHERE direction = 'outgoing')::int AS outgoing_calls,
+            COUNT(*) FILTER (WHERE answered)::int AS answered_calls,
+            COUNT(*) FILTER (WHERE direction = 'incoming' AND NOT answered)::int AS missed_calls,
+            COALESCE(SUM(bill_sec), 0)::int AS total_bill_sec
+          FROM enriched
+          GROUP BY day_key
+        ),
+        by_hour AS (
+          SELECT
+            hour,
+            COUNT(*)::int AS total_calls,
+            COUNT(*) FILTER (WHERE answered)::int AS answered_calls,
+            COALESCE(SUM(bill_sec), 0)::int AS total_bill_sec
+          FROM enriched
+          GROUP BY hour
+        ),
+        by_weekday AS (
+          SELECT
+            weekday,
+            COUNT(*)::int AS total_calls,
+            COALESCE(SUM(bill_sec), 0)::int AS total_bill_sec
+          FROM enriched
+          GROUP BY weekday
+        ),
+        by_direction AS (
+          SELECT
+            direction,
+            MAX(direction_label) AS label,
+            COUNT(*)::int AS total_calls,
+            COALESCE(SUM(bill_sec), 0)::int AS total_bill_sec
+          FROM enriched
+          GROUP BY direction
+        ),
+        by_disposition AS (
+          SELECT
+            disposition_name AS label,
+            COUNT(*)::int AS total_calls,
+            COUNT(*) FILTER (WHERE answered)::int AS answered_calls,
+            COALESCE(SUM(bill_sec), 0)::int AS total_bill_sec
+          FROM enriched
+          GROUP BY disposition_name
+        ),
+        duration_buckets AS (
+          SELECT
+            CASE
+              WHEN bill_sec <= 0 THEN '0'
+              WHEN bill_sec <= 30 THEN '1-30'
+              WHEN bill_sec <= 120 THEN '31-120'
+              WHEN bill_sec <= 300 THEN '121-300'
+              WHEN bill_sec <= 900 THEN '301-900'
+              ELSE '900+'
+            END AS bucket,
+            CASE
+              WHEN bill_sec <= 0 THEN '0 c'
+              WHEN bill_sec <= 30 THEN '1-30 c'
+              WHEN bill_sec <= 120 THEN '31 c - 2 хв'
+              WHEN bill_sec <= 300 THEN '2-5 хв'
+              WHEN bill_sec <= 900 THEN '5-15 хв'
+              ELSE '15+ хв'
+            END AS label,
+            CASE
+              WHEN bill_sec <= 0 THEN 0
+              WHEN bill_sec <= 30 THEN 1
+              WHEN bill_sec <= 120 THEN 2
+              WHEN bill_sec <= 300 THEN 3
+              WHEN bill_sec <= 900 THEN 4
+              ELSE 5
+            END AS sort_order,
+            COUNT(*)::int AS total_calls
+          FROM enriched
+          GROUP BY bucket, label, sort_order
+        ),
+        managers AS (
+          SELECT
+            manager_key,
+            MAX(manager_label) AS label,
+            MAX(internal_number) AS internal_number,
+            MAX(employee_name) AS employee_name,
+            MAX(pbx_name) AS pbx_name,
+            COUNT(*)::int AS total_calls,
+            COUNT(*) FILTER (WHERE direction = 'incoming')::int AS incoming_calls,
+            COUNT(*) FILTER (WHERE direction = 'outgoing')::int AS outgoing_calls,
+            COUNT(*) FILTER (WHERE answered)::int AS answered_calls,
+            COUNT(*) FILTER (WHERE direction = 'incoming' AND NOT answered)::int AS missed_calls,
+            COUNT(DISTINCT NULLIF(external_digits, ''))::int AS unique_customers,
+            COALESCE(SUM(bill_sec), 0)::int AS total_bill_sec,
+            COALESCE(SUM(wait_sec), 0)::int AS total_wait_sec,
+            COALESCE(ROUND(AVG(NULLIF(bill_sec, 0))), 0)::int AS avg_bill_sec,
+            COALESCE(ROUND(AVG(wait_sec)), 0)::int AS avg_wait_sec,
+            COUNT(*) FILTER (WHERE recording_status <> '' OR recording_cache_status <> '')::int AS recording_calls,
+            MIN(started_at) AS first_call_at,
+            MAX(started_at) AS last_call_at
+          FROM enriched
+          GROUP BY manager_key
+        ),
+        lines AS (
+          SELECT
+            COALESCE(NULLIF(pbx_number, ''), NULLIF(internal_number, ''), 'unknown') AS key,
+            COALESCE(NULLIF(pbx_name, ''), NULLIF(pbx_number, ''), NULLIF(internal_number, ''), 'Лінія не визначена') AS label,
+            MAX(pbx_number) AS number,
+            MAX(internal_number) AS internal_number,
+            COUNT(*)::int AS total_calls,
+            COUNT(*) FILTER (WHERE direction = 'incoming')::int AS incoming_calls,
+            COUNT(*) FILTER (WHERE direction = 'outgoing')::int AS outgoing_calls,
+            COALESCE(SUM(bill_sec), 0)::int AS total_bill_sec
+          FROM enriched
+          GROUP BY key, label
+        ),
+        top_external AS (
+          SELECT
+            COALESCE(NULLIF(external_number, ''), NULLIF(external_digits, ''), 'Номер не визначений') AS phone,
+            external_digits,
+            COUNT(*)::int AS total_calls,
+            COUNT(*) FILTER (WHERE direction = 'incoming')::int AS incoming_calls,
+            COUNT(*) FILTER (WHERE direction = 'outgoing')::int AS outgoing_calls,
+            COUNT(*) FILTER (WHERE answered)::int AS answered_calls,
+            COALESCE(SUM(bill_sec), 0)::int AS total_bill_sec,
+            MAX(started_at) AS last_call_at
+          FROM enriched
+          GROUP BY phone, external_digits
+        ),
+        heatmap AS (
+          SELECT
+            weekday,
+            hour,
+            COUNT(*)::int AS total_calls,
+            COALESCE(SUM(bill_sec), 0)::int AS total_bill_sec
+          FROM enriched
+          GROUP BY weekday, hour
+        )
+        SELECT
+          COALESCE((SELECT to_jsonb(summary) FROM summary), '{}'::jsonb) AS summary,
+          COALESCE((SELECT jsonb_agg(to_jsonb(by_day) ORDER BY day_started_at) FROM by_day), '[]'::jsonb) AS daily,
+          COALESCE((SELECT jsonb_agg(to_jsonb(by_hour) ORDER BY hour) FROM by_hour), '[]'::jsonb) AS hourly,
+          COALESCE((SELECT jsonb_agg(to_jsonb(by_weekday) ORDER BY weekday) FROM by_weekday), '[]'::jsonb) AS weekdays,
+          COALESCE((SELECT jsonb_agg(to_jsonb(by_direction) ORDER BY total_calls DESC) FROM by_direction), '[]'::jsonb) AS directions,
+          COALESCE((SELECT jsonb_agg(to_jsonb(by_disposition) ORDER BY total_calls DESC, label) FROM by_disposition), '[]'::jsonb) AS dispositions,
+          COALESCE((SELECT jsonb_agg(to_jsonb(duration_buckets) ORDER BY sort_order) FROM duration_buckets), '[]'::jsonb) AS duration_buckets,
+          COALESCE((SELECT jsonb_agg(to_jsonb(managers) ORDER BY total_calls DESC, total_bill_sec DESC, label) FROM managers), '[]'::jsonb) AS managers,
+          COALESCE((
+            SELECT jsonb_agg(to_jsonb(line_rows) ORDER BY total_calls DESC, label)
+            FROM (
+              SELECT * FROM lines
+              ORDER BY total_calls DESC, label
+              LIMIT 20
+            ) line_rows
+          ), '[]'::jsonb) AS lines,
+          COALESCE((
+            SELECT jsonb_agg(to_jsonb(external_rows) ORDER BY total_calls DESC, last_call_at DESC)
+            FROM (
+              SELECT * FROM top_external
+              ORDER BY total_calls DESC, last_call_at DESC
+              LIMIT 20
+            ) external_rows
+          ), '[]'::jsonb) AS top_external_numbers,
+          COALESCE((SELECT jsonb_agg(to_jsonb(heatmap) ORDER BY weekday, hour) FROM heatmap), '[]'::jsonb) AS heatmap
+      `,
+      values
+    );
+
+    const row = result.rows[0] || {};
+    const summary = row.summary || {};
+    const totalCalls = integer(summary.total_calls, 0);
+    const answeredCalls = integer(summary.answered_calls, 0);
+    const incomingCalls = integer(summary.incoming_calls, 0);
+    const outgoingCalls = integer(summary.outgoing_calls, 0);
+    const totalBillSec = integer(summary.total_bill_sec, 0);
+
+    return {
+      period: {
+        from: optionalTimestamp(options.from),
+        to: optionalTimestamp(options.to),
+        timezone
+      },
+      summary: {
+        totalCalls,
+        incomingCalls,
+        outgoingCalls,
+        answeredCalls,
+        missedCalls: integer(summary.missed_calls, 0),
+        uniqueCustomers: integer(summary.unique_customers, 0),
+        totalBillSec,
+        totalWaitSec: integer(summary.total_wait_sec, 0),
+        avgBillSec: integer(summary.avg_bill_sec, 0),
+        avgWaitSec: integer(summary.avg_wait_sec, 0),
+        recordingCalls: integer(summary.recording_calls, 0),
+        answerRate: totalCalls ? Math.round((answeredCalls / totalCalls) * 1000) / 10 : 0,
+        incomingShare: totalCalls ? Math.round((incomingCalls / totalCalls) * 1000) / 10 : 0,
+        outgoingShare: totalCalls ? Math.round((outgoingCalls / totalCalls) * 1000) / 10 : 0,
+        avgCallsPerDay: 0,
+        talkHours: Math.round((totalBillSec / 3600) * 10) / 10,
+        firstCallAt: optionalTimestamp(summary.first_call_at),
+        lastCallAt: optionalTimestamp(summary.last_call_at)
+      },
+      daily: Array.isArray(row.daily) ? row.daily : [],
+      hourly: Array.isArray(row.hourly) ? row.hourly : [],
+      weekdays: Array.isArray(row.weekdays) ? row.weekdays : [],
+      directions: Array.isArray(row.directions) ? row.directions : [],
+      dispositions: Array.isArray(row.dispositions) ? row.dispositions : [],
+      durationBuckets: Array.isArray(row.duration_buckets) ? row.duration_buckets : [],
+      managers: Array.isArray(row.managers) ? row.managers : [],
+      lines: Array.isArray(row.lines) ? row.lines : [],
+      topExternalNumbers: Array.isArray(row.top_external_numbers) ? row.top_external_numbers : [],
+      heatmap: Array.isArray(row.heatmap) ? row.heatmap : []
+    };
+  }
+
+  async managerRating(options = {}) {
+    await this.ensureAnalysisInternalNumbersSchema();
+    const limit = Math.max(
+      1,
+      Math.min(Number(options.limit || 5000), this.maxCalls || 5000, 5000)
+    );
+    const query = text(options.query).toLowerCase();
+    const queryDigits = query.replace(/\D/g, "");
+    const callClauses = [];
+    const metricClauses = [
+      "summaries.status = 'done'",
+      "metrics.counts_toward_score = true",
+      "metrics.score IS NOT NULL",
+      "metrics.max_score IS NOT NULL",
+      "metrics.max_score > 0"
+    ];
+    const values = [];
+
+    callClauses.push(analysisInternalNumberEnabledClause("source_calls"));
+
+    if (options.since) {
+      values.push(optionalTimestamp(options.since));
+      callClauses.push(`source_calls.started_at >= $${values.length}`);
+    }
+
+    if (query) {
+      values.push(`%${query}%`);
+      const textParam = `$${values.length}`;
+      values.push(`%${queryDigits}%`);
+      const digitsParam = `$${values.length}`;
+      metricClauses.push(`(
+        lower(calls.external_number) LIKE ${textParam}
+        OR lower(calls.internal_number) LIKE ${textParam}
+        OR lower(calls.call_id) LIKE ${textParam}
+        OR lower(calls.employee_payload::text) LIKE ${textParam}
+        OR lower(metrics.metric_label) LIKE ${textParam}
+        OR lower(metrics.metric_key) LIKE ${textParam}
+        OR (${digitsParam} <> '%%' AND calls.external_digits LIKE ${digitsParam})
+      )`);
+    }
+
+    values.push(limit);
+    const limitParam = `$${values.length}`;
+
+    const result = await this.pool.query(
+      `
+        WITH filtered AS (
+          SELECT
+            calls.general_call_id,
+            calls.started_at,
+            calls.bill_sec,
+            calls.internal_number,
+            calls.employee_payload,
+            calls.pbx_number_payload,
+            summaries.call_type,
+            summaries.call_type_label,
+            metrics.metric_key,
+            metrics.metric_label,
+            metrics.metric_group,
+            metrics.selected_option_key,
+            metrics.selected_option_label,
+            metrics.score,
+            metrics.max_score,
+            metrics.color
+          FROM (
+            SELECT source_calls.*
+            FROM binotel_calls source_calls
+            ${callClauses.length ? `WHERE ${callClauses.join(" AND ")}` : ""}
+            ORDER BY source_calls.started_at DESC NULLS LAST, source_calls.call_id DESC
+            LIMIT ${limitParam}
+          ) calls
+          JOIN call_summaries summaries
+            ON summaries.call_id = calls.general_call_id
+          JOIN call_summary_metric_results metrics
+            ON metrics.call_id = summaries.call_id
+          WHERE ${metricClauses.join(" AND ")}
+        )
+        SELECT
+          COUNT(DISTINCT general_call_id)::int AS rated_calls,
+          COUNT(*)::int AS scored_metrics,
+          COALESCE(
+            jsonb_agg(
+              jsonb_build_object(
+                'callId', general_call_id,
+                'startedAt', started_at,
+                'billSec', bill_sec,
+                'internalNumber', internal_number,
+                'employee', employee_payload,
+                'pbxNumber', pbx_number_payload,
+                'callType', call_type,
+                'callTypeLabel', call_type_label,
+                'metricKey', metric_key,
+                'metricLabel', metric_label,
+                'metricGroup', metric_group,
+                'selectedOptionKey', selected_option_key,
+                'selectedOptionLabel', selected_option_label,
+                'score', score,
+                'maxScore', max_score,
+                'color', color
+              )
+              ORDER BY started_at DESC NULLS LAST, general_call_id DESC, metric_key
+            ),
+            '[]'::jsonb
+          ) AS rows
+        FROM filtered
+      `,
+      values
+    );
+    const row = result.rows[0] || {};
+
+    return {
+      limit,
+      offset: 0,
+      ratedCalls: integer(row.rated_calls, 0),
+      scoredMetrics: integer(row.scored_metrics, 0),
+      rows: Array.isArray(row.rows) ? row.rows : []
+    };
+  }
+
   async status() {
     const [sync, total] = await Promise.all([
       this.syncState(),
@@ -1518,6 +2746,7 @@ function createAppStateDatabase(config) {
     binotelMonitorStore: new PostgresBinotelMonitorStore(pool, {
       maxCalls: config.binotelMonitor && config.binotelMonitor.maxStoredCalls
     }),
+    telegramStore: new PostgresTelegramStore(pool),
     recordingCacheStore: new PostgresRecordingCacheStore(pool),
     async close() {
       await pool.end();
@@ -1531,6 +2760,8 @@ module.exports = {
   PostgresCallSummaryStore,
   PostgresLocalNotesStore,
   PostgresRecordingCacheStore,
+  PostgresTelegramStore,
   createAppStateDatabase,
-  createAppStatePool
+  createAppStatePool,
+  nextTelegramAccountStatus
 };

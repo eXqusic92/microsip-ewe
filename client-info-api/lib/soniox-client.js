@@ -3,6 +3,20 @@
 const { DOMAIN_TERMS, TRANSCRIPTION_DOMAIN_PROMPT } = require("./ai-prompts");
 
 const DEFAULT_SONIOX_ASYNC_MODEL = "stt-async-v5";
+const MINIMAL_DOMAIN_TERMS = [
+  "DUMA",
+  "East West Eurolines",
+  "Іст Вест Євролайнс",
+  "EWE",
+  "бронювання",
+  "викуп",
+  "перенесення",
+  "повернення",
+  "скасування",
+  "посадка",
+  "автовокзал",
+  "АС"
+];
 
 function text(value) {
   return value === null || value === undefined ? "" : String(value).trim();
@@ -86,6 +100,54 @@ function sonioxErrorMessage(data, fallback) {
   const base = [errorType, message].filter(Boolean).join(": ") || fallback;
 
   return requestId ? `${base} (request_id: ${requestId})` : base;
+}
+
+function sonioxContext(mode) {
+  const contextMode = text(mode || "minimal").toLowerCase();
+
+  if (contextMode === "none") {
+    return null;
+  }
+
+  if (contextMode === "full") {
+    return {
+      general: [
+        {
+          key: "organization",
+          value: "DUMA / East West Eurolines"
+        },
+        {
+          key: "setting",
+          value: "Phone conversation between a bus company operator and a customer"
+        },
+        {
+          key: "topic",
+          value: "Bus routes, schedules, tickets, booking, changes, returns, baggage and boarding"
+        },
+        {
+          key: "languages",
+          value: "Mostly Ukrainian, sometimes Russian or English"
+        },
+        {
+          key: "speakers",
+          value: "Usually 2 primary speakers: company operator and customer. Background voices or third parties may appear."
+        }
+      ],
+      text: TRANSCRIPTION_DOMAIN_PROMPT,
+      terms: DOMAIN_TERMS
+    };
+  }
+
+  return {
+    general: [
+      {
+        key: "domain",
+        value:
+          "Phone calls of bus company DUMA / East West Eurolines: tickets, routes, booking, baggage, boarding, returns and schedule changes."
+      }
+    ],
+    terms: MINIMAL_DOMAIN_TERMS
+  };
 }
 
 function formatTimestamp(value) {
@@ -412,34 +474,13 @@ class SonioxClient {
         enable_speaker_diarization:
           this.config.enableSpeakerDiarization !== false,
         enable_language_identification:
-          this.config.enableLanguageIdentification !== false,
-        context: {
-          general: [
-            {
-              key: "organization",
-              value: "DUMA / East West Eurolines"
-            },
-            {
-              key: "setting",
-              value: "Phone conversation between a bus company operator and a customer"
-            },
-            {
-              key: "topic",
-              value: "Bus routes, schedules, tickets, booking, changes, returns, baggage and boarding"
-            },
-            {
-              key: "languages",
-              value: "Mostly Ukrainian, sometimes Russian or English"
-            },
-            {
-              key: "speakers",
-              value: "Usually 2 primary speakers: company operator and customer. Background voices or third parties may appear."
-            }
-          ],
-          text: TRANSCRIPTION_DOMAIN_PROMPT,
-          terms: DOMAIN_TERMS
-        }
+          this.config.enableLanguageIdentification !== false
       };
+      const context = sonioxContext(this.config.contextMode);
+
+      if (context) {
+        body.context = context;
+      }
 
       if (options.callId) {
         body.client_reference_id = String(options.callId).slice(0, 256);

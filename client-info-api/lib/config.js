@@ -88,6 +88,11 @@ function parseUnixTimestamp(value, fallback = 0) {
   return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : fallback;
 }
 
+function parseChoice(value, choices, fallback) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return choices.includes(normalized) ? normalized : fallback;
+}
+
 const host = process.env.HOST || "0.0.0.0";
 const port = Number(process.env.PORT || 3000);
 const demoMode = String(process.env.DEMO_MODE || "auto").toLowerCase();
@@ -96,6 +101,17 @@ const binotelSecret = process.env.BINOTEL_SECRET || "";
 const openAiKey = process.env.OPENAI_API_KEY || "";
 const sonioxKey = process.env.SONIOX_API_KEY || "";
 const appStateDbPassword = process.env.APP_STATE_DB_PASSWORD || "";
+const dispatcherApiBaseUrl = process.env.DISPATCHER_API_BASE_URL || "";
+const dispatcherApiUsername = process.env.DISPATCHER_API_USERNAME || "";
+const dispatcherApiPassword = process.env.DISPATCHER_API_PASSWORD || "";
+const telegramApiId = Number(process.env.TELEGRAM_API_ID || 0);
+const telegramApiHash = process.env.TELEGRAM_API_HASH || "";
+const viberDbPath = process.env.VIBER_DB_PATH || "";
+const viberReaderBin = process.env.VIBER_READER_BIN
+  ? (path.isAbsolute(process.env.VIBER_READER_BIN)
+    ? process.env.VIBER_READER_BIN
+    : path.resolve(__dirname, "..", process.env.VIBER_READER_BIN))
+  : path.resolve(__dirname, "..", "bin", "viber-reader");
 const transcriptionAudioPreprocessing = parseBoolean(
   process.env.TRANSCRIPTION_AUDIO_PREPROCESSING,
   true
@@ -183,6 +199,64 @@ module.exports = {
       8
     )
   },
+  dispatcherApi: {
+    enabled: parseBoolean(
+      process.env.DISPATCHER_API_ENABLED,
+      Boolean(dispatcherApiBaseUrl && dispatcherApiUsername && dispatcherApiPassword)
+    ),
+    baseUrl: dispatcherApiBaseUrl,
+    username: dispatcherApiUsername,
+    password: dispatcherApiPassword,
+    timeoutMillis: parsePositiveNumber(process.env.DISPATCHER_API_TIMEOUT_MS, 5000),
+    cacheTtlMillis: parsePositiveNumber(
+      process.env.DISPATCHER_API_CACHE_TTL_MS,
+      60000
+    )
+  },
+  telegram: {
+    enabled: parseBoolean(
+      process.env.TELEGRAM_ENABLED,
+      Boolean(telegramApiId && telegramApiHash)
+    ),
+    apiId: telegramApiId,
+    apiHash: telegramApiHash,
+    connectionRetries: Number(process.env.TELEGRAM_CONNECTION_RETRIES || 5),
+    requestTimeoutMs: parsePositiveNumber(
+      process.env.TELEGRAM_REQUEST_TIMEOUT_MS,
+      20000
+    ),
+    failureCooldownMs: parsePositiveNumber(
+      process.env.TELEGRAM_FAILURE_COOLDOWN_MS,
+      60000
+    ),
+    accountLookupConcurrency: parsePositiveNumber(
+      process.env.TELEGRAM_ACCOUNT_LOOKUP_CONCURRENCY,
+      2
+    ),
+    contactCacheTtlMs: parsePositiveNumber(
+      process.env.TELEGRAM_CONTACT_CACHE_TTL_MS,
+      60 * 60 * 1000
+    ),
+    dialogLookupLimit: parsePositiveNumber(
+      process.env.TELEGRAM_DIALOG_LOOKUP_LIMIT,
+      150
+    ),
+    messageLimit: Number(process.env.TELEGRAM_MESSAGE_LIMIT || 50),
+    deviceModel: process.env.TELEGRAM_DEVICE_MODEL || "DUMA Client Info API",
+    systemVersion: process.env.TELEGRAM_SYSTEM_VERSION || "macOS",
+    appVersion: process.env.TELEGRAM_APP_VERSION || "1.0"
+  },
+  viber: {
+    enabled: parseBoolean(process.env.VIBER_ENABLED, Boolean(viberDbPath)),
+    dbPath: viberDbPath,
+    readerBin: viberReaderBin,
+    pluginPath:
+      process.env.VIBER_PLUGIN_PATH ||
+      "/Applications/Viber.app/Contents/PlugIns",
+    accountPhone: process.env.VIBER_ACCOUNT_PHONE || "",
+    dbKey: process.env.VIBER_DB_KEY || "",
+    messageLimit: Number(process.env.VIBER_MESSAGE_LIMIT || 50)
+  },
   binotel: {
     enabled: parseBoolean(
       process.env.BINOTEL_ENABLED,
@@ -217,7 +291,7 @@ module.exports = {
       process.env.BINOTEL_MONITOR_OVERLAP_SECONDS,
       300
     ),
-    maxStoredCalls: parsePositiveNumber(
+    maxStoredCalls: parseNonNegativeNumber(
       process.env.BINOTEL_MONITOR_MAX_STORED_CALLS,
       2000
     ),
@@ -279,6 +353,11 @@ module.exports = {
     apiKey: sonioxKey,
     baseUrl: process.env.SONIOX_BASE_URL || "https://api.soniox.com/v1",
     model: process.env.SONIOX_MODEL || "stt-async-v5",
+    contextMode: parseChoice(
+      process.env.SONIOX_CONTEXT_MODE,
+      ["none", "minimal", "full"],
+      "minimal"
+    ),
     languageHints: parseCsv(process.env.SONIOX_LANGUAGE_HINTS, [
       "uk",
       "ru",

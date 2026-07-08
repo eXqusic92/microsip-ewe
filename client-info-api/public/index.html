@@ -21,7 +21,7 @@
     </script>
     <title>Картка клієнта | DUMA</title>
     <link rel="icon" href="/duma-logo.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/styles.css?v=20260609-quality-score-3">
+    <link rel="stylesheet" href="/styles.css?v=20260707-call-filters">
   </head>
   <body>
     <header class="app-header">
@@ -32,10 +32,9 @@
         <nav class="app-tabs" aria-label="Основна навігація">
           <a href="/client-card" data-view-link="client-card">Картка</a>
           <a href="/calls-monitor" data-view-link="calls-monitor">Дзвінки</a>
+          <a href="/call-stats" data-view-link="call-stats">Статистика</a>
           <a href="/call-analytics" data-view-link="call-analytics">AI-аналітика</a>
-          <a href="/ai-settings" data-view-link="ai-settings">AI-налаштування</a>
         </nav>
-        <h1 id="page-title">Картка клієнта</h1>
       </div>
 
       <div class="header-actions">
@@ -57,9 +56,18 @@
           <button class="primary-button" type="submit">Знайти</button>
         </form>
 
-        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Перемкнути тему">
-          <span class="theme-toggle-track" aria-hidden="true"><span></span></span>
-          <span id="theme-toggle-label">Темна тема</span>
+        <button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle aria-label="Перемкнути тему">
+          <span class="theme-toggle-option is-sun" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/>
+            </svg>
+          </span>
+          <span class="theme-toggle-option is-moon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>
+            </svg>
+          </span>
         </button>
 
         <div class="profile-menu" id="profile-menu">
@@ -84,8 +92,16 @@
                 <small id="profile-menu-role">Користувач</small>
               </span>
             </div>
+            <div class="profile-menu-divider"></div>
+            <a class="profile-menu-item" href="/ai-settings" role="menuitem" data-view-link="ai-settings">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+              </svg>
+              <span>AI-налаштування</span>
+            </a>
             <div class="profile-menu-divider" data-profile-admin-only hidden></div>
-            <a class="profile-menu-item" href="/admin" role="menuitem" data-profile-admin-only hidden>
+            <a class="profile-menu-item" href="/admin" role="menuitem" data-view-link="admin" data-profile-admin-only hidden>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M3 21h18"></path>
                 <path d="M5 21V7l8-4v18"></path>
@@ -147,7 +163,6 @@
               <span id="client-email">Email не вказаний</span>
             </div>
           </div>
-          <div class="source-indicator" id="source-indicator"></div>
         </div>
 
         <div class="profile-grid">
@@ -178,66 +193,181 @@
           <div class="upcoming-trip" id="upcoming-trip"></div>
         </section>
 
-        <section class="calls-section">
-          <div class="section-heading">
-            <div>
-              <p class="section-label">Телефонія</p>
-              <h2>Дзвінки Binotel</h2>
-            </div>
-            <span class="muted" id="call-count-label"></span>
+        <div class="content-grid">
+          <div class="client-main-stack">
+            <section class="tickets-section">
+              <div class="section-heading">
+                <div>
+                  <p class="section-label">Історія</p>
+                  <h2>Останні замовлення</h2>
+                </div>
+                <span class="muted" id="ticket-count-label"></span>
+              </div>
+
+              <div class="ticket-list" id="ticket-list"></div>
+            </section>
+
+            <section class="calls-section">
+              <div class="section-heading">
+                <div>
+                  <p class="section-label">Телефонія</p>
+                  <h2>Дзвінки Binotel</h2>
+                </div>
+                <span class="muted" id="call-count-label"></span>
+              </div>
+
+              <article class="ai-summary-card" id="ai-summary-card">
+                <div class="ai-summary-head">
+                  <div>
+                    <p class="section-label">AI-підсумок</p>
+                    <h3>Останній записаний дзвінок</h3>
+                  </div>
+                  <span class="status" id="ai-summary-status">—</span>
+                </div>
+                <p class="ai-summary-text" id="ai-summary-text">
+                  Очікуємо дані дзвінка…
+                </p>
+                <div class="ai-summary-details" id="ai-summary-details"></div>
+              </article>
+
+              <div class="call-list" id="call-list"></div>
+            </section>
           </div>
 
-          <article class="ai-summary-card" id="ai-summary-card">
-            <div class="ai-summary-head">
-              <div>
-                <p class="section-label">AI-підсумок</p>
-                <h3>Останній записаний дзвінок</h3>
+          <div class="client-side-stack">
+            <section class="telegram-section messaging-section">
+              <div class="section-heading">
+                <div>
+                  <p class="section-label">Переписки</p>
+                  <h2>Чат з клієнтом</h2>
+                </div>
+                <div class="messaging-tabs" id="messaging-tabs" role="tablist" aria-label="Канал переписки">
+                  <button
+                    class="messaging-tab is-active"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="telegram-panel"
+                    data-messaging-tab="telegram"
+                  >Telegram</button>
+                  <button
+                    class="messaging-tab hidden"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-hidden="true"
+                    aria-controls="viber-panel"
+                    data-messaging-tab="viber"
+                    tabindex="-1"
+                    disabled
+                  >Viber</button>
+                </div>
               </div>
-              <span class="status" id="ai-summary-status">—</span>
-            </div>
-            <p class="ai-summary-text" id="ai-summary-text">
-              Очікуємо дані дзвінка…
-            </p>
-            <div class="ai-summary-details" id="ai-summary-details"></div>
-          </article>
 
-          <div class="call-list" id="call-list"></div>
-        </section>
+              <div class="messaging-panel" id="telegram-panel" data-messaging-panel="telegram" role="tabpanel">
+                <div class="messaging-panel-toolbar">
+                  <div class="messaging-channel-title">
+                    <strong>Telegram</strong>
+                    <span>Активний акаунт</span>
+                  </div>
+                  <div class="telegram-head-actions">
+                    <div class="telegram-account-dropdown" id="telegram-account-dropdown">
+                      <button
+                        class="telegram-account-trigger"
+                        id="telegram-account-trigger"
+                        type="button"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        disabled
+                      >
+                        <span class="telegram-account-trigger-main">
+                          <strong id="telegram-account-label">Telegram</strong>
+                          <small id="telegram-account-status">Не завантажено</small>
+                        </span>
+                        <span class="telegram-account-chevron" aria-hidden="true">⌄</span>
+                      </button>
+                      <div
+                        class="telegram-account-menu hidden"
+                        id="telegram-account-menu"
+                        role="listbox"
+                        aria-label="Telegram акаунт"
+                      ></div>
+                    </div>
+                    <button class="secondary-button telegram-refresh" id="telegram-refresh" type="button">Оновити</button>
+                  </div>
+                </div>
 
-        <div class="content-grid">
-          <section class="tickets-section">
-            <div class="section-heading">
-              <div>
-                <p class="section-label">Історія</p>
-                <h2>Останні квитки</h2>
+                <div class="telegram-thread hidden" id="telegram-thread" aria-live="polite"></div>
+
+                <div class="telegram-chat" id="telegram-chat">
+                  <div class="telegram-empty">Telegram ще не завантажено.</div>
+                </div>
+
+                <form class="telegram-compose" id="telegram-compose">
+                  <div class="telegram-reply-bar hidden" id="telegram-reply-bar">
+                    <div>
+                      <span>Відповідь</span>
+                      <strong id="telegram-reply-title"></strong>
+                    </div>
+                    <button type="button" id="telegram-reply-cancel" aria-label="Скасувати відповідь">×</button>
+                  </div>
+                  <label class="sr-only" for="telegram-message">Повідомлення Telegram</label>
+                  <textarea
+                    id="telegram-message"
+                    maxlength="4096"
+                    rows="2"
+                    placeholder="Написати в Telegram…"
+                  ></textarea>
+                  <button class="primary-button" id="telegram-send" type="submit">Надіслати</button>
+                </form>
+                <p class="form-message" id="telegram-message-status" aria-live="polite"></p>
               </div>
-              <span class="muted" id="ticket-count-label"></span>
-            </div>
 
-            <div class="ticket-list" id="ticket-list"></div>
-          </section>
+              <div
+                class="messaging-panel hidden"
+                id="viber-panel"
+                data-messaging-panel="viber"
+                role="tabpanel"
+              >
+                <div class="messaging-panel-toolbar">
+                  <div class="messaging-channel-title">
+                    <strong>Viber</strong>
+                    <span>Локальна база</span>
+                  </div>
+                  <button class="secondary-button viber-refresh" id="viber-refresh" type="button">Оновити</button>
+                </div>
 
-          <aside class="notes-section">
-            <div class="section-heading">
-              <div>
-                <p class="section-label">Для операторів</p>
-                <h2>Примітки</h2>
+                <div class="telegram-thread hidden viber-thread" id="viber-thread" aria-live="polite"></div>
+
+                <div class="telegram-chat viber-chat" id="viber-chat">
+                  <div class="telegram-empty">Viber ще не завантажено.</div>
+                </div>
+                <p class="form-message" id="viber-message-status" aria-live="polite"></p>
               </div>
-            </div>
+            </section>
 
-            <form class="note-form" id="note-form">
-              <label class="sr-only" for="note-text">Нова примітка</label>
-              <textarea
-                id="note-text"
-                maxlength="2000"
-                placeholder="Додати важливу інформацію про клієнта…"
-              ></textarea>
-              <button class="primary-button" type="submit">Додати примітку</button>
-              <p class="form-message" id="note-message" aria-live="polite"></p>
-            </form>
+            <aside class="notes-section">
+              <div class="section-heading">
+                <div>
+                  <p class="section-label">Для операторів</p>
+                  <h2>Примітки</h2>
+                </div>
+              </div>
 
-            <div class="notes-list" id="notes-list"></div>
-          </aside>
+              <form class="note-form" id="note-form">
+                <label class="sr-only" for="note-text">Нова примітка</label>
+                <textarea
+                  id="note-text"
+                  maxlength="2000"
+                  placeholder="Додати важливу інформацію про клієнта…"
+                ></textarea>
+                <button class="primary-button" type="submit">Додати примітку</button>
+                <p class="form-message" id="note-message" aria-live="polite"></p>
+              </form>
+
+              <div class="notes-list" id="notes-list"></div>
+            </aside>
+          </div>
         </div>
       </section>
 
@@ -276,6 +406,21 @@
           <form class="monitor-toolbar" id="monitor-search" role="search">
             <label class="sr-only" for="monitor-query">Пошук у дзвінках</label>
             <input id="monitor-query" name="q" placeholder="Номер, оператор або Binotel ID">
+            <label class="monitor-filter-select">
+              <span>AI-тип</span>
+              <select id="monitor-call-type-filter">
+                <option value="">Усі типи</option>
+                <option value="__none">Без типу</option>
+              </select>
+            </label>
+            <label class="monitor-filter-select">
+              <span>Проблеми</span>
+              <select id="monitor-problem-filter">
+                <option value="">Усі дзвінки</option>
+                <option value="escalation">Ескалація</option>
+                <option value="churnRisk">Ризик втрати</option>
+              </select>
+            </label>
             <label class="monitor-page-size">
               <span>На сторінці</span>
               <select id="monitor-page-size">
@@ -296,6 +441,205 @@
             <button class="secondary-button" id="monitor-next-page" type="button">Вперед</button>
             <span class="muted" id="monitor-page-info"></span>
           </nav>
+        </section>
+      </section>
+
+      <section class="call-stats-page hidden" id="call-stats-page" aria-live="polite">
+        <div class="monitor-hero call-stats-hero">
+          <div>
+            <p class="section-label">Binotel analytics</p>
+            <h1>Статистика дзвінків</h1>
+            <p>Операційна картина телефонії: навантаження, тривалість, активні години, менеджери, лінії та повторні контакти.</p>
+          </div>
+          <form class="call-stats-filter" id="call-stats-filter">
+            <label>
+              <span>Період</span>
+              <select id="call-stats-period">
+                <option value="today">Сьогодні</option>
+                <option value="7">7 днів</option>
+                <option value="30" selected>30 днів</option>
+                <option value="90">90 днів</option>
+                <option value="180">180 днів</option>
+                <option value="all">Весь час</option>
+                <option value="custom">Власний</option>
+              </select>
+            </label>
+            <label>
+              <span>Від</span>
+              <input id="call-stats-from" type="date">
+            </label>
+            <label>
+              <span>До</span>
+              <input id="call-stats-to" type="date">
+            </label>
+            <button class="primary-button" type="submit">Оновити</button>
+          </form>
+        </div>
+
+        <section class="monitor-panel call-stats-panel">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Підсумок</p>
+              <h2>Загальна активність</h2>
+            </div>
+            <span class="muted" id="call-stats-range">—</span>
+          </div>
+
+          <div class="call-stats-summary">
+            <div>
+              <span>Усі дзвінки</span>
+              <strong id="call-stats-total">0</strong>
+              <small id="call-stats-total-caption">—</small>
+            </div>
+            <div>
+              <span>Вхідні</span>
+              <strong id="call-stats-incoming">0</strong>
+              <small id="call-stats-incoming-caption">—</small>
+            </div>
+            <div>
+              <span>Вихідні</span>
+              <strong id="call-stats-outgoing">0</strong>
+              <small id="call-stats-outgoing-caption">—</small>
+            </div>
+            <div>
+              <span>Відповіді</span>
+              <strong id="call-stats-answer-rate">0%</strong>
+              <small id="call-stats-answer-caption">—</small>
+            </div>
+            <div>
+              <span>Розмови</span>
+              <strong id="call-stats-talk-time">0 хв</strong>
+              <small id="call-stats-talk-caption">—</small>
+            </div>
+            <div>
+              <span>Середня розмова</span>
+              <strong id="call-stats-avg-duration">—</strong>
+              <small id="call-stats-avg-wait">—</small>
+            </div>
+            <div>
+              <span>Клієнтів</span>
+              <strong id="call-stats-customers">0</strong>
+              <small id="call-stats-customers-caption">унікальні номери</small>
+            </div>
+            <div>
+              <span>Записи</span>
+              <strong id="call-stats-recordings">0</strong>
+              <small id="call-stats-recordings-caption">мають запис/кеш</small>
+            </div>
+          </div>
+          <div class="call-stats-focus" id="call-stats-focus">
+            <div>
+              <span>Обраний зріз</span>
+              <strong id="call-stats-focus-title">Загальна вибірка</strong>
+              <small id="call-stats-focus-subtitle">—</small>
+            </div>
+            <div class="call-stats-focus-metrics" id="call-stats-focus-metrics"></div>
+          </div>
+        </section>
+
+        <section class="call-stats-grid">
+          <article class="call-stats-card call-stats-card-wide">
+            <div class="call-stats-card-head">
+              <div>
+                <p class="section-label">Динаміка</p>
+                <h2>Дзвінки по днях</h2>
+              </div>
+            </div>
+            <div class="call-stats-chart-wrap">
+              <canvas id="call-stats-daily-chart"></canvas>
+            </div>
+          </article>
+
+          <article class="call-stats-card">
+            <div class="call-stats-card-head">
+              <div>
+                <p class="section-label">Години</p>
+                <h2>Навантаження</h2>
+              </div>
+            </div>
+            <div class="call-stats-chart-wrap">
+              <canvas id="call-stats-hourly-chart"></canvas>
+            </div>
+          </article>
+
+          <article class="call-stats-card">
+            <div class="call-stats-card-head">
+              <div>
+                <p class="section-label">Напрямки</p>
+                <h2>Вхідні / вихідні</h2>
+              </div>
+            </div>
+            <div class="call-stats-chart-wrap">
+              <canvas id="call-stats-direction-chart"></canvas>
+            </div>
+          </article>
+
+          <article class="call-stats-card">
+            <div class="call-stats-card-head">
+              <div>
+                <p class="section-label">Статуси</p>
+                <h2>Результати дзвінків</h2>
+              </div>
+            </div>
+            <div class="call-stats-chart-wrap">
+              <canvas id="call-stats-disposition-chart"></canvas>
+            </div>
+          </article>
+
+          <article class="call-stats-card">
+            <div class="call-stats-card-head">
+              <div>
+                <p class="section-label">Тривалість</p>
+                <h2>Сегменти розмов</h2>
+              </div>
+            </div>
+            <div class="call-stats-chart-wrap">
+              <canvas id="call-stats-duration-chart"></canvas>
+            </div>
+          </article>
+
+          <article class="call-stats-card call-stats-card-wide">
+            <div class="call-stats-card-head">
+              <div>
+                <p class="section-label">Пікові години</p>
+                <h2>Активність по днях і годинах</h2>
+              </div>
+            </div>
+            <div class="call-stats-heatmap" id="call-stats-heatmap"></div>
+          </article>
+        </section>
+
+        <section class="call-stats-card call-stats-table-card">
+          <div class="call-stats-card-head">
+            <div>
+              <p class="section-label">Менеджери</p>
+              <h2>Аналітика по операторах</h2>
+            </div>
+          </div>
+          <div class="call-stats-table-wrap">
+            <table class="call-stats-table" id="call-stats-managers"></table>
+          </div>
+        </section>
+
+        <section class="call-stats-bottom-grid">
+          <article class="call-stats-card">
+            <div class="call-stats-card-head">
+              <div>
+                <p class="section-label">Лінії</p>
+                <h2>Внутрішні номери</h2>
+              </div>
+            </div>
+            <div class="call-stats-list" id="call-stats-lines"></div>
+          </article>
+          <article class="call-stats-card">
+            <div class="call-stats-card-head">
+              <div>
+                <p class="section-label">Сигнали</p>
+                <h2>Операційні метрики</h2>
+              </div>
+            </div>
+            <div class="call-stats-list" id="call-stats-insights"></div>
+          </article>
         </section>
       </section>
 
@@ -376,6 +720,18 @@
           <p class="no-data hidden" id="customer-question-empty">
             За вибраний період AI ще не виділив типові питання клієнтів.
           </p>
+
+          <div class="analytics-subsection manager-rating-heading">
+            <div>
+              <p class="section-label">Рейтинг менеджерів</p>
+              <h2>Хто найкраще справляється з дзвінками</h2>
+            </div>
+            <div class="manager-rating-summary" id="manager-rating-summary" aria-live="polite"></div>
+          </div>
+          <div class="manager-rating-table" id="manager-rating-table" aria-live="polite"></div>
+          <p class="no-data hidden" id="manager-rating-empty">
+            За вибраний період ще немає оцінених метрик по менеджерах.
+          </p>
         </section>
       </section>
 
@@ -383,10 +739,10 @@
         <div id="ai-settings-tab-ai">
           <div class="ai-soldly-hero" id="ai-settings-list-hero">
             <div class="ai-hero-title">
-              <span class="ai-hero-icon" aria-hidden="true"></span>
               <div>
-                <h1>Інструкції для метрик</h1>
-                <p>Оберіть тип дзвінка, відкрийте метрику і налаштуйте, як AI має її оцінювати.</p>
+                <p class="section-label">Налаштування якості</p>
+                <h1>Правила оцінювання дзвінків</h1>
+                <p>Оберіть тип дзвінка, відкрийте метрику і налаштуйте критерії оцінювання для операторів.</p>
               </div>
             </div>
           </div>
@@ -394,8 +750,8 @@
           <div class="ai-soldly-hero hidden" id="ai-settings-detail-hero">
             <button class="ai-hero-back" type="button" data-ai-action="back-to-types" aria-label="Назад до типів"></button>
             <div class="ai-hero-title ai-hero-title-stack">
-              <span class="ai-hero-icon" aria-hidden="true"></span>
               <div>
+                <p class="section-label">Тип дзвінка</p>
                 <h1 id="ai-detail-title">Тип дзвінка</h1>
                 <p id="ai-detail-description">Опис типу аналізу.</p>
               </div>
@@ -432,10 +788,8 @@
             <div class="ai-detail-grid ai-detail-grid-single">
               <section class="ai-detail-main">
                 <div class="ai-metrics-head">
-                  <div class="ai-metrics-title">
-                    <span class="ai-check-badge" aria-hidden="true"></span>
-                    <span class="ai-target-badge" aria-hidden="true"></span>
-                    <h2>Ваші метрики</h2>
+                <div class="ai-metrics-title">
+                    <h2>Метрики оцінювання</h2>
                     <span class="ai-count-pill" id="ai-metric-count">0/0</span>
                   </div>
                   <button class="ai-gradient-button" id="ai-add-metric" type="button" data-ai-action="add-metric">
@@ -463,7 +817,7 @@
             <div class="ai-dialog-body">
               <div class="ai-modal-top-row">
                 <label>
-                  <span>Назва метрики <span class="ai-help-dot" aria-hidden="true"></span></span>
+                  <span>Назва метрики</span>
                   <input id="ai-modal-metric-label" type="text" placeholder="Наприклад: Привітання">
                 </label>
                 <label>
@@ -485,17 +839,17 @@
               </div>
 
               <label class="ai-dialog-field">
-                <span>Група <span class="ai-help-dot" aria-hidden="true"></span></span>
+                <span>Група</span>
                 <input id="ai-modal-metric-group" type="text" placeholder="Наприклад: Етап привітання">
               </label>
 
               <label class="ai-dialog-field">
-                <span>Опис <span class="ai-help-dot" aria-hidden="true"></span></span>
+                <span>Опис</span>
                 <textarea id="ai-modal-metric-description" rows="3" placeholder="Наприклад: Чи представив менеджер себе на початку дзвінка"></textarea>
               </label>
 
               <label class="ai-dialog-field">
-                <span>Деталі для AI <b>AI</b> <span class="ai-help-dot" aria-hidden="true"></span></span>
+                <span>Інструкція для оцінювання</span>
                 <textarea id="ai-modal-metric-instructions" rows="3"></textarea>
               </label>
 
@@ -505,7 +859,7 @@
                     <span class="ai-js-icon" data-icon="zap"></span>
                     <div>
                       <h3>Варіанти відповідей</h3>
-                      <p>AI обере найбільше відповідний варіант</p>
+                      <p>Система обере найбільш відповідний варіант під час аналізу дзвінка.</p>
                     </div>
                   </div>
                   <button type="button" id="ai-modal-add-option">
@@ -560,8 +914,8 @@
         <div class="admin-hero">
           <div>
             <p class="section-label">Адмінка</p>
-            <h1>Користувачі</h1>
-            <p>Облікові записи для доступу до Client Info API.</p>
+            <h1 id="admin-title">Користувачі</h1>
+            <p id="admin-description">Облікові записи для доступу до Client Info API.</p>
           </div>
           <button class="primary-button admin-add-user" id="admin-add-user" type="button">
             Додати користувача
@@ -569,10 +923,12 @@
         </div>
 
         <div class="admin-tabs" aria-label="Розділи адмінки">
-          <button class="active" type="button">Користувачі</button>
+          <button class="active" type="button" data-admin-tab="users">Користувачі</button>
+          <button type="button" data-admin-tab="analysis-numbers">AI-номери</button>
+          <button type="button" data-admin-tab="telegram">Telegram</button>
         </div>
 
-        <section class="admin-panel">
+        <section class="admin-panel" id="admin-users-panel" data-admin-panel="users">
           <div class="section-heading">
             <div>
               <p class="section-label">Доступ</p>
@@ -582,6 +938,48 @@
           </div>
           <p class="form-message" id="admin-users-message" aria-live="polite"></p>
           <div class="admin-users-list" id="admin-users-list"></div>
+        </section>
+
+        <section class="admin-panel hidden" id="admin-analysis-numbers-panel" data-admin-panel="analysis-numbers">
+          <div class="section-heading admin-number-heading">
+            <div>
+              <p class="section-label">AI-аналіз</p>
+              <h2>Внутрішні номери</h2>
+            </div>
+            <span class="muted" id="admin-analysis-number-count">—</span>
+          </div>
+          <div class="admin-panel-actions">
+            <button class="secondary-button" id="admin-analysis-enable-all" type="button">Увімкнути всі</button>
+            <button class="secondary-button" id="admin-analysis-disable-all" type="button">Вимкнути всі</button>
+            <button class="primary-button" id="admin-analysis-numbers-save" type="button">Зберегти</button>
+          </div>
+          <p class="form-message" id="admin-analysis-numbers-message" aria-live="polite"></p>
+          <div class="admin-numbers-list" id="admin-analysis-numbers-list"></div>
+        </section>
+
+        <section class="admin-panel hidden" id="admin-telegram-panel" data-admin-panel="telegram">
+          <div class="section-heading admin-number-heading">
+            <div>
+              <p class="section-label">Telegram User API</p>
+              <h2>Акаунти для пошуку переписок</h2>
+            </div>
+            <span class="muted" id="admin-telegram-count">—</span>
+          </div>
+
+          <form class="admin-telegram-add" id="admin-telegram-form">
+            <label>
+              <span>Назва</span>
+              <input id="admin-telegram-label" type="text" placeholder="Наприклад: Основний акаунт">
+            </label>
+            <label>
+              <span>Телефон акаунта</span>
+              <input id="admin-telegram-phone" type="tel" placeholder="+380..." required>
+            </label>
+            <button class="primary-button" id="admin-telegram-add" type="submit">Додати акаунт</button>
+          </form>
+
+          <p class="form-message" id="admin-telegram-message" aria-live="polite"></p>
+          <div class="admin-telegram-list" id="admin-telegram-list"></div>
         </section>
       </section>
 
@@ -634,7 +1032,7 @@
         </section>
 
         <div class="call-detail-grid">
-          <article class="detail-panel">
+          <article class="detail-panel call-ai-panel">
             <div class="section-heading">
               <div>
                 <p class="section-label">AI-аналіз</p>
@@ -646,6 +1044,34 @@
             </div>
             <p class="detail-summary" id="detail-summary">AI-підсумок ще готується.</p>
             <div class="detail-analysis-list" id="detail-analysis-list"></div>
+            <section class="detail-transcript-block transcript-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="section-label">Транскрипція</p>
+                  <h2>Текст розмови</h2>
+                </div>
+                <span class="muted" id="detail-language"></span>
+              </div>
+              <div class="detail-audio" id="detail-audio-wrap">
+                <audio id="detail-audio" preload="auto"></audio>
+                <div class="audio-player" id="detail-audio-player">
+                  <div class="audio-visual" id="detail-audio-visual" role="button" tabindex="0" aria-label="Перемотати запис">
+                    <canvas id="detail-audio-canvas" aria-hidden="true"></canvas>
+                    <button class="audio-play-button" id="detail-audio-play" type="button" aria-label="Відтворити запис">
+                      <span id="detail-audio-play-icon">▶</span>
+                    </button>
+                  </div>
+                  <div class="audio-controls">
+                    <span class="audio-time" id="detail-audio-current">0:00</span>
+                    <input id="detail-audio-progress" class="audio-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Позиція відтворення">
+                    <span class="audio-time" id="detail-audio-duration">0:00</span>
+                    <button class="audio-speed" id="detail-audio-speed" type="button">1×</button>
+                  </div>
+                </div>
+                <p id="detail-audio-status">Перевіряємо доступність запису…</p>
+              </div>
+              <div class="transcript-list" id="detail-transcript"></div>
+            </section>
           </article>
           <article class="detail-panel call-quality-panel">
             <div class="section-heading">
@@ -661,35 +1087,6 @@
             <div class="quality-notes" id="detail-quality-notes"></div>
           </article>
         </div>
-
-        <section class="detail-panel transcript-panel">
-          <div class="section-heading">
-            <div>
-              <p class="section-label">Транскрипція</p>
-              <h2>Текст розмови</h2>
-            </div>
-            <span class="muted" id="detail-language"></span>
-          </div>
-          <div class="detail-audio" id="detail-audio-wrap">
-            <audio id="detail-audio" preload="auto"></audio>
-            <div class="audio-player" id="detail-audio-player">
-              <div class="audio-visual" id="detail-audio-visual" role="button" tabindex="0" aria-label="Перемотати запис">
-                <canvas id="detail-audio-canvas" aria-hidden="true"></canvas>
-                <button class="audio-play-button" id="detail-audio-play" type="button" aria-label="Відтворити запис">
-                  <span id="detail-audio-play-icon">▶</span>
-                </button>
-              </div>
-              <div class="audio-controls">
-                <span class="audio-time" id="detail-audio-current">0:00</span>
-                <input id="detail-audio-progress" class="audio-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Позиція відтворення">
-                <span class="audio-time" id="detail-audio-duration">0:00</span>
-                <button class="audio-speed" id="detail-audio-speed" type="button">1×</button>
-              </div>
-            </div>
-            <p id="detail-audio-status">Перевіряємо доступність запису…</p>
-          </div>
-          <div class="transcript-list" id="detail-transcript"></div>
-        </section>
 
         <section class="detail-panel">
           <div class="section-heading">
@@ -809,6 +1206,42 @@
       </div>
     </dialog>
 
+    <dialog class="telegram-photo-modal" id="telegram-photo-modal" aria-labelledby="telegram-photo-modal-title">
+      <div class="telegram-photo-modal-panel">
+        <header class="telegram-photo-modal-header">
+          <div>
+            <p class="section-label">Telegram</p>
+            <h2 id="telegram-photo-modal-title">Фото</h2>
+          </div>
+          <button class="modal-close" id="telegram-photo-modal-close" type="button" aria-label="Закрити">
+            ×
+          </button>
+        </header>
+        <div class="telegram-photo-modal-body">
+          <img id="telegram-photo-modal-image" src="/duma-logo.svg" alt="Telegram фото">
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="tickets-modal manager-rating-modal" id="manager-rating-modal" aria-labelledby="manager-rating-modal-title">
+      <div class="tickets-modal-panel manager-rating-modal-panel">
+        <header class="tickets-modal-header manager-rating-modal-header">
+          <div>
+            <p class="section-label">Рейтинг менеджера</p>
+            <h2 id="manager-rating-modal-title">Менеджер</h2>
+            <p id="manager-rating-modal-subtitle"></p>
+          </div>
+          <button class="modal-close" id="manager-rating-modal-close" type="button" aria-label="Закрити">
+            ×
+          </button>
+        </header>
+        <div class="manager-rating-modal-body">
+          <div class="manager-rating-modal-summary" id="manager-rating-modal-summary"></div>
+          <div class="manager-rating-modal-metrics" id="manager-rating-modal-metrics"></div>
+        </div>
+      </div>
+    </dialog>
+
     <template id="ticket-template">
       <article class="ticket-row">
         <div class="ticket-date">
@@ -836,9 +1269,9 @@
         <div class="ticket-price">
           <strong data-field="price"></strong>
           <span data-field="carrier"></span>
-          <a class="order-link" data-field="order-link" href="#" target="_blank" rel="noopener noreferrer">
-            Перейти в замовлення
-          </a>
+          <button class="order-link" data-field="order-link" type="button">
+            Відкрити замовлення
+          </button>
         </div>
       </article>
     </template>
@@ -850,21 +1283,10 @@
           <span data-field="time"></span>
         </div>
         <div class="call-main">
-          <div class="call-title">
-            <span class="call-direction-icon" data-field="direction-icon" aria-hidden="true"></span>
-            <strong data-field="direction"></strong>
-            <span class="status" data-field="disposition"></span>
-          </div>
-          <p data-field="operator"></p>
-          <div class="call-meta">
-            <span data-field="numbers"></span>
-            <span data-field="duration"></span>
-            <span data-field="recording"></span>
-          </div>
-        </div>
-        <div class="call-side">
-          <strong data-field="phone"></strong>
-          <span data-field="binotel-id"></span>
+          <span class="call-direction-icon" data-field="direction-icon" aria-hidden="true"></span>
+          <strong data-field="direction"></strong>
+          <span class="status" data-field="disposition"></span>
+          <span class="call-operator" data-field="operator"></span>
         </div>
       </a>
     </template>
@@ -877,6 +1299,7 @@
             <strong data-field="phone"></strong>
           </div>
           <span data-field="type"></span>
+          <div class="monitor-call-alerts" data-field="alerts" hidden></div>
         </div>
         <div class="monitor-call-fact">
           <span>Дата і час</span>
@@ -896,6 +1319,8 @@
       </a>
     </template>
 
-    <script src="/app.js?v=20260609-quality-score-3" defer></script>
+    <script src="/vendor/anime.umd.min.js" defer></script>
+    <script src="/vendor/chart.umd.min.js" defer></script>
+    <script src="/app.js?v=20260707-call-filters" defer></script>
   </body>
 </html>

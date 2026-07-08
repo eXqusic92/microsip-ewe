@@ -24,6 +24,7 @@ client-info-api/data*.zip
 client-info-api/data*.7z
 client-info-api/data*.rar
 client-info-api/data/recordings/
+client-info-api/bin/
 client-info-api/tmp/
 client-info-api/server.*.log
 

@@ -6,7 +6,6 @@ const message = document.querySelector("#login-message");
 const usernameInput = document.querySelector("#login-username");
 const passwordInput = document.querySelector("#login-password");
 const themeToggle = document.querySelector("#theme-toggle");
-const themeToggleLabel = document.querySelector("#theme-toggle-label");
 
 function currentTheme() {
   return document.body.dataset.theme === "dark" ? "dark" : "light";
@@ -19,7 +18,6 @@ function updateThemeControl() {
     isDark ? "Увімкнути світлу тему" : "Увімкнути темну тему"
   );
   themeToggle.setAttribute("aria-pressed", String(isDark));
-  themeToggleLabel.textContent = isDark ? "Світла тема" : "Темна тема";
 }
 
 function setTheme(theme, persist = true) {

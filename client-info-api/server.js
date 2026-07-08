@@ -12,11 +12,33 @@ const { createClientStore } = require("./lib/client-store");
 const { normalizePhone } = require("./lib/phone");
 const { BinotelMonitorService } = require("./lib/binotel-monitor-service");
 const { RecordingCache } = require("./lib/recording-cache");
+const { TelegramUserService } = require("./lib/telegram-service");
+const { ViberService } = require("./lib/viber-service");
 
 const publicDir = path.join(__dirname, "public");
+const animeBundlePath = path.join(
+  __dirname,
+  "node_modules",
+  "animejs",
+  "dist",
+  "bundles",
+  "anime.umd.min.js"
+);
+const chartBundlePath = path.join(
+  __dirname,
+  "node_modules",
+  "chart.js",
+  "dist",
+  "chart.umd.min.js"
+);
 const appStateDatabase = createAppStateDatabase(config);
 const authService = new AuthService(config, appStateDatabase.pool, sendJson);
 const store = createClientStore(config, appStateDatabase);
+const telegramService = new TelegramUserService(
+  config,
+  appStateDatabase.telegramStore
+);
+const viberService = new ViberService(config);
 const recordingCache = new RecordingCache(
   config,
   store.binotelClient,
@@ -55,12 +77,7 @@ function sendJson(res, statusCode, data) {
   res.end(body);
 }
 
-function sendFile(res, filename) {
-  const filePath = path.join(publicDir, filename);
-  const cacheControl = filename === "duma-logo.png" || filename === "duma-logo.svg"
-    ? "public, max-age=86400"
-    : "no-store";
-
+function sendDiskFile(res, filePath, cacheControl = "no-store") {
   fs.readFile(filePath, (error, body) => {
     if (error) {
       sendJson(res, error.code === "ENOENT" ? 404 : 500, {
@@ -71,13 +88,91 @@ function sendFile(res, filename) {
     }
 
     res.writeHead(200, {
-      "Content-Type": contentTypes[path.extname(filename)] || "application/octet-stream",
+      "Content-Type": contentTypes[path.extname(filePath)] || "application/octet-stream",
       "Content-Length": body.length,
       "Cache-Control": cacheControl,
       "X-Content-Type-Options": "nosniff"
     });
     res.end(body);
   });
+}
+
+function parseKyivDateBoundary(value, endExclusive = false) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const candidate = dateOnly
+    ? `${dateOnly[1]}-${dateOnly[2]}-${dateOnly[3]}T00:00:00+03:00`
+    : raw;
+  const parsed = new Date(candidate).getTime();
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  const time = dateOnly && endExclusive
+    ? parsed + 24 * 60 * 60 * 1000
+    : parsed;
+  return new Date(time).toISOString();
+}
+
+function kyivDateKey(timestamp = Date.now()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date(timestamp));
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return map.year && map.month && map.day ? `${map.year}-${map.month}-${map.day}` : "";
+}
+
+function callStatsPeriod(searchParams) {
+  const period = String(searchParams.get("period") || "30").trim();
+  const customFrom = parseKyivDateBoundary(searchParams.get("from"));
+  const customTo = parseKyivDateBoundary(searchParams.get("to"), true);
+  const now = Date.now();
+
+  if (period === "custom" && customFrom && customTo) {
+    return {
+      periodKey: "custom",
+      from: customFrom,
+      to: customTo
+    };
+  }
+
+  if (period === "today") {
+    return {
+      periodKey: period,
+      from: parseKyivDateBoundary(kyivDateKey(now)),
+      to: null
+    };
+  }
+
+  if (period === "all") {
+    return {
+      periodKey: period,
+      from: null,
+      to: null
+    };
+  }
+
+  const days = [7, 30, 90, 180].includes(Number(period)) ? Number(period) : 30;
+  return {
+    periodKey: String(days),
+    from: new Date(now - days * 24 * 60 * 60 * 1000).toISOString(),
+    to: null
+  };
+}
+
+function sendFile(res, filename) {
+  const cacheControl = filename === "duma-logo.png" || filename === "duma-logo.svg"
+    ? "public, max-age=86400"
+    : "no-store";
+
+  sendDiskFile(res, path.join(publicDir, filename), cacheControl);
 }
 
 function safeHeaderFilename(filename) {
@@ -164,6 +259,22 @@ function sendAudio(req, res, audio) {
     "Content-Length": size
   });
   res.end(audio.bytes);
+}
+
+function sendTelegramMedia(res, media) {
+  const bytes = media && media.bytes ? media.bytes : Buffer.alloc(0);
+  const contentType = media && media.contentType
+    ? media.contentType
+    : "application/octet-stream";
+  const filename = safeHeaderFilename((media && media.filename) || "telegram-media");
+  res.writeHead(200, {
+    "Content-Type": contentType,
+    "Cache-Control": "private, max-age=86400",
+    "Content-Disposition": `inline; filename="${filename}"`,
+    "Content-Length": bytes.length,
+    "X-Content-Type-Options": "nosniff"
+  });
+  res.end(bytes);
 }
 
 function readJsonBody(req, maxBytes = 32768) {
@@ -294,6 +405,16 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/vendor/anime.umd.min.js") {
+    sendDiskFile(res, animeBundlePath, "public, max-age=86400");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/vendor/chart.umd.min.js") {
+    sendDiskFile(res, chartBundlePath, "public, max-age=86400");
+    return;
+  }
+
   if (req.method === "GET" && requestUrl.pathname === "/") {
     if (!(await requirePageAuth(req, res, requestUrl))) {
       return;
@@ -311,6 +432,14 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/calls-monitor") {
+    if (!(await requirePageAuth(req, res, requestUrl))) {
+      return;
+    }
+    sendFile(res, "index.html");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/call-stats") {
     if (!(await requirePageAuth(req, res, requestUrl))) {
       return;
     }
@@ -388,6 +517,163 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (requestUrl.pathname === "/api/admin/analysis-internal-numbers") {
+    const auth = await authService.requireAdmin(req, res);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      if (req.method === "GET") {
+        sendJson(res, 200, {
+          ok: true,
+          ...(await binotelMonitorStore.analysisInternalNumbers())
+        });
+        return;
+      }
+
+      if (req.method === "PUT") {
+        const payload = await readJsonBody(req, 128 * 1024);
+        const numbers = Array.isArray(payload.numbers) ? payload.numbers : [];
+        const result = await binotelMonitorStore.updateAnalysisInternalNumbers(numbers);
+        if (typeof binotelMonitor.clearAnalyticsCache === "function") {
+          binotelMonitor.clearAnalyticsCache();
+        }
+        sendJson(res, 200, {
+          ok: true,
+          ...result
+        });
+        return;
+      }
+
+      res.writeHead(405, { Allow: "GET, PUT" });
+      res.end("Method not allowed");
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : 500;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: statusCode === 400 ? error.message : "analysis_numbers_failed"
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/admin/telegram/accounts") {
+    const auth = await authService.requireAdmin(req, res);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      if (req.method === "GET") {
+        sendJson(res, 200, await telegramService.adminAccounts());
+        return;
+      }
+
+      if (req.method === "POST") {
+        const payload = await readJsonBody(req);
+        sendJson(res, 201, await telegramService.createAccount(payload));
+        return;
+      }
+
+      res.writeHead(405, { Allow: "GET, POST" });
+      res.end("Method not allowed");
+    } catch (error) {
+      const statusCode = [
+        "invalid_json",
+        "request_body_too_large",
+        "telegram_phone_invalid"
+      ].includes(error.message)
+        ? 400
+        : 500;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: statusCode === 400 ? error.message : "telegram_accounts_failed"
+      });
+    }
+    return;
+  }
+
+  const telegramAdminActionMatch = requestUrl.pathname.match(
+    /^\/api\/admin\/telegram\/accounts\/([^/]+)\/(send-code|confirm)$/
+  );
+  if (telegramAdminActionMatch) {
+    const auth = await authService.requireAdmin(req, res);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      if (req.method !== "POST") {
+        res.writeHead(405, { Allow: "POST" });
+        res.end("Method not allowed");
+        return;
+      }
+      const accountId = decodeURIComponent(telegramAdminActionMatch[1] || "");
+      const action = telegramAdminActionMatch[2];
+      const payload = await readJsonBody(req);
+      const result = action === "send-code"
+        ? await telegramService.sendCode(accountId, payload)
+        : await telegramService.confirmCode(accountId, payload);
+      sendJson(res, result.ok ? 200 : 422, result);
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : 500;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: statusCode === 400 ? error.message : "telegram_login_failed"
+      });
+    }
+    return;
+  }
+
+  const telegramAdminAccountMatch = requestUrl.pathname.match(
+    /^\/api\/admin\/telegram\/accounts\/([^/]+)$/
+  );
+  if (telegramAdminAccountMatch) {
+    const auth = await authService.requireAdmin(req, res);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      const accountId = decodeURIComponent(telegramAdminAccountMatch[1] || "");
+      if (req.method === "PATCH") {
+        const payload = await readJsonBody(req);
+        const result = await telegramService.updateAccount(accountId, payload);
+        sendJson(res, result.ok ? 200 : 404, result);
+        return;
+      }
+
+      if (req.method === "DELETE") {
+        const result = await telegramService.deleteAccount(accountId);
+        sendJson(res, result.ok ? 200 : 404, result);
+        return;
+      }
+
+      res.writeHead(405, { Allow: "PATCH, DELETE" });
+      res.end("Method not allowed");
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : 500;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: statusCode === 400 ? error.message : "telegram_account_failed"
+      });
+    }
+    return;
+  }
+
   if (
     requestUrl.pathname.startsWith("/api/") ||
     requestUrl.pathname === "/client"
@@ -409,7 +695,117 @@ async function handleRequest(req, res) {
       return;
     }
 
-    sendJson(res, 200, await store.getClientCard(phone));
+    const fast = ["1", "true", "yes"].includes(
+      String(requestUrl.searchParams.get("fast") || "").toLowerCase()
+    );
+    sendJson(
+      res,
+      200,
+      fast ? await store.getClientCardBase(phone) : await store.getClientCard(phone)
+    );
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/client-card-calls") {
+    const phone = normalizePhone(requestUrl.searchParams.get("phone"));
+
+    if (!phone) {
+      sendJson(res, 400, {
+        error: "phone query parameter is required"
+      });
+      return;
+    }
+
+    sendJson(res, 200, await store.getClientCardCalls(phone));
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/client-card-trip-assignments") {
+    sendJson(
+      res,
+      200,
+      await store.getTripAssignmentsForTripIds(requestUrl.searchParams.get("tripIds"))
+    );
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/telegram/conversation") {
+    try {
+      sendJson(
+        res,
+        200,
+        await telegramService.conversation({
+          phone: requestUrl.searchParams.get("phone"),
+          accountId: requestUrl.searchParams.get("accountId"),
+          force: requestUrl.searchParams.get("force"),
+          limit: requestUrl.searchParams.get("limit")
+        })
+      );
+    } catch (error) {
+      sendJson(res, 500, {
+        ok: false,
+        error: error.message || "telegram_conversation_failed"
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/viber/conversation") {
+    try {
+      sendJson(
+        res,
+        200,
+        await viberService.conversation({
+          phone: requestUrl.searchParams.get("phone"),
+          limit: requestUrl.searchParams.get("limit")
+        })
+      );
+    } catch (error) {
+      sendJson(res, 500, {
+        ok: false,
+        error: error.message || "viber_conversation_failed"
+      });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/api/telegram/messages") {
+    try {
+      const payload = await readJsonBody(req, 16 * 1024);
+      const result = await telegramService.sendMessage(payload);
+      sendJson(res, result.ok ? 201 : 422, result);
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : 500;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: statusCode === 400 ? error.message : "telegram_message_failed"
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/telegram/media") {
+    try {
+      const result = await telegramService.media({
+        phone: requestUrl.searchParams.get("phone"),
+        accountId: requestUrl.searchParams.get("accountId"),
+        messageId: requestUrl.searchParams.get("messageId")
+      });
+      if (!result.ok) {
+        sendJson(res, 404, result);
+        return;
+      }
+      sendTelegramMedia(res, result);
+    } catch (error) {
+      sendJson(res, 500, {
+        ok: false,
+        error: error.message || "telegram_media_failed"
+      });
+    }
     return;
   }
 
@@ -486,7 +882,15 @@ async function handleRequest(req, res) {
     const limit = Number(requestUrl.searchParams.get("limit") || 100);
     const offset = Number(requestUrl.searchParams.get("offset") || 0);
     const query = requestUrl.searchParams.get("q") || "";
-    sendJson(res, 200, await binotelMonitor.listCalls({ limit, offset, query }));
+    const callType = requestUrl.searchParams.get("callType") || "";
+    const problem = requestUrl.searchParams.get("problem") || "";
+    sendJson(res, 200, await binotelMonitor.listCalls({
+      limit,
+      offset,
+      query,
+      callType,
+      problem
+    }));
     return;
   }
 
@@ -564,13 +968,48 @@ async function handleRequest(req, res) {
       ? new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString()
       : null;
 
-    sendJson(
-      res,
-      200,
-      await binotelMonitor.callTypeAnalytics({
+    const [analytics, managerRating] = await Promise.all([
+      binotelMonitor.callTypeAnalytics({
         query,
         since,
         periodDays
+      }),
+      binotelMonitor.managerRating({
+        query,
+        since,
+        periodDays
+      })
+    ]);
+
+    sendJson(res, 200, {
+      ...analytics,
+      managerRating
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/binotel-monitor/call-statistics") {
+    const query = requestUrl.searchParams.get("q") || "";
+    const period = callStatsPeriod(requestUrl.searchParams);
+
+    if (
+      requestUrl.searchParams.get("period") === "custom" &&
+      (!period.from || !period.to || new Date(period.to).getTime() <= new Date(period.from).getTime())
+    ) {
+      sendJson(res, 400, {
+        ok: false,
+        error: "Некоректний період аналітики дзвінків."
+      });
+      return;
+    }
+
+    sendJson(
+      res,
+      200,
+      await binotelMonitor.callStatistics({
+        query,
+        ...period,
+        timezone: "Europe/Kyiv"
       })
     );
     return;
@@ -588,7 +1027,7 @@ async function handleRequest(req, res) {
     }
 
     try {
-      const call = await binotelMonitorStore.getCall(callId);
+      const call = await binotelMonitor.visibleCall(callId);
       if (!call) {
         sendJson(res, 404, {
           ok: false,
@@ -632,6 +1071,82 @@ async function handleRequest(req, res) {
       sendJson(res, 201, {
         ok: true,
         note: await store.addNote(phone, text)
+      });
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : 500;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: error.message
+      });
+    }
+    return;
+  }
+
+  const clientNoteMatch = requestUrl.pathname.match(/^\/api\/client-notes\/([^/]+)$/);
+  if (clientNoteMatch && (req.method === "PATCH" || req.method === "DELETE")) {
+    const noteId = decodeURIComponent(clientNoteMatch[1] || "").trim();
+
+    if (!noteId) {
+      sendJson(res, 400, {
+        ok: false,
+        error: "note id is required"
+      });
+      return;
+    }
+
+    try {
+      if (req.method === "DELETE") {
+        const deleted = await store.deleteNote(noteId);
+        if (!deleted) {
+          sendJson(res, 404, {
+            ok: false,
+            error: "note not found"
+          });
+          return;
+        }
+
+        sendJson(res, 200, {
+          ok: true,
+          note: deleted
+        });
+        return;
+      }
+
+      const payload = await readJsonBody(req);
+      const text = String(payload.text || "").trim();
+
+      if (!text) {
+        sendJson(res, 400, {
+          ok: false,
+          error: "text is required"
+        });
+        return;
+      }
+
+      if (text.length > 2000) {
+        sendJson(res, 400, {
+          ok: false,
+          error: "note is too long"
+        });
+        return;
+      }
+
+      const note = await store.updateNote(noteId, text);
+      if (!note) {
+        sendJson(res, 404, {
+          ok: false,
+          error: "note not found"
+        });
+        return;
+      }
+
+      sendJson(res, 200, {
+        ok: true,
+        note
       });
     } catch (error) {
       const statusCode = ["invalid_json", "request_body_too_large"].includes(
