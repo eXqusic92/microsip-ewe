@@ -1658,13 +1658,13 @@ body[data-theme="dark"] .login-form input:focus {
   grid-row: 2;
   position: relative;
   overflow: hidden;
-  padding: 22px;
+  padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background:
     linear-gradient(110deg, rgba(227, 6, 19, 0.1), transparent 46%),
     var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: 0 3px 8px rgba(31, 48, 58, 0.08);
 }
 
 .identity-row > * {
@@ -1685,7 +1685,7 @@ body[data-theme="dark"] .login-form input:focus {
   margin: 0;
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
-  font-size: clamp(26px, 3.2vw, 38px);
+  font-size: 34px;
   line-height: 1.15;
 }
 
@@ -1699,6 +1699,9 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .identity-meta a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
   color: var(--ink);
   font-weight: 700;
   text-decoration: none;
@@ -1803,9 +1806,9 @@ body[data-theme="dark"] .login-form input:focus {
   grid-row: 3;
   position: relative;
   overflow: hidden;
-  padding: 22px 24px;
+  padding: 18px 20px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 10px;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--brand) 5%, transparent), transparent 38%),
     var(--panel);
@@ -1852,7 +1855,7 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .upcoming-trip {
-  margin-top: 18px;
+  margin-top: 14px;
   position: relative;
   z-index: 1;
 }
@@ -1868,7 +1871,7 @@ body[data-theme="dark"] .login-form input:focus {
   grid-template-columns: minmax(0, 1fr) minmax(178px, 0.19fr);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
-  border-radius: 12px;
+  border-radius: 10px;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--panel-soft) 94%, var(--brand)), var(--panel-soft)),
     var(--panel-soft);
@@ -1880,8 +1883,8 @@ body[data-theme="dark"] .login-form input:focus {
   gap: 14px;
   align-items: center;
   min-width: 0;
-  min-height: 86px;
-  padding: 13px 18px;
+  min-height: 78px;
+  padding: 12px 16px;
 }
 
 .trip-place {
@@ -1915,7 +1918,7 @@ body[data-theme="dark"] .login-form input:focus {
   color: var(--ink);
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
-  font-size: clamp(20px, 1.75vw, 27px);
+  font-size: 24px;
   font-weight: 950;
   letter-spacing: 0;
   line-height: 1.08;
@@ -1996,7 +1999,7 @@ body[data-theme="dark"] .login-form input:focus {
   display: grid;
   align-content: center;
   min-width: 0;
-  padding: 12px 16px;
+  padding: 11px 14px;
   border-left: 1px solid var(--line);
   background:
     linear-gradient(160deg, color-mix(in srgb, var(--brand) 18%, transparent), transparent 66%),
@@ -2021,7 +2024,7 @@ body[data-theme="dark"] .login-form input:focus {
   color: var(--brand);
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
-  font-size: 27px;
+  font-size: 25px;
   font-weight: 950;
   letter-spacing: 0;
   line-height: 1;
@@ -2103,7 +2106,7 @@ body[data-theme="dark"] .login-form input:focus {
   min-width: 0;
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
-  border-radius: 12px;
+  border-radius: 10px;
   background: color-mix(in srgb, var(--panel-soft) 86%, var(--panel));
 }
 
@@ -2266,9 +2269,9 @@ body[data-theme="dark"] .login-form input:focus {
 .trip-info-item {
   grid-column: span 3;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 9px 10px;
   border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
-  border-radius: 12px;
+  border-radius: 10px;
   background: color-mix(in srgb, var(--panel-soft) 78%, transparent);
 }
 
@@ -2354,11 +2357,11 @@ body[data-theme="dark"] .login-form input:focus {
 .notes-section,
 .telegram-section {
   min-width: 0;
-  padding: 20px;
+  padding: 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
-  box-shadow: 0 10px 26px rgba(31, 48, 58, 0.08);
+  box-shadow: 0 3px 8px rgba(31, 48, 58, 0.08);
 }
 
 .telegram-section {
@@ -2380,7 +2383,7 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .messaging-tab {
-  min-height: 32px;
+  min-height: 38px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -2460,7 +2463,7 @@ body[data-theme="dark"] .login-form input:focus {
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 38px;
+  min-height: 42px;
   border: 1px solid var(--field-border);
   border-radius: 10px;
   background: var(--field);
@@ -2626,7 +2629,7 @@ body[data-theme="dark"] .login-form input:focus {
 
 .telegram-refresh,
 .viber-refresh {
-  min-height: 36px;
+  min-height: 42px;
   padding: 0 12px;
   white-space: nowrap;
 }
@@ -2782,8 +2785,8 @@ body[data-theme="dark"] .login-form input:focus {
 
 .telegram-reply-button {
   display: inline-grid;
-  width: 24px;
-  height: 24px;
+  width: 36px;
+  height: 36px;
   place-items: center;
   border: 1px solid transparent;
   border-radius: 999px;
@@ -2807,6 +2810,7 @@ body[data-theme="dark"] .login-form input:focus {
   display: grid;
   gap: 2px;
   width: 100%;
+  min-height: 44px;
   border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--line));
   border-radius: 7px;
   background: color-mix(in srgb, var(--brand) 10%, transparent);
@@ -3644,6 +3648,7 @@ body[data-theme="dark"] .login-form input:focus {
 .show-all-tickets,
 .show-all-calls {
   min-width: 210px;
+  min-height: 44px;
 }
 
 .tickets-modal {
@@ -4019,7 +4024,7 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .note-form button {
-  min-height: 42px;
+  min-height: 44px;
   width: 100%;
   margin-top: 10px;
 }
@@ -4075,8 +4080,8 @@ body[data-theme="dark"] .login-form input:focus {
 .note-action-button {
   display: inline-grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   border: 1px solid color-mix(in srgb, var(--line-strong) 78%, transparent);
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel-soft) 82%, transparent);
@@ -7679,6 +7684,7 @@ body[data-theme="dark"] .call-stats-list-row {
   align-items: center;
   justify-self: start;
   gap: 8px;
+  min-height: 32px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 900;
@@ -7700,7 +7706,7 @@ body[data-theme="dark"] .call-stats-list-row {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 26px;
+  padding: 20px;
   background:
     linear-gradient(110deg, rgba(227, 6, 19, 0.1), transparent 48%),
     var(--panel);
@@ -7710,7 +7716,7 @@ body[data-theme="dark"] .call-stats-list-row {
   margin: 0;
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
-  font-size: clamp(28px, 3.4vw, 44px);
+  font-size: 38px;
   line-height: 1.08;
 }
 
@@ -7744,8 +7750,8 @@ body[data-theme="dark"] .call-stats-list-row {
   display: grid;
   align-content: center;
   gap: 8px;
-  min-height: 100px;
-  padding: 18px 20px;
+  min-height: 84px;
+  padding: 14px 18px;
   border-right: 1px solid var(--line);
 }
 
@@ -7778,7 +7784,7 @@ body[data-theme="dark"] .call-stats-list-row {
 
 .detail-panel {
   min-width: 0;
-  padding: 22px;
+  padding: 18px;
 }
 
 .call-ai-panel {
@@ -7793,26 +7799,26 @@ body[data-theme="dark"] .call-stats-list-row {
 }
 
 .detail-summary {
-  margin: 18px 0 0;
-  font-size: 17px;
+  margin: 14px 0 0;
+  font-size: 15px;
   font-weight: 800;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 .detail-analysis-list {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px;
-  margin: 20px 0 0;
+  gap: 10px;
+  margin: 14px 0 0;
 }
 
 .detail-analysis-group {
   --detail-color: var(--line-strong);
   display: grid;
-  gap: 13px;
-  padding: 15px;
+  gap: 10px;
+  padding: 12px;
   border: 1px solid color-mix(in srgb, var(--detail-color) 40%, var(--line));
-  border-radius: 12px;
+  border-radius: 10px;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--detail-color) 12%, transparent), transparent 58%),
     color-mix(in srgb, var(--panel-soft) 92%, var(--panel));
@@ -7867,14 +7873,14 @@ body[data-theme="dark"] .call-stats-list-row {
 .detail-analysis-group-body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .detail-analysis-item,
 .detail-technical > div {
   display: grid;
   gap: 6px;
-  padding: 13px 14px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-soft);
@@ -7961,8 +7967,8 @@ body[data-theme="dark"] .call-stats-list-row {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  min-width: 86px;
-  min-height: 48px;
+  min-width: 78px;
+  min-height: 44px;
   border: 1px solid color-mix(in srgb, var(--quality-tone) 42%, var(--line));
   border-radius: 8px;
   background:
@@ -7970,9 +7976,7 @@ body[data-theme="dark"] .call-stats-list-row {
     color-mix(in srgb, var(--quality-tone) 8%, var(--panel-soft));
   color: color-mix(in srgb, var(--quality-tone) 78%, var(--ink));
   padding: 0 14px;
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, #ffffff 8%, transparent),
-    0 10px 22px color-mix(in srgb, var(--quality-tone) 14%, transparent);
+  box-shadow: 0 3px 8px color-mix(in srgb, var(--quality-tone) 12%, transparent);
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
   font-size: 22px;
@@ -7980,16 +7984,6 @@ body[data-theme="dark"] .call-stats-list-row {
   line-height: 1;
   text-align: center;
   white-space: nowrap;
-}
-
-.quality-score::before {
-  content: "";
-  position: absolute;
-  inset: 7px auto 7px 7px;
-  width: 4px;
-  border-radius: 999px;
-  background: var(--quality-tone);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--quality-tone) 16%, transparent);
 }
 
 .quality-score.quality-good {
@@ -8029,7 +8023,7 @@ body[data-theme="dark"] .call-stats-list-row {
 }
 
 .quality-summary {
-  margin: 16px 0 0;
+  margin: 12px 0 0;
   color: var(--ink);
   font-size: 14px;
   font-weight: 800;
@@ -8040,7 +8034,7 @@ body[data-theme="dark"] .call-stats-list-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .quality-context-item {
@@ -8112,7 +8106,7 @@ body[data-theme="dark"] .call-stats-list-row {
 .quality-metric-group {
   display: grid;
   gap: 8px;
-  padding: 10px;
+  padding: 9px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background:
@@ -8164,7 +8158,7 @@ body[data-theme="dark"] .call-stats-list-row {
 .quality-item {
   display: grid;
   gap: 7px;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-soft);
@@ -8274,9 +8268,7 @@ body[data-theme="dark"] .call-stats-list-row {
   background: color-mix(in srgb, var(--metric-color) 14%, var(--panel)) !important;
   color: color-mix(in srgb, var(--metric-color) 76%, var(--ink)) !important;
   padding: 6px 10px;
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, #ffffff 7%, transparent),
-    0 8px 18px color-mix(in srgb, var(--metric-color) 12%, transparent);
+  box-shadow: 0 3px 8px color-mix(in srgb, var(--metric-color) 10%, transparent);
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
   font-size: 15px;
@@ -8332,7 +8324,7 @@ body[data-theme="dark"] .call-stats-list-row {
 .detail-audio {
   display: grid;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .detail-audio audio {
@@ -8351,7 +8343,7 @@ body[data-theme="dark"] .call-stats-list-row {
   position: relative;
   display: grid;
   gap: 8px;
-  padding: 10px 12px 9px;
+  padding: 9px 10px;
   border: 1px solid var(--line);
   border-radius: 9px;
   background:
@@ -8399,8 +8391,8 @@ body[data-theme="dark"] .call-stats-list-row {
   bottom: 8px;
   z-index: 3;
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 0;
   border-radius: 50%;
@@ -8454,12 +8446,13 @@ body[data-theme="dark"] .call-stats-list-row {
 
 .audio-progress {
   width: 100%;
+  min-height: 32px;
   accent-color: var(--accent);
 }
 
 .audio-speed {
   min-width: 44px;
-  min-height: 30px;
+  min-height: 36px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--panel);
@@ -8482,8 +8475,8 @@ body[data-theme="dark"] .call-stats-list-row {
   grid-template-rows: auto auto minmax(0, 1fr);
   flex: 1 1 auto;
   min-height: 0;
-  margin-top: 22px;
-  padding-top: 18px;
+  margin-top: 18px;
+  padding-top: 14px;
   border-top: 1px solid var(--line);
   overflow: hidden;
 }
@@ -8492,7 +8485,7 @@ body[data-theme="dark"] .call-stats-list-row {
   display: grid;
   gap: 7px;
   min-height: 0;
-  margin-top: 14px;
+  margin-top: 12px;
   padding-right: 4px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -8600,8 +8593,8 @@ body[data-theme="dark"] .call-stats-list-row {
 
 .transcript-play {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 50%;
@@ -9526,7 +9519,13 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .call-detail-hero {
     align-items: flex-start;
     flex-direction: column;
-    padding: 20px;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .call-detail-hero h1 {
+    font-size: 26px;
+    line-height: 1.12;
   }
 
   .call-detail-badges {
@@ -9539,7 +9538,8 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
 
   .call-detail-facts > div,
   .call-detail-facts > div:nth-child(2) {
-    min-height: 82px;
+    min-height: 70px;
+    padding: 12px 16px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
@@ -9567,16 +9567,41 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   }
 
   .detail-panel {
-    padding: 18px;
+    padding: 16px;
   }
 
   .transcript-item {
-    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-columns: 44px minmax(0, 1fr);
     width: 100%;
+    gap: 8px 10px;
+    padding: 10px;
   }
 
   .transcript-item p {
     grid-column: 2;
+  }
+
+  .detail-back-link,
+  .detail-reanalyze-button,
+  .audio-play-button,
+  .audio-speed,
+  .transcript-play {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .detail-back-link {
+    margin-block: -12px;
+    padding-block: 12px;
+  }
+
+  .transcript-play {
+    width: 44px;
+    height: 44px;
+  }
+
+  .audio-progress {
+    min-height: 44px;
   }
 
   .audio-controls {
@@ -9639,13 +9664,13 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
 
   .profile-dates {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 18px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .upcoming-section {
-    padding: 16px;
-    border-radius: 14px;
+    padding: 14px;
+    border-radius: 10px;
   }
 
   .trip-card {
@@ -9654,12 +9679,12 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
 
   .trip-hero {
     grid-template-columns: 1fr;
-    border-radius: 14px;
+    border-radius: 10px;
   }
 
   .trip-route {
-    grid-template-columns: 1fr;
-    gap: 9px;
+    grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
+    gap: 8px;
     min-height: 0;
     padding: 12px;
   }
@@ -9673,16 +9698,20 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
     justify-self: stretch;
   }
 
+  .trip-place-to {
+    text-align: left;
+  }
+
   .trip-route-connector {
-    align-items: flex-start;
-    justify-content: flex-start;
-    min-height: 34px;
-    padding-left: 10px;
+    align-items: center;
+    justify-content: center;
+    min-height: 86px;
+    padding-left: 0;
   }
 
   .trip-route-line {
     width: 2px;
-    height: 28px;
+    height: 60px;
     margin-left: 0;
   }
 
@@ -9738,20 +9767,29 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   }
 
   .trip-place strong {
-    font-size: 20px;
+    font-size: 18px;
+    white-space: normal;
   }
 
   .trip-departure b {
-    font-size: 25px;
+    font-size: 24px;
   }
 
   .trip-departure {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 12px;
+    align-items: center;
     padding: 12px;
   }
 
+  .trip-departure b {
+    grid-column: 2;
+    grid-row: 1 / 4;
+  }
+
   .trip-info {
-    grid-template-columns: 1fr;
-    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .trip-info-item,
@@ -9763,6 +9801,11 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .trip-info-bus,
   .trip-info-price {
     grid-column: auto;
+  }
+
+  .trip-info-passenger,
+  .trip-info-agent {
+    grid-column: 1 / -1;
   }
 
   .modal-ticket-card {
@@ -9874,6 +9917,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .order-link {
     width: 100%;
     min-width: 0;
+    min-height: 46px;
   }
 
   .tickets-modal {
@@ -9913,6 +9957,32 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .identity-row,
   .profile-block {
     padding: 16px;
+  }
+
+  .identity-row h1 {
+    font-size: 26px;
+  }
+
+  .identity-meta a {
+    min-height: 0;
+    padding-block: 14px;
+    margin-block: -14px;
+  }
+
+  .messaging-tab,
+  .telegram-account-trigger,
+  .telegram-refresh,
+  .viber-refresh,
+  .telegram-reply-button,
+  .note-action-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .telegram-reply-button,
+  .note-action-button {
+    width: 44px;
+    height: 44px;
   }
 }
 
