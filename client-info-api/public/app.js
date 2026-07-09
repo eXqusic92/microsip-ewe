@@ -1029,6 +1029,15 @@ const AI_ICON_PATHS = {
   x: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>',
   link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"></path><path d="M15 7h2a5 5 0 1 1 0 10h-2"></path><line x1="8" x2="16" y1="12" y2="12"></line>',
   reply: '<polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"></path>',
+  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path>',
+  music: '<path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle>',
+  mapPin: '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle>',
+  user: '<path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="7" r="4"></circle>',
+  smile: '<circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><path d="M9 9h.01"></path><path d="M15 9h.01"></path>',
+  receipt: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2Z"></path><path d="M8 7h8"></path><path d="M8 11h8"></path><path d="M8 15h5"></path>',
+  dice: '<rect width="16" height="16" x="4" y="4" rx="3"></rect><circle cx="9" cy="9" r="1"></circle><circle cx="15" cy="9" r="1"></circle><circle cx="9" cy="15" r="1"></circle><circle cx="15" cy="15" r="1"></circle>',
+  gift: '<rect width="18" height="14" x="3" y="8" rx="2"></rect><path d="M12 8v14"></path><path d="M3 12h18"></path><path d="M12 8H8.5A2.5 2.5 0 1 1 11 5.5Z"></path><path d="M12 8h3.5A2.5 2.5 0 1 0 13 5.5Z"></path>',
   fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="M16 13H8"></path><path d="M16 17H8"></path><path d="M10 9H8"></path>'
 };
 
@@ -5304,6 +5313,91 @@ function telegramMediaUrl(message, accountId) {
   return `/api/telegram/media?${params.toString()}`;
 }
 
+function telegramMessageMedia(message) {
+  if (message && message.media) {
+    return message.media;
+  }
+  const payload = message && message.payload;
+  if (payload && payload.media) {
+    return payload.media;
+  }
+  if (payload && payload.hasMedia) {
+    return {
+      type: "unsupported",
+      label: "Непідтримуване повідомлення",
+      description: "Telegram media",
+      downloadable: false
+    };
+  }
+  return null;
+}
+
+function telegramMediaIcon(media = {}) {
+  switch (media.type) {
+    case "photo":
+      return "image";
+    case "video":
+    case "video_note":
+    case "animation":
+    case "story":
+      return "video";
+    case "voice":
+      return "mic";
+    case "audio":
+      return "music";
+    case "location":
+    case "location_live":
+    case "venue":
+      return "mapPin";
+    case "contact":
+      return "user";
+    case "sticker":
+      return "smile";
+    case "webpage":
+      return "link";
+    case "poll":
+      return "list";
+    case "invoice":
+      return "receipt";
+    case "dice":
+      return "dice";
+    case "game":
+      return "star";
+    case "giveaway":
+    case "giveaway_results":
+    case "paid_media":
+      return "gift";
+    case "service":
+      return "info";
+    default:
+      return "fileText";
+  }
+}
+
+function telegramMediaTitle(media = {}) {
+  if (["pdf", "file"].includes(media.type) && media.filename) {
+    return media.filename;
+  }
+  return media.label || media.filename || "Telegram повідомлення";
+}
+
+function telegramMediaSubtitle(media = {}, fallback = "Telegram") {
+  return media.description || media.filename || media.mimeType || fallback;
+}
+
+function createTelegramMediaCard(media = {}, options = {}) {
+  const node = document.createElement(options.href ? "a" : "div");
+  const mediaTypeClass = String(media.type || "").replace(/[^a-z0-9_-]/gi, "");
+  node.className = `telegram-media-file${options.href ? "" : " is-static"}${mediaTypeClass ? ` is-${mediaTypeClass}` : ""}`;
+  if (options.href) {
+    node.href = options.href;
+    node.target = "_blank";
+    node.rel = "noopener";
+  }
+  node.innerHTML = `${aiIcon(telegramMediaIcon(media))}<span><strong>${escapeHtml(telegramMediaTitle(media))}</strong><small>${escapeHtml(options.subtitle || telegramMediaSubtitle(media, options.fallbackSubtitle))}</small></span>`;
+  return node;
+}
+
 function appendTelegramReplyPreview(bubble, message) {
   const preview = message && message.replyPreview;
   if (!preview && !message.replyToMessageId) {
@@ -5324,16 +5418,13 @@ function appendTelegramReplyPreview(bubble, message) {
 }
 
 function appendTelegramMedia(bubble, message, accountId) {
-  const media = message && message.media;
-  if (!media || !media.downloadable) {
-    return;
+  const media = telegramMessageMedia(message);
+  if (!media) {
+    return false;
   }
-  const url = telegramMediaUrl(message, accountId);
-  if (!url) {
-    return;
-  }
+  const url = media.downloadable ? telegramMediaUrl(message, accountId) : "";
 
-  if (media.type === "photo") {
+  if (media.type === "photo" && url) {
     const link = document.createElement("a");
     link.className = "telegram-media-photo";
     link.href = url;
@@ -5345,32 +5436,38 @@ function appendTelegramMedia(bubble, message, accountId) {
     image.loading = "lazy";
     link.append(image);
     bubble.append(link);
-    return;
+    return true;
   }
 
-  if (media.type === "pdf") {
-    const link = document.createElement("a");
-    link.className = "telegram-media-file is-pdf";
-    link.href = url;
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.innerHTML = `${aiIcon("fileText")}<span><strong>${escapeHtml(media.filename || "PDF файл")}</strong><small>Відкрити PDF</small></span>`;
-    bubble.append(link);
-    return;
+  if (url) {
+    bubble.append(createTelegramMediaCard(media, {
+      href: url,
+      subtitle: media.type === "pdf" ? "Відкрити PDF" : "Завантажити"
+    }));
+    return true;
   }
 
-  const file = document.createElement("a");
-  file.className = "telegram-media-file";
-  file.href = url;
-  file.target = "_blank";
-  file.rel = "noopener";
-  file.innerHTML = `${aiIcon("fileText")}<span><strong>${escapeHtml(media.filename || media.label || "Файл")}</strong><small>Завантажити</small></span>`;
-  bubble.append(file);
+  bubble.append(createTelegramMediaCard(media, {
+    fallbackSubtitle: media.type === "unsupported"
+      ? "Цей тип Telegram не можна показати повністю"
+      : "Telegram"
+  }));
+  return true;
+}
+
+function shouldRenderTelegramMessage(message) {
+  return Boolean(
+    message &&
+    (
+      String(message.text || "").trim() ||
+      telegramMessageMedia(message)
+    )
+  );
 }
 
 function renderTelegramMessages(messages, accountId = selectedTelegramAccountId) {
   elements.telegramChat.replaceChildren();
-  const list = Array.isArray(messages) ? messages : [];
+  const list = (Array.isArray(messages) ? messages : []).filter(shouldRenderTelegramMessage);
   if (!list.length) {
     const empty = document.createElement("div");
     empty.className = "telegram-empty";
@@ -5384,15 +5481,13 @@ function renderTelegramMessages(messages, accountId = selectedTelegramAccountId)
     bubble.className = `telegram-bubble ${message.direction === "outgoing" ? "is-outgoing" : "is-incoming"}`;
     bubble.dataset.telegramMessageId = String(message.id || "");
     appendTelegramReplyPreview(bubble, message);
-    appendTelegramMedia(bubble, message, accountId);
+    const hasRenderedMedia = appendTelegramMedia(bubble, message, accountId);
     if (message.text) {
       const textNode = document.createElement("p");
       textNode.textContent = message.text;
       bubble.append(textNode);
-    } else if (!message.media) {
-      const textNode = document.createElement("p");
-      textNode.textContent = "[порожнє повідомлення]";
-      bubble.append(textNode);
+    } else if (!hasRenderedMedia) {
+      continue;
     }
     const footer = document.createElement("div");
     footer.className = "telegram-bubble-footer";

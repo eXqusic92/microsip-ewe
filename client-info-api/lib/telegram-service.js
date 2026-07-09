@@ -250,20 +250,311 @@ function telegramDocumentFilename(document) {
   return text(filenameAttribute && (filenameAttribute.fileName || filenameAttribute.file_name));
 }
 
+function telegramClassName(value) {
+  return text(value && (value.className || (value.constructor && value.constructor.name)));
+}
+
+function telegramRichText(value) {
+  if (!value) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return text(value);
+  }
+  return text(value.text || value.title || value.name || value.value);
+}
+
+function telegramDocumentAttributes(document) {
+  return Array.isArray(document && document.attributes)
+    ? document.attributes.filter(Boolean)
+    : [];
+}
+
+function telegramDocumentAttribute(document, className) {
+  return telegramDocumentAttributes(document).find((attribute) =>
+    telegramClassName(attribute).includes(className)
+  ) || null;
+}
+
+function telegramDurationDescription(duration) {
+  const seconds = Math.trunc(Number(duration) || 0);
+  if (!seconds) {
+    return "";
+  }
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return minutes ? `${minutes}:${String(rest).padStart(2, "0")}` : `${rest} с`;
+}
+
+function telegramPeriodDescription(period) {
+  const seconds = Math.trunc(Number(period) || 0);
+  if (!seconds) {
+    return "";
+  }
+  if (seconds < 60) {
+    return `${seconds} с`;
+  }
+  if (seconds < 3600) {
+    return `${Math.round(seconds / 60)} хв`;
+  }
+  if (seconds < 86400) {
+    return `${Math.round(seconds / 3600)} год`;
+  }
+  return `${Math.round(seconds / 86400)} дн`;
+}
+
+function telegramAmountDescription(action) {
+  const amount = text(action && (
+    action.totalAmount ||
+    action.total_amount ||
+    action.amount ||
+    action.stars ||
+    action.boosts
+  ));
+  const currency = text(action && action.currency);
+  return [amount, currency].filter(Boolean).join(" ");
+}
+
+function telegramServiceDescription(...parts) {
+  return parts.map((part) => text(part)).filter(Boolean).join(" · ");
+}
+
+function telegramActionSubtype(className) {
+  return text(className)
+    .replace(/^MessageAction/, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase();
+}
+
+function telegramActionDetails(action) {
+  const actionClass = telegramClassName(action);
+  const title = telegramRichText(action && action.title);
+  const message = telegramRichText(action && (action.message || action.text));
+  const score = text(action && action.score);
+  const duration = telegramDurationDescription(action && action.duration);
+  const period = telegramPeriodDescription(action && (
+    action.period ||
+    action.ttlPeriod ||
+    action.ttl_period
+  ));
+  const distance = text(action && action.distance);
+  const emoticon = text(action && action.emoticon);
+  const amount = telegramAmountDescription(action);
+
+  const staticActions = {
+    MessageActionEmpty: ["Службове повідомлення", "Без деталей"],
+    MessageActionChatEditPhoto: ["Фото чату оновлено", "Telegram"],
+    MessageActionChatDeletePhoto: ["Фото чату видалено", "Telegram"],
+    MessageActionChatAddUser: ["Учасника додано", "Telegram"],
+    MessageActionChatDeleteUser: ["Учасника видалено", "Telegram"],
+    MessageActionChatJoinedByLink: ["Приєднання за посиланням", "Telegram"],
+    MessageActionChatMigrateTo: ["Чат перенесено в канал", "Telegram"],
+    MessageActionChannelMigrateFrom: ["Канал створено з групи", "Telegram"],
+    MessageActionPinMessage: ["Повідомлення закріплено", "Telegram"],
+    MessageActionHistoryClear: ["Історію очищено", "Telegram"],
+    MessageActionScreenshotTaken: ["Зроблено скриншот", "Telegram"],
+    MessageActionBotAllowed: ["Бота дозволено", "Telegram"],
+    MessageActionSecureValuesSentMe: ["Дані Telegram Passport отримано", "Telegram"],
+    MessageActionSecureValuesSent: ["Дані Telegram Passport надіслано", "Telegram"],
+    MessageActionContactSignUp: ["Контакт зареєструвався у Telegram", "Telegram"],
+    MessageActionInviteToGroupCall: ["Запрошення до групового дзвінка", "Telegram"],
+    MessageActionChatJoinedByRequest: ["Приєднання за запитом", "Telegram"],
+    MessageActionWebViewDataSentMe: ["Дані Web App отримано", "Telegram"],
+    MessageActionWebViewDataSent: ["Дані Web App надіслано", "Telegram"],
+    MessageActionSuggestProfilePhoto: ["Запропоновано фото профілю", "Telegram"],
+    MessageActionRequestedPeer: ["Запитано контакт або чат", "Telegram"],
+    MessageActionSetChatWallPaper: ["Шпалери чату змінено", "Telegram"],
+    MessageActionGiveawayLaunch: ["Розіграш запущено", "Telegram"],
+    MessageActionGiveawayResults: ["Результати розіграшу", "Telegram"],
+    MessageActionRequestedPeerSentMe: ["Надіслано запитаний контакт або чат", "Telegram"]
+  };
+
+  if (Object.prototype.hasOwnProperty.call(staticActions, actionClass)) {
+    const [label, description] = staticActions[actionClass];
+    return { label, description };
+  }
+
+  switch (actionClass) {
+    case "MessageActionChatCreate":
+      return { label: "Чат створено", description: title || "Telegram" };
+    case "MessageActionChatEditTitle":
+      return { label: "Назву чату змінено", description: title || "Telegram" };
+    case "MessageActionChannelCreate":
+      return { label: "Канал створено", description: title || "Telegram" };
+    case "MessageActionGameScore":
+      return {
+        label: "Результат гри",
+        description: score ? `Рахунок ${score}` : "Telegram game"
+      };
+    case "MessageActionPaymentSentMe":
+      return { label: "Платіж отримано", description: amount || "Telegram" };
+    case "MessageActionPaymentSent":
+      return { label: "Платіж надіслано", description: amount || "Telegram" };
+    case "MessageActionPhoneCall":
+      return { label: "Телефонний дзвінок", description: duration || "Дзвінок у Telegram" };
+    case "MessageActionCustomAction":
+      return { label: message || "Службова дія", description: "Telegram" };
+    case "MessageActionGeoProximityReached":
+      return {
+        label: "Досягнуто геолокаційної близькості",
+        description: distance ? `${distance} м` : "Telegram"
+      };
+    case "MessageActionGroupCall":
+      return { label: "Груповий дзвінок", description: duration || "Telegram" };
+    case "MessageActionSetMessagesTTL":
+      return { label: "Таймер повідомлень змінено", description: period || "Telegram" };
+    case "MessageActionGroupCallScheduled":
+      return { label: "Груповий дзвінок заплановано", description: "Telegram" };
+    case "MessageActionSetChatTheme":
+      return { label: "Тему чату змінено", description: emoticon || "Telegram" };
+    case "MessageActionGiftPremium":
+      return { label: "Premium подаровано", description: amount || "Telegram" };
+    case "MessageActionTopicCreate":
+      return { label: "Тему створено", description: title || "Telegram" };
+    case "MessageActionTopicEdit":
+      return {
+        label: "Тему змінено",
+        description: telegramServiceDescription(title, emoticon) || "Telegram"
+      };
+    case "MessageActionGiftCode":
+      return { label: "Подарунковий код", description: amount || "Telegram" };
+    case "MessageActionBoostApply":
+      return { label: "Буст застосовано", description: amount || "Telegram" };
+    case "MessageActionPaymentRefunded":
+      return { label: "Платіж повернено", description: amount || "Telegram" };
+    case "MessageActionGiftStars":
+      return { label: "Stars подаровано", description: amount || "Telegram" };
+    case "MessageActionPrizeStars":
+      return { label: "Stars виграно", description: amount || "Telegram" };
+    case "MessageActionStarGift":
+      return { label: "Star Gift", description: amount || "Telegram" };
+    case "MessageActionStarGiftUnique":
+      return { label: "Унікальний Star Gift", description: amount || "Telegram" };
+    default:
+      return { label: "Службове повідомлення", description: "Telegram" };
+  }
+}
+
+function normalizeTelegramAction(action) {
+  if (!action) {
+    return null;
+  }
+  const actionClass = telegramClassName(action);
+  const details = telegramActionDetails(action);
+  return {
+    type: "service",
+    subtype: telegramActionSubtype(actionClass),
+    label: details.label || "Службове повідомлення",
+    description: details.description || "Telegram",
+    mimeType: "",
+    filename: "",
+    downloadable: false,
+    className: actionClass
+  };
+}
+
+function telegramDocumentMediaType(media, document, mimeType, filename) {
+  const sticker = telegramDocumentAttribute(document, "DocumentAttributeSticker");
+  const audio = telegramDocumentAttribute(document, "DocumentAttributeAudio");
+  const video = telegramDocumentAttribute(document, "DocumentAttributeVideo");
+  const animated = telegramDocumentAttribute(document, "DocumentAttributeAnimated");
+  const lowerFilename = filename.toLowerCase();
+
+  if (
+    sticker ||
+    mimeType === "application/x-tgsticker" ||
+    mimeType === "application/x-sticker"
+  ) {
+    const alt = text(sticker && sticker.alt);
+    return {
+      type: "sticker",
+      label: alt ? `Стікер ${alt}` : "Стікер",
+      description: alt || "Telegram sticker"
+    };
+  }
+
+  if (media && (media.voice || (audio && audio.voice))) {
+    return {
+      type: "voice",
+      label: "Голосове повідомлення",
+      description: telegramDurationDescription(audio && audio.duration)
+    };
+  }
+
+  if (audio) {
+    return {
+      type: "audio",
+      label: text(audio.title) || "Аудіо",
+      description:
+        [text(audio.performer), telegramDurationDescription(audio.duration)].filter(Boolean).join(" · ") ||
+        "Аудіофайл"
+    };
+  }
+
+  if (media && (media.video || video || mimeType.startsWith("video/"))) {
+    const round = Boolean(media.round || (video && video.roundMessage));
+    return {
+      type: round ? "video_note" : "video",
+      label: round ? "Відеоповідомлення" : "Відео",
+      description: telegramDurationDescription(video && video.duration)
+    };
+  }
+
+  if (animated || mimeType === "image/gif" || lowerFilename.endsWith(".gif")) {
+    return {
+      type: "animation",
+      label: "GIF",
+      description: "Анімація"
+    };
+  }
+
+  if (mimeType === "application/pdf" || lowerFilename.endsWith(".pdf")) {
+    return {
+      type: "pdf",
+      label: "PDF",
+      description: "Документ PDF"
+    };
+  }
+
+  if (mimeType.startsWith("image/")) {
+    return {
+      type: "photo",
+      label: "Фото",
+      description: "Зображення"
+    };
+  }
+
+  return {
+    type: "file",
+    label: "Файл",
+    description: mimeType || "Файл"
+  };
+}
+
 function normalizeTelegramMedia(message) {
   const media = message && message.media;
+  const action = message && message.action;
+  if (!media && action) {
+    return normalizeTelegramAction(action);
+  }
   if (!media) {
     return null;
   }
 
-  const mediaClass = text(media.className || (media.constructor && media.constructor.name));
+  const mediaClass = telegramClassName(media);
+  if (mediaClass.includes("MessageMediaEmpty")) {
+    return null;
+  }
+
   if (media.photo || mediaClass.includes("MessageMediaPhoto")) {
     return {
       type: "photo",
       label: "Фото",
+      description: "Зображення",
       mimeType: "image/jpeg",
       filename: `telegram-photo-${idText(message.id) || "media"}.jpg`,
-      downloadable: true
+      downloadable: true,
+      className: mediaClass
     };
   }
 
@@ -274,24 +565,59 @@ function normalizeTelegramMedia(message) {
       (mimeType === "application/pdf"
         ? `telegram-document-${idText(message.id) || "media"}.pdf`
         : `telegram-file-${idText(message.id) || "media"}`);
-    const isPdf = mimeType === "application/pdf" || filename.toLowerCase().endsWith(".pdf");
-    const isImage = mimeType.startsWith("image/");
+    const mediaType = telegramDocumentMediaType(media, document, mimeType, filename);
     return {
-      type: isPdf ? "pdf" : isImage ? "photo" : "file",
-      label: isPdf ? "PDF" : isImage ? "Фото" : "Файл",
+      ...mediaType,
       mimeType,
       filename,
       size: Number(document.size) || 0,
-      downloadable: true
+      downloadable: true,
+      className: mediaClass
+    };
+  }
+
+  const knownMedia = [
+    ["MessageMediaGeoLive", "location_live", "Live-локація", "Геолокація в реальному часі"],
+    ["MessageMediaGeo", "location", "Локація", "Геолокація"],
+    ["MessageMediaVenue", "venue", text(media.title) || "Місце", text(media.address) || "Локація"],
+    [
+      "MessageMediaContact",
+      "contact",
+      [text(media.firstName || media.first_name), text(media.lastName || media.last_name)].filter(Boolean).join(" ") || "Контакт",
+      normalizePhone(media.phoneNumber || media.phone_number) || text(media.phoneNumber || media.phone_number)
+    ],
+    ["MessageMediaPoll", "poll", "Опитування", telegramRichText(media.poll && media.poll.question)],
+    ["MessageMediaDice", "dice", "Емодзі-кубик", [text(media.emoticon), text(media.value)].filter(Boolean).join(" · ")],
+    ["MessageMediaWebPage", "webpage", "Посилання", telegramRichText(media.webpage && (media.webpage.title || media.webpage.url))],
+    ["MessageMediaGame", "game", "Гра", telegramRichText(media.game && media.game.title)],
+    ["MessageMediaInvoice", "invoice", text(media.title) || "Рахунок", text(media.description)],
+    ["MessageMediaStory", "story", "Історія", "Telegram story"],
+    ["MessageMediaGiveawayResults", "giveaway_results", "Результати розіграшу", text(media.prizeDescription || media.prize_description)],
+    ["MessageMediaGiveaway", "giveaway", "Розіграш", text(media.prizeDescription || media.prize_description)],
+    ["MessageMediaPaidMedia", "paid_media", "Платне медіа", "Telegram paid media"],
+    ["MessageMediaUnsupported", "unsupported", "Непідтримуване повідомлення", "Telegram media"]
+  ].find(([className]) => mediaClass.includes(className));
+
+  if (knownMedia) {
+    return {
+      type: knownMedia[1],
+      label: knownMedia[2],
+      description: knownMedia[3] || mediaClass,
+      mimeType: "",
+      filename: "",
+      downloadable: false,
+      className: mediaClass
     };
   }
 
   return {
     type: "unsupported",
-    label: "Медіа",
+    label: "Непідтримуване повідомлення",
+    description: mediaClass || "Telegram media",
     mimeType: "",
     filename: "",
-    downloadable: false
+    downloadable: false,
+    className: mediaClass
   };
 }
 
@@ -318,7 +644,7 @@ function messagePayload(message) {
     senderId: idText(message.senderId),
     peerId: idText(message.peerId && (message.peerId.userId || message.peerId.chatId || message.peerId.channelId)),
     groupedId: idText(message.groupedId),
-    hasMedia: Boolean(message.media),
+    hasMedia: Boolean(message.media || message.action),
     media,
     replyToMessageId: messageReplyToId(message) || null
   };
@@ -370,6 +696,37 @@ function attachTelegramReplyPreviews(messages, extraMessages = []) {
       replyPreview: telegramReplyPreview(byId.get(Number(message.replyToMessageId)))
     };
   });
+}
+
+function normalizeCachedTelegramMessage(message) {
+  if (!message || !message.media || message.media.type !== "service") {
+    return message;
+  }
+  const actionClass = telegramClassName(message.media);
+  if (!actionClass.includes("MessageAction")) {
+    return message;
+  }
+  const media = normalizeTelegramAction({
+    className: actionClass,
+    duration: message.media.duration,
+    title: message.media.title,
+    message: message.media.message,
+    score: message.media.score,
+    period: message.media.period,
+    distance: message.media.distance,
+    emoticon: message.media.emoticon,
+    stars: message.media.stars
+  });
+  return {
+    ...message,
+    media,
+    payload: message.payload
+      ? {
+          ...message.payload,
+          media
+        }
+      : message.payload
+  };
 }
 
 async function hydrateTelegramReplyPreviews(client, entity, messages) {
@@ -1080,7 +1437,9 @@ class TelegramUserService {
     }
 
     const contact = cached && cached.contact ? cached.contact : null;
-    const messages = cached && Array.isArray(cached.messages) ? cached.messages : [];
+    const messages = cached && Array.isArray(cached.messages)
+      ? cached.messages.map(normalizeCachedTelegramMessage)
+      : [];
     const hasCachedData = Boolean((contact && contact.found) || messages.length);
     return {
       account: telegramAccountSafe(account),

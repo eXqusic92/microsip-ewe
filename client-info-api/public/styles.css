@@ -2469,8 +2469,11 @@ body[data-theme="dark"] .admin-tabs button.active {
 
 .messaging-tabs {
   display: inline-flex;
+  flex: 0 0 auto;
   gap: 3px;
-  min-width: 190px;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
@@ -2478,6 +2481,7 @@ body[data-theme="dark"] .admin-tabs button.active {
 }
 
 .messaging-tab {
+  flex: 0 0 auto;
   min-height: 44px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -2897,25 +2901,37 @@ body[data-theme="dark"] .admin-tabs button.active {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
+  min-height: 0;
 }
 
 .telegram-bubble time {
   color: var(--muted);
   font-size: 10px;
   font-weight: 800;
+  line-height: 1.2;
 }
 
 .telegram-reply-button {
+  position: relative;
   display: inline-grid;
-  width: 44px;
-  height: 44px;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   place-items: center;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+}
+
+.telegram-reply-button::before {
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  content: "";
 }
 
 .telegram-reply-button:hover,
@@ -2931,8 +2947,8 @@ body[data-theme="dark"] .admin-tabs button.active {
 }
 
 .telegram-reply-button .ai-svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 .telegram-reply-preview {
@@ -3020,6 +3036,14 @@ body[data-theme="dark"] .admin-tabs button.active {
 .telegram-media-file:focus-visible {
   border-color: var(--brand);
   outline: 0;
+}
+
+.telegram-media-file.is-static {
+  cursor: default;
+}
+
+.telegram-media-file.is-static:hover {
+  border-color: color-mix(in srgb, var(--brand) 24%, var(--line));
 }
 
 .telegram-media-file:focus-visible {
@@ -10427,13 +10451,11 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .telegram-account-trigger,
   .telegram-refresh,
   .viber-refresh,
-  .telegram-reply-button,
   .note-action-button {
     min-width: 44px;
     min-height: 44px;
   }
 
-  .telegram-reply-button,
   .note-action-button {
     width: 44px;
     height: 44px;

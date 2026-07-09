@@ -1015,6 +1015,299 @@ async function mediaOnlyMessageDoesNotUsePlaceholderText() {
   assert.equal(result.messages[0].media.type, "pdf");
 }
 
+async function conversationLabelsTelegramMessageKinds() {
+  const telegram = service(
+    {},
+    {
+      cacheMessages: async () => {}
+    }
+  );
+  telegram.resolveContact = async () => ({
+    contact: {
+      found: true,
+      telegramUserId: "999",
+      phoneDigits: "380671112233",
+      displayName: "Client"
+    },
+    entity: { id: 999 }
+  });
+  telegram.withClient = async (account, callback) => callback({
+    getMessages: async () => [
+      {
+        id: 91,
+        out: true,
+        message: "",
+        media: {
+          document: {
+            mimeType: "audio/ogg",
+            attributes: [
+              {
+                className: "DocumentAttributeAudio",
+                voice: true,
+                duration: 12
+              }
+            ]
+          }
+        },
+        date: 1783094400,
+        senderId: 42
+      },
+      {
+        id: 92,
+        out: true,
+        message: "",
+        media: {
+          document: {
+            mimeType: "image/webp",
+            attributes: [
+              {
+                className: "DocumentAttributeSticker",
+                alt: ":)"
+              }
+            ]
+          }
+        },
+        date: 1783094401,
+        senderId: 42
+      },
+      {
+        id: 93,
+        out: true,
+        message: "",
+        media: {
+          className: "MessageMediaContact",
+          firstName: "Іван",
+          lastName: "Петренко",
+          phoneNumber: "+380671112233"
+        },
+        date: 1783094402,
+        senderId: 42
+      },
+      {
+        id: 94,
+        out: true,
+        message: "",
+        media: {
+          className: "MessageMediaGeo",
+          geo: { lat: 50.45, long: 30.52 }
+        },
+        date: 1783094403,
+        senderId: 42
+      },
+      {
+        id: 95,
+        out: true,
+        message: "",
+        media: {
+          className: "MessageMediaDice",
+          emoticon: "🎲",
+          value: 5
+        },
+        date: 1783094404,
+        senderId: 42
+      },
+      {
+        id: 96,
+        out: true,
+        message: "",
+        action: {
+          className: "MessageActionPhoneCall"
+        },
+        date: 1783094405,
+        senderId: 42
+      }
+    ]
+  });
+
+  const result = await telegram.conversationForAccount(
+    {
+      id: "acc",
+      status: "connected",
+      enabled: true,
+      sessionString: "session",
+      label: "Main"
+    },
+    "+380671112233",
+    20
+  );
+
+  const byId = new Map(result.messages.map((message) => [message.id, message]));
+  assert.equal(byId.get(91).media.type, "voice");
+  assert.equal(byId.get(91).media.label, "Голосове повідомлення");
+  assert.equal(byId.get(92).media.type, "sticker");
+  assert.equal(byId.get(93).media.type, "contact");
+  assert.equal(byId.get(93).media.label, "Іван Петренко");
+  assert.equal(byId.get(94).media.type, "location");
+  assert.equal(byId.get(95).media.type, "dice");
+  assert.equal(byId.get(96).media.type, "service");
+  assert.equal(byId.get(96).media.label, "Телефонний дзвінок");
+  assert.ok(!byId.get(96).media.description.includes("MessageAction"));
+}
+
+async function conversationLabelsTelegramServiceActions() {
+  const actionClassNames = [
+    "MessageActionEmpty",
+    "MessageActionChatCreate",
+    "MessageActionChatEditTitle",
+    "MessageActionChatEditPhoto",
+    "MessageActionChatDeletePhoto",
+    "MessageActionChatAddUser",
+    "MessageActionChatDeleteUser",
+    "MessageActionChatJoinedByLink",
+    "MessageActionChannelCreate",
+    "MessageActionChatMigrateTo",
+    "MessageActionChannelMigrateFrom",
+    "MessageActionPinMessage",
+    "MessageActionHistoryClear",
+    "MessageActionGameScore",
+    "MessageActionPaymentSentMe",
+    "MessageActionPaymentSent",
+    "MessageActionPhoneCall",
+    "MessageActionScreenshotTaken",
+    "MessageActionCustomAction",
+    "MessageActionBotAllowed",
+    "MessageActionSecureValuesSentMe",
+    "MessageActionSecureValuesSent",
+    "MessageActionContactSignUp",
+    "MessageActionGeoProximityReached",
+    "MessageActionGroupCall",
+    "MessageActionInviteToGroupCall",
+    "MessageActionSetMessagesTTL",
+    "MessageActionGroupCallScheduled",
+    "MessageActionSetChatTheme",
+    "MessageActionChatJoinedByRequest",
+    "MessageActionWebViewDataSentMe",
+    "MessageActionWebViewDataSent",
+    "MessageActionGiftPremium",
+    "MessageActionTopicCreate",
+    "MessageActionTopicEdit",
+    "MessageActionSuggestProfilePhoto",
+    "MessageActionRequestedPeer",
+    "MessageActionSetChatWallPaper",
+    "MessageActionGiftCode",
+    "MessageActionGiveawayLaunch",
+    "MessageActionGiveawayResults",
+    "MessageActionBoostApply",
+    "MessageActionRequestedPeerSentMe",
+    "MessageActionPaymentRefunded",
+    "MessageActionGiftStars",
+    "MessageActionPrizeStars",
+    "MessageActionStarGift",
+    "MessageActionStarGiftUnique"
+  ];
+  const telegram = service(
+    {},
+    {
+      cacheMessages: async () => {}
+    }
+  );
+  telegram.resolveContact = async () => ({
+    contact: {
+      found: true,
+      telegramUserId: "999",
+      phoneDigits: "380671112233",
+      displayName: "Client"
+    },
+    entity: { id: 999 }
+  });
+  telegram.withClient = async (account, callback) => callback({
+    getMessages: async () => actionClassNames.map((className, index) => ({
+      id: 200 + index,
+      out: true,
+      message: "",
+      action: {
+        className,
+        title: "Тест",
+        message: "Тестова дія",
+        score: 5,
+        duration: 75,
+        period: 3600,
+        distance: 150,
+        emoticon: "🎨",
+        stars: 10
+      },
+      date: 1783094400 + index,
+      senderId: 42
+    }))
+  });
+
+  const result = await telegram.conversationForAccount(
+    {
+      id: "acc",
+      status: "connected",
+      enabled: true,
+      sessionString: "session",
+      label: "Main"
+    },
+    "+380671112233",
+    100
+  );
+
+  assert.equal(result.messages.length, actionClassNames.length);
+  for (const message of result.messages) {
+    assert.equal(message.media.type, "service");
+    assert.ok(message.media.label);
+    assert.ok(message.media.description);
+    assert.ok(!message.media.label.includes("MessageAction"));
+    assert.ok(!message.media.description.includes("MessageAction"));
+  }
+}
+
+async function cachedConversationRelabelsServiceActions() {
+  const telegram = service(
+    {},
+    {
+      cachedConversation: async () => ({
+        contact: {
+          found: true,
+          displayName: "Cached Client"
+        },
+        messages: [
+          {
+            id: 500,
+            direction: "incoming",
+            text: "",
+            media: {
+              type: "service",
+              label: "Службове повідомлення",
+              description: "MessageActionPhoneCall",
+              className: "MessageActionPhoneCall"
+            },
+            payload: {
+              hasMedia: true,
+              media: {
+                type: "service",
+                label: "Службове повідомлення",
+                description: "MessageActionPhoneCall",
+                className: "MessageActionPhoneCall"
+              }
+            },
+            sentAt: "2026-07-08T13:10:00.000Z"
+          }
+        ]
+      })
+    }
+  );
+
+  const result = await telegram.cachedConversationForAccount(
+    {
+      id: "acc",
+      status: "connected",
+      enabled: true,
+      sessionString: "session",
+      label: "Main"
+    },
+    "+380671112233",
+    20,
+    new Error("TIMEOUT")
+  );
+
+  assert.equal(result.messages[0].media.label, "Телефонний дзвінок");
+  assert.ok(!result.messages[0].media.description.includes("MessageAction"));
+  assert.equal(result.messages[0].payload.media.label, "Телефонний дзвінок");
+  assert.ok(!result.messages[0].payload.media.description.includes("MessageAction"));
+}
+
 async function conversationTimeoutUsesCacheAndCooldown() {
   let liveAttempts = 0;
   const account = {
@@ -1121,6 +1414,9 @@ const tests = [
   sendMessagePassesReplyToMessageId,
   mediaDownloadReturnsPdfBytes,
   mediaOnlyMessageDoesNotUsePlaceholderText,
+  conversationLabelsTelegramMessageKinds,
+  conversationLabelsTelegramServiceActions,
+  cachedConversationRelabelsServiceActions,
   conversationTimeoutUsesCacheAndCooldown,
   invalidTelegramSessionMarksAccountFailed
 ];
