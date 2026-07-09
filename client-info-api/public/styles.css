@@ -4014,7 +4014,7 @@ body[data-theme="dark"] .admin-tabs button.active {
 }
 
 .modal-ticket-route .trip-place strong {
-  font-size: clamp(18px, 2.1vw, 25px);
+  font-size: 22px;
 }
 
 .modal-ticket-route .trip-place small {
@@ -8963,10 +8963,19 @@ body[data-theme="dark"] .quality-metric-option {
 }
 
 .order-price strong,
+.order-date strong,
+.identity-row h1,
+.trip-place strong,
+.trip-departure strong,
+.trip-departure b,
 .ticket-date strong,
 .ticket-route strong,
 .ticket-price strong,
 .call-side strong,
+.modal-ticket-title strong,
+.modal-ticket-badges > strong,
+.modal-ticket-departure strong,
+.modal-ticket-departure b,
 .monitor-analytics-summary strong,
 .manager-rating-summary strong,
 .manager-rating-rank,
