@@ -7,6 +7,9 @@
   --line-strong: #c9c7c2;
   --text: #111111;
   --muted: #686865;
+  --font-ui: Montserrat, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-accent: "Montserrat Alternates", var(--font-ui);
+  --font-data: var(--font-ui);
   --brand: #e30613;
   --brand-dark: #b5000c;
   --brand-soft: #fff0f1;
@@ -90,10 +93,10 @@
   --z-tooltip: 220;
   --z-confirm-layer: 260;
   --z-confirm-popover: 270;
-  font-family:
-    Montserrat, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-ui);
   color: var(--ink);
   background: var(--page);
+  font-kerning: normal;
   font-synthesis: none;
 }
 
@@ -8957,6 +8960,34 @@ body[data-theme="dark"] .quality-metric-option {
   border-radius: 8px;
   outline: 0;
   background: var(--panel-soft);
+}
+
+.order-price strong,
+.ticket-date strong,
+.ticket-route strong,
+.ticket-price strong,
+.call-side strong,
+.monitor-analytics-summary strong,
+.manager-rating-summary strong,
+.manager-rating-rank,
+.manager-rating-cell-score,
+.manager-rating-modal-stat strong,
+.manager-rating-modal-metric-head span,
+.call-type-percentage,
+.monitor-call-phone strong,
+.call-stats-summary strong,
+.call-stats-focus strong,
+.call-detail-facts strong,
+.detail-analysis-item > strong,
+.detail-technical dd,
+.quality-score,
+.quality-context-score strong,
+.quality-score-pill,
+.audio-time,
+.audio-speed {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 body[data-theme="dark"] .identity-row,
