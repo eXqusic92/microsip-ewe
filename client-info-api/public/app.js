@@ -890,7 +890,7 @@ function formatMinutesFromSeconds(value) {
 }
 
 function formatDuration(value) {
-  const totalSeconds = Math.max(0, Number(value || 0));
+  const totalSeconds = Math.max(0, Math.round(Number(value || 0)));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
