@@ -15,6 +15,12 @@
   --green: #2f9b69;
   --amber: #d9901f;
   --red: #e30613;
+  --brand-readable: var(--brand-dark);
+  --success-readable: #236f4c;
+  --warning-readable: #704d00;
+  --danger-readable: var(--brand-dark);
+  --return-readable: #56358b;
+  --call-outgoing-readable: #24697d;
   --ink-soft: #f0efec;
   --accent: var(--brand);
   --accent-dark: var(--brand-dark);
@@ -33,6 +39,15 @@
   --warning-bg: #fff8e7;
   --warning-text: #704d00;
   --warning-border: #e3a008;
+  --state-neutral-bg: color-mix(in srgb, var(--panel-soft) 86%, var(--panel));
+  --state-info-bg: color-mix(in srgb, var(--brand) 8%, var(--panel));
+  --state-success-bg: color-mix(in srgb, var(--success) 10%, var(--panel));
+  --state-warning-bg: color-mix(in srgb, var(--warning) 13%, var(--panel));
+  --state-danger-bg: color-mix(in srgb, var(--danger) 9%, var(--panel));
+  --state-info-border: color-mix(in srgb, var(--brand) 26%, var(--line));
+  --state-success-border: color-mix(in srgb, var(--success) 34%, var(--line));
+  --state-warning-border: color-mix(in srgb, var(--warning) 42%, var(--line));
+  --state-danger-border: color-mix(in srgb, var(--danger) 34%, var(--line));
   --success: var(--green);
   --warning: var(--amber);
   --danger: var(--red);
@@ -79,6 +94,12 @@ body[data-theme="dark"] {
   --green: #53c58e;
   --amber: #e2a73f;
   --red: #f06b6b;
+  --brand-readable: var(--brand-dark);
+  --success-readable: color-mix(in srgb, var(--success) 42%, var(--ink));
+  --warning-readable: color-mix(in srgb, var(--warning) 45%, var(--ink));
+  --danger-readable: color-mix(in srgb, var(--danger) 42%, var(--ink));
+  --return-readable: color-mix(in srgb, var(--return) 46%, var(--ink));
+  --call-outgoing-readable: color-mix(in srgb, var(--call-outgoing) 44%, var(--ink));
   --ink-soft: #23313a;
   --warning-bg: #2c2414;
   --warning-text: #f1cb7b;
@@ -597,11 +618,17 @@ select:disabled {
 }
 
 .profile-menu-trigger:hover,
+.profile-menu-trigger:focus-visible,
 .profile-menu.is-open .profile-menu-trigger {
   border-color: var(--accent);
   color: var(--accent);
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(227, 6, 19, 0.14);
+}
+
+.profile-menu-trigger:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  outline-offset: 2px;
 }
 
 .profile-menu-trigger svg,
@@ -1006,7 +1033,9 @@ body[data-theme="dark"] .login-form input:focus {
   padding: 30px 34px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--panel);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand) 5%, transparent), transparent 46%),
+    var(--panel);
   text-align: left;
   color: var(--muted);
 }
@@ -1055,6 +1084,8 @@ body[data-theme="dark"] .login-form input:focus {
   justify-content: center;
   gap: 12px;
   color: var(--muted);
+  font-size: 14px;
+  font-weight: 850;
 }
 
 .spinner {
@@ -1082,6 +1113,11 @@ body[data-theme="dark"] .login-form input:focus {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.no-data.async-loading {
+  display: flex;
+  justify-content: center;
 }
 
 .trip-info .inline-loading {
@@ -1158,9 +1194,24 @@ body[data-theme="dark"] .login-form input:focus {
   font-weight: 900;
 }
 
+.admin-tabs button:hover,
+.admin-tabs button:focus-visible {
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  color: var(--ink);
+  outline: 0;
+}
+
+.admin-tabs button:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 .admin-tabs button.active {
   background: var(--brand);
   color: #ffffff;
+}
+
+body[data-theme="dark"] .admin-tabs button.active {
+  color: var(--brand-ink);
 }
 
 .admin-panel {
@@ -1325,7 +1376,7 @@ body[data-theme="dark"] .login-form input:focus {
   border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 10%, var(--panel));
-  color: var(--accent);
+  color: var(--brand-readable);
   padding: 0 11px;
   font-size: 12px;
   font-weight: 900;
@@ -1335,7 +1386,7 @@ body[data-theme="dark"] .login-form input:focus {
 .admin-role-pill.is-admin {
   border-color: color-mix(in srgb, var(--brand) 32%, var(--line));
   background: color-mix(in srgb, var(--brand) 10%, var(--panel));
-  color: var(--brand);
+  color: var(--brand-readable);
 }
 
 .admin-user-actions {
@@ -1385,12 +1436,14 @@ body[data-theme="dark"] .login-form input:focus {
 
 .admin-empty {
   margin: 0;
-  border: 1px dashed var(--line-strong);
+  border: 1px solid var(--state-info-border);
   border-radius: 9px;
-  background: var(--panel-soft);
+  background: var(--state-info-bg);
   color: var(--muted);
   padding: 18px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.45;
   text-align: center;
 }
 
@@ -1630,12 +1683,14 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .warning {
-  border: 1px solid var(--warning-border);
+  border: 1px solid var(--state-warning-border);
   border-radius: 7px;
-  background: var(--warning-bg);
-  color: var(--warning-text);
+  background: var(--state-warning-bg);
+  color: var(--warning-readable);
   padding: 12px 16px;
   font-size: 13px;
+  font-weight: 850;
+  line-height: 1.45;
 }
 
 .warning-stack:empty {
@@ -1833,23 +1888,23 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .status-paid {
-  color: var(--success);
+  color: var(--success-readable);
 }
 
 .status-cancelled {
-  color: var(--danger);
+  color: var(--danger-readable);
 }
 
 .status-returned {
-  color: var(--return);
+  color: var(--return-readable);
 }
 
 .status-reserved {
-  color: var(--warning);
+  color: var(--warning-readable);
 }
 
 .upcoming-section .status-paid {
-  color: var(--success);
+  color: var(--success-readable);
 }
 
 .upcoming-trip {
@@ -2401,10 +2456,17 @@ body[data-theme="dark"] .login-form input:focus {
   background: color-mix(in srgb, var(--brand) 8%, transparent);
 }
 
+.messaging-tab:focus-visible {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  outline-offset: 2px;
+}
+
 .messaging-tab.is-active {
   border-color: color-mix(in srgb, var(--brand) 36%, var(--line));
   background: color-mix(in srgb, var(--brand) 14%, var(--panel));
-  color: var(--brand);
+  color: var(--brand-readable);
 }
 
 .messaging-panel {
@@ -2441,7 +2503,7 @@ body[data-theme="dark"] .login-form input:focus {
 .messaging-channel-title span {
   overflow: visible;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 850;
   line-height: 1.25;
   text-overflow: clip;
@@ -2483,9 +2545,15 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .telegram-account-dropdown.is-open .telegram-account-trigger,
+.telegram-account-trigger:not(:disabled):focus-visible,
 .telegram-account-trigger:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--brand) 48%, var(--field-border));
   background: color-mix(in srgb, var(--brand) 8%, var(--field));
+}
+
+.telegram-account-trigger:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  outline-offset: 2px;
 }
 
 .telegram-account-trigger-main {
@@ -2508,20 +2576,20 @@ body[data-theme="dark"] .login-form input:focus {
 
 .telegram-account-trigger-main small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
 }
 
 .telegram-account-trigger-main small.is-success {
-  color: var(--success);
+  color: var(--success-readable);
 }
 
 .telegram-account-trigger-main small.is-error {
-  color: var(--danger);
+  color: var(--danger-readable);
 }
 
 .telegram-account-trigger-main small.is-neutral {
-  color: var(--brand);
+  color: var(--brand-readable);
 }
 
 .telegram-account-chevron {
@@ -2574,9 +2642,15 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .telegram-account-option:hover,
+.telegram-account-option:focus-visible,
 .telegram-account-option.is-selected {
   border-color: color-mix(in srgb, var(--brand) 34%, var(--line));
   background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+.telegram-account-option:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  outline-offset: 1px;
 }
 
 .telegram-account-option-main {
@@ -2615,19 +2689,19 @@ body[data-theme="dark"] .login-form input:focus {
 
 .telegram-account-option.is-success .telegram-account-option-badge {
   border-color: color-mix(in srgb, var(--success) 46%, var(--line));
-  color: var(--success);
+  color: var(--success-readable);
   background: color-mix(in srgb, var(--success) 12%, transparent);
 }
 
 .telegram-account-option.is-error .telegram-account-option-badge {
   border-color: color-mix(in srgb, var(--danger) 46%, var(--line));
-  color: var(--danger);
+  color: var(--danger-readable);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 .telegram-account-option.is-neutral .telegram-account-option-badge {
   border-color: color-mix(in srgb, var(--brand) 38%, var(--line));
-  color: var(--brand);
+  color: var(--brand-readable);
   background: color-mix(in srgb, var(--brand) 10%, transparent);
 }
 
@@ -2703,19 +2777,19 @@ body[data-theme="dark"] .login-form input:focus {
 
 .telegram-thread-status.is-success {
   border-color: color-mix(in srgb, var(--success) 45%, var(--line));
-  color: var(--success);
+  color: var(--success-readable);
   background: color-mix(in srgb, var(--success) 12%, var(--panel));
 }
 
 .telegram-thread-status.is-error {
   border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
-  color: var(--danger);
+  color: var(--danger-readable);
   background: color-mix(in srgb, var(--danger) 12%, var(--panel));
 }
 
 .telegram-thread-status.is-neutral {
   border-color: color-mix(in srgb, var(--brand) 30%, var(--line));
-  color: var(--brand);
+  color: var(--brand-readable);
   background: color-mix(in srgb, var(--brand) 10%, var(--panel));
 }
 
@@ -2742,9 +2816,12 @@ body[data-theme="dark"] .login-form input:focus {
   display: grid;
   min-height: 100%;
   place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--state-neutral-bg) 72%, transparent);
   color: var(--muted);
+  padding: 16px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 850;
   line-height: 1.45;
   text-align: center;
 }
@@ -2799,10 +2876,16 @@ body[data-theme="dark"] .login-form input:focus {
   cursor: pointer;
 }
 
-.telegram-reply-button:hover {
+.telegram-reply-button:hover,
+.telegram-reply-button:focus-visible {
   border-color: color-mix(in srgb, var(--brand) 34%, var(--line));
   color: var(--brand);
   background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+.telegram-reply-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  outline-offset: 2px;
 }
 
 .telegram-reply-button .ai-svg {
@@ -2822,6 +2905,17 @@ body[data-theme="dark"] .login-form input:focus {
   padding: 6px 8px;
   text-align: left;
   cursor: pointer;
+}
+
+.telegram-reply-preview:hover,
+.telegram-reply-preview:focus-visible {
+  border-color: color-mix(in srgb, var(--brand) 42%, var(--line));
+  background: color-mix(in srgb, var(--brand) 13%, transparent);
+  outline: 0;
+}
+
+.telegram-reply-preview:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .telegram-reply-preview span {
@@ -2850,6 +2944,16 @@ body[data-theme="dark"] .login-form input:focus {
   cursor: zoom-in;
 }
 
+.telegram-media-photo:hover,
+.telegram-media-photo:focus-visible {
+  border-color: var(--brand);
+  outline: 0;
+}
+
+.telegram-media-photo:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 .telegram-media-photo img {
   display: block;
   width: 100%;
@@ -2870,8 +2974,14 @@ body[data-theme="dark"] .login-form input:focus {
   text-decoration: none;
 }
 
-.telegram-media-file:hover {
+.telegram-media-file:hover,
+.telegram-media-file:focus-visible {
   border-color: var(--brand);
+  outline: 0;
+}
+
+.telegram-media-file:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .telegram-media-file .ai-svg {
@@ -3043,10 +3153,16 @@ body[data-theme="dark"] .login-form input:focus {
   line-height: 1;
 }
 
-.telegram-reply-bar #telegram-reply-cancel:hover {
+.telegram-reply-bar #telegram-reply-cancel:hover,
+.telegram-reply-bar #telegram-reply-cancel:focus-visible {
   border-color: var(--brand);
   color: var(--brand);
   background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+.telegram-reply-bar #telegram-reply-cancel:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  outline-offset: 2px;
 }
 
 .telegram-compose textarea {
@@ -3310,7 +3426,7 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .order-price strong {
-  color: var(--call-outgoing);
+  color: var(--call-outgoing-readable);
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
   line-height: 1.2;
@@ -3589,7 +3705,7 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .ticket-price strong {
-  color: var(--call-outgoing);
+  color: var(--call-outgoing-readable);
   font-family:
     "Montserrat Alternates", Montserrat, "Segoe UI", system-ui, sans-serif;
   font-size: 21px;
@@ -3717,9 +3833,15 @@ body[data-theme="dark"] .login-form input:focus {
   line-height: 1;
 }
 
-.modal-close:hover {
+.modal-close:hover,
+.modal-close:focus-visible {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.modal-close:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  outline-offset: 2px;
 }
 
 .tickets-modal-list {
@@ -4036,22 +4158,62 @@ body[data-theme="dark"] .login-form input:focus {
 }
 
 .form-message {
-  min-height: 18px;
+  min-height: 0;
   margin: 7px 0 0;
-  color: var(--danger);
+  color: var(--danger-readable);
   font-size: 12px;
+  font-weight: 850;
+  line-height: 1.4;
 }
 
-.form-message[data-tone="success"] {
-  color: var(--success);
+.form-message:not(:empty) {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 34px;
+  border: 1px solid var(--state-danger-border);
+  border-radius: 7px;
+  background: var(--state-danger-bg);
+  padding: 8px 10px;
 }
 
-.form-message[data-tone="warning"] {
-  color: var(--warning);
+.form-message:not(:empty)::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-top: 0.48em;
+  border-radius: 999px;
+  background: currentColor;
 }
 
-.form-message[data-tone="neutral"] {
+.form-message[data-tone="success"],
+.form-message.success {
+  border-color: var(--state-success-border);
+  background: var(--state-success-bg);
+  color: var(--success-readable);
+}
+
+.form-message[data-tone="warning"],
+.form-message.warning {
+  border-color: var(--state-warning-border);
+  background: var(--state-warning-bg);
+  color: var(--warning-readable);
+}
+
+.form-message[data-tone="neutral"],
+.form-message.neutral {
+  border-color: var(--state-info-border);
+  background: var(--state-info-bg);
   color: var(--muted);
+}
+
+.form-message[data-tone="danger"],
+.form-message[data-tone="error"],
+.form-message.error {
+  border-color: var(--state-danger-border);
+  background: var(--state-danger-bg);
+  color: var(--danger-readable);
 }
 
 .notes-list {
@@ -4304,13 +4466,15 @@ body[data-theme="dark"] .login-form input:focus {
 
 .no-data {
   margin: 18px 0 0;
-  padding: 22px;
-  border: 1px dashed var(--field-border);
+  padding: 18px 20px;
+  border: 1px solid var(--state-info-border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--state-info-bg);
   color: var(--muted);
   text-align: center;
   font-size: 13px;
+  font-weight: 850;
+  line-height: 1.45;
 }
 
 .monitor-page,
@@ -5213,7 +5377,9 @@ body[data-theme="dark"] .ai-settings-page {
 }
 
 .ai-gradient-button:hover,
-.ai-dialog-submit:hover {
+.ai-gradient-button:focus-visible,
+.ai-dialog-submit:hover,
+.ai-dialog-submit:focus-visible {
   background: var(--brand-dark);
   border-color: var(--brand-dark);
   transform: translateY(-1px);
@@ -5242,7 +5408,8 @@ body[data-theme="dark"] .ai-settings-page {
   box-shadow: none;
 }
 
-.ai-white-button:hover {
+.ai-white-button:hover,
+.ai-white-button:focus-visible {
   color: var(--ai-indigo);
   border-color: color-mix(in srgb, var(--ai-indigo) 32%, var(--ai-panel));
 }
@@ -5257,6 +5424,7 @@ body[data-theme="dark"] .ai-settings-page {
 }
 
 .ai-quiet-button:hover,
+.ai-quiet-button:focus-visible,
 .ai-quiet-button[data-active="true"] {
   background: color-mix(in srgb, var(--ai-indigo) 12%, var(--ai-panel));
   color: var(--ai-indigo);
@@ -5301,7 +5469,7 @@ body[data-theme="dark"] .ai-settings-page {
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--ai-line));
   background: color-mix(in srgb, var(--accent) 8%, var(--ai-panel));
-  color: var(--ai-indigo);
+  color: var(--brand-readable);
   padding: 0 12px;
   font-size: 13px;
   font-weight: 900;
@@ -5336,7 +5504,9 @@ body[data-theme="dark"] .ai-settings-page {
 }
 
 .ai-type-card:hover,
-.ai-metric-card:hover {
+.ai-type-card:focus-visible,
+.ai-metric-card:hover,
+.ai-metric-card:focus-visible {
   border-color: color-mix(in srgb, var(--ai-indigo) 32%, var(--ai-line));
   box-shadow: none;
   transform: translateY(-1px);
@@ -5440,7 +5610,8 @@ body[data-theme="dark"] .ai-settings-page {
   line-height: 1;
 }
 
-.ai-icon-button-soft:hover {
+.ai-icon-button-soft:hover,
+.ai-icon-button-soft:focus-visible {
   background: var(--ai-button-soft);
   color: var(--ai-indigo);
 }
@@ -5589,7 +5760,8 @@ body[data-theme="dark"] .ai-settings-page {
   user-select: none;
 }
 
-.ai-metric-card:hover {
+.ai-metric-card:hover,
+.ai-metric-card:focus-visible {
   transform: none;
   box-shadow: none;
 }
@@ -5851,6 +6023,17 @@ body[data-theme="dark"] .ai-settings-page {
   color: var(--ai-muted);
   font-size: 14px;
   font-weight: 700;
+}
+
+.ai-soldly-empty {
+  margin: 8px 0 0;
+  border: 1px solid color-mix(in srgb, var(--ai-indigo) 22%, var(--ai-line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ai-indigo) 7%, var(--ai-panel));
+  padding: 16px;
+  font-weight: 850;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .ai-settings-status {
@@ -6229,7 +6412,8 @@ body[data-theme="dark"] .ai-settings-page {
 }
 
 .ai-color-swatch[aria-expanded="true"],
-.ai-color-swatch:hover {
+.ai-color-swatch:hover,
+.ai-color-swatch:focus-visible {
   border-color: color-mix(in srgb, var(--ai-indigo) 50%, var(--ai-line-strong));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ai-indigo) 13%, transparent);
 }
@@ -6287,9 +6471,15 @@ body[data-theme="dark"] .ai-settings-page {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ai-indigo) 22%, transparent);
 }
 
-.ai-color-choice:hover {
+.ai-color-choice:hover,
+.ai-color-choice:focus-visible {
   transform: translateY(-1px);
   border-color: var(--ai-indigo);
+}
+
+.ai-color-choice:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ai-indigo) 20%, transparent);
+  outline-offset: 2px;
 }
 
 .ai-modal-option-criteria {
@@ -6804,7 +6994,7 @@ body[data-theme="dark"] .ai-settings-page {
   border: 1px solid color-mix(in srgb, var(--call-type-color, var(--line-strong)) 55%, var(--line));
   border-radius: 999px;
   background: color-mix(in srgb, var(--call-type-color, var(--panel-soft)) 12%, var(--panel-soft));
-  color: var(--call-type-color, var(--muted));
+  color: color-mix(in srgb, var(--call-type-color, var(--muted)) 54%, var(--ink));
   padding: 4px 8px;
   overflow: hidden;
   font-size: 12px;
@@ -6812,6 +7002,12 @@ body[data-theme="dark"] .ai-settings-page {
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+body[data-theme="dark"] .monitor-call-identity > span {
+  border-color: color-mix(in srgb, var(--call-type-color, var(--line-strong)) 46%, var(--line-strong));
+  background: color-mix(in srgb, var(--call-type-color, var(--panel-soft)) 18%, var(--panel-soft));
+  color: color-mix(in srgb, var(--call-type-color, var(--ink)) 42%, var(--ink));
 }
 
 .monitor-call-alerts {
@@ -6833,7 +7029,7 @@ body[data-theme="dark"] .ai-settings-page {
   border: 1px solid color-mix(in srgb, var(--warning) 58%, var(--line));
   border-radius: 999px;
   background: color-mix(in srgb, var(--warning) 13%, var(--panel-soft));
-  color: var(--warning);
+  color: var(--warning-readable);
   padding: 4px 8px;
   overflow: hidden;
   font-size: 12px;
@@ -6846,19 +7042,19 @@ body[data-theme="dark"] .ai-settings-page {
 .monitor-alert-badge[data-tone="danger"] {
   border-color: color-mix(in srgb, var(--danger) 60%, var(--line));
   background: color-mix(in srgb, var(--danger) 12%, var(--panel-soft));
-  color: var(--danger);
+  color: var(--danger-readable);
 }
 
 .monitor-alert-badge[data-tone="info"] {
   border-color: color-mix(in srgb, var(--call-outgoing) 60%, var(--line));
   background: color-mix(in srgb, var(--call-outgoing) 12%, var(--panel-soft));
-  color: var(--call-outgoing);
+  color: var(--call-outgoing-readable);
 }
 
 .monitor-alert-badge[data-tone="success"] {
   border-color: color-mix(in srgb, var(--success) 58%, var(--line));
   background: color-mix(in srgb, var(--success) 11%, var(--panel-soft));
-  color: var(--success);
+  color: var(--success-readable);
 }
 
 .monitor-call-fact {
@@ -6928,10 +7124,16 @@ body[data-theme="dark"] .ai-settings-page {
 }
 
 .monitor-page-button:hover,
+.monitor-page-button:focus-visible,
 .monitor-page-button.active {
   border-color: var(--brand);
   background: var(--brand);
   color: #ffffff;
+}
+
+.monitor-page-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  outline-offset: 2px;
 }
 
 .monitor-page-button:disabled {
@@ -7518,7 +7720,11 @@ body[data-theme="dark"] .call-stats-heatmap-cell.call-stats-is-selected {
 }
 
 .call-stats-empty-cell {
+  background: var(--state-info-bg) !important;
   color: var(--muted) !important;
+  font-weight: 850 !important;
+  line-height: 1.45 !important;
+  padding: 18px !important;
   text-align: center !important;
 }
 
@@ -7782,7 +7988,7 @@ body[data-theme="dark"] .call-stats-list-row {
 .call-detail-badges .status:first-child {
   border-color: color-mix(in srgb, var(--call-type-color, var(--line-strong)) 60%, var(--line));
   background: color-mix(in srgb, var(--call-type-color, var(--panel-soft)) 13%, var(--panel-soft));
-  color: var(--call-type-color, var(--ink));
+  color: color-mix(in srgb, var(--call-type-color, var(--ink)) 54%, var(--ink));
 }
 
 .call-detail-facts {
@@ -7997,7 +8203,7 @@ body[data-theme="dark"] .call-stats-list-row {
 
 .detail-analysis-item[data-tone="info"] > strong,
 .detail-analysis-item[data-tone="accent"] > strong {
-  color: color-mix(in srgb, var(--item-color) 74%, var(--ink));
+  color: color-mix(in srgb, var(--item-color) 54%, var(--ink));
 }
 
 .call-quality-panel {
@@ -8294,10 +8500,14 @@ body[data-theme="dark"] .call-stats-list-row {
 
 .quality-metric-option {
   grid-column: 2;
-  color: var(--muted) !important;
-  font-size: 11px !important;
+  color: color-mix(in srgb, var(--muted) 84%, var(--ink)) !important;
+  font-size: 12px !important;
   font-weight: 900 !important;
   line-height: 1.25 !important;
+}
+
+body[data-theme="dark"] .quality-metric-option {
+  color: color-mix(in srgb, var(--muted) 72%, var(--ink)) !important;
 }
 
 .quality-score-pill,
@@ -8499,9 +8709,15 @@ body[data-theme="dark"] .call-stats-list-row {
   font-weight: 900;
 }
 
-.audio-speed:hover {
+.audio-speed:hover,
+.audio-speed:focus-visible {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.audio-speed:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  outline-offset: 2px;
 }
 
 .transcript-panel {
