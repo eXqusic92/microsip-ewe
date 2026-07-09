@@ -77,6 +77,7 @@
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
+  --scroll-rail-padding: 12px;
   --z-base: 0;
   --z-raised: 1;
   --z-active: 2;
@@ -229,6 +230,19 @@ a {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--panel-soft);
+}
+
+.app-tabs,
+.admin-tabs,
+.ai-soldly-tabs,
+.monitor-analytics-summary,
+.manager-rating-summary,
+.call-stats-heatmap,
+.call-stats-table-wrap,
+.manager-rating-table {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: var(--scroll-rail-padding);
 }
 
 .app-tabs a {
@@ -4736,6 +4750,7 @@ body[data-theme="dark"] .admin-tabs button.active {
   min-height: 36px;
   align-items: center;
   gap: 8px;
+  scroll-snap-align: start;
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -4760,6 +4775,7 @@ body[data-theme="dark"] .admin-tabs button.active {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
+  scrollbar-gutter: stable;
 }
 
 .manager-rating-matrix {
@@ -6603,11 +6619,13 @@ body[data-theme="dark"] .ai-settings-page {
     gap: 24px;
     overflow-x: auto;
     padding-bottom: 1px;
+    scroll-snap-type: x proximity;
     white-space: nowrap;
   }
 
   .ai-soldly-tabs button {
     flex: 0 0 auto;
+    scroll-snap-align: start;
     font-size: 14px;
   }
 
@@ -7688,6 +7706,7 @@ body[data-theme="dark"] .call-stats-heatmap-cell.call-stats-is-selected {
 
 .call-stats-table-wrap {
   overflow-x: auto;
+  scrollbar-gutter: stable;
 }
 
 .call-stats-table {
@@ -9333,6 +9352,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
     gap: 4px;
     overflow-x: auto;
     border-radius: 12px;
+    scroll-snap-type: x proximity;
     scrollbar-width: none;
   }
 
@@ -9345,6 +9365,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
     justify-content: center;
     min-height: 44px;
     padding: 0 9px;
+    scroll-snap-align: start;
     text-align: center;
   }
 
@@ -9359,6 +9380,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
     flex-wrap: nowrap;
     overflow-x: auto;
     padding-bottom: 2px;
+    scroll-snap-type: x proximity;
     scrollbar-width: none;
   }
 
@@ -9578,6 +9600,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .admin-tabs {
     max-width: 100%;
     overflow-x: auto;
+    scroll-snap-type: x proximity;
     scrollbar-width: none;
   }
 
@@ -9587,6 +9610,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
 
   .admin-tabs button {
     flex: 0 0 auto;
+    scroll-snap-align: start;
   }
 
   .admin-telegram-card {
