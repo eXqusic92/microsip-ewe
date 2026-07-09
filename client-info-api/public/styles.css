@@ -63,6 +63,22 @@
   --audio-extra-5: #c05aa3;
   --audio-extra-6: #6a9b3e;
   --shadow: 0 8px 18px rgba(17, 17, 17, 0.08);
+  --shadow-control: 0 3px 8px color-mix(in srgb, var(--ink) 8%, transparent);
+  --shadow-control-active: 0 3px 8px color-mix(in srgb, var(--brand) 20%, transparent);
+  --shadow-menu: 0 10px 22px color-mix(in srgb, var(--ink) 16%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent);
+  --focus-ring-strong: 0 0 0 3px color-mix(in srgb, var(--brand) 24%, transparent);
+  --motion-fast: 140ms;
+  --motion-base: 160ms;
+  --motion-panel: 180ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --z-base: 0;
+  --z-raised: 1;
+  --z-active: 2;
+  --z-sticky-table: 3;
+  --z-sticky-corner: 4;
+  --z-floating-action: 80;
   --z-dropdown: 90;
   --z-header: 120;
   --z-popover: 150;
@@ -269,7 +285,7 @@ body[data-theme="dark"] .app-tabs a.active {
 
 .phone-search:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.12);
+  box-shadow: var(--focus-ring);
 }
 
 .search-icon {
@@ -319,10 +335,10 @@ body[data-theme="dark"] .app-tabs a.active {
   font-weight: 900;
   box-shadow: none;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    color 0.16s ease,
-    box-shadow 0.16s ease;
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
 }
 
 .phone-search button {
@@ -405,9 +421,9 @@ select:disabled {
   white-space: nowrap;
   box-shadow: none;
   transition:
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    background 0.16s ease;
+    border-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard);
 }
 
 .custom-select-button::after {
@@ -420,7 +436,7 @@ select:disabled {
   border-bottom: 2px solid currentColor;
   opacity: 0.78;
   transform: translateY(-2px) rotate(45deg);
-  transition: transform 0.16s ease;
+  transition: transform var(--motion-base) var(--ease-standard);
 }
 
 .custom-select.is-open .custom-select-button::after {
@@ -432,7 +448,7 @@ select:disabled {
 .custom-select.is-open .custom-select-button {
   border-color: var(--accent);
   outline: 0;
-  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.12);
+  box-shadow: var(--focus-ring);
 }
 
 .custom-select-value {
@@ -457,7 +473,7 @@ select:disabled {
   border-radius: 10px;
   background: var(--panel);
   padding: 6px;
-  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.16);
+  box-shadow: var(--shadow-menu);
 }
 
 .monitor-period .custom-select-menu {
@@ -525,10 +541,10 @@ select:disabled {
   font-weight: 900;
   box-shadow: none;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    color 0.16s ease,
-    opacity 0.16s ease;
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    color var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard);
 }
 
 .secondary-action:hover,
@@ -593,7 +609,7 @@ select:disabled {
 
 .profile-menu {
   position: relative;
-  z-index: 20;
+  z-index: var(--z-dropdown);
   flex: 0 0 auto;
 }
 
@@ -608,13 +624,13 @@ select:disabled {
   background: var(--panel-soft);
   color: var(--ink);
   padding: 0;
-  box-shadow: 0 3px 8px rgba(31, 48, 58, 0.08);
+  box-shadow: var(--shadow-control);
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    color 0.16s ease,
-    transform 0.16s ease,
-    box-shadow 0.16s ease;
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    color var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
 }
 
 .profile-menu-trigger:hover,
@@ -623,7 +639,7 @@ select:disabled {
   border-color: var(--accent);
   color: var(--accent);
   transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(227, 6, 19, 0.14);
+  box-shadow: var(--shadow-control-active);
 }
 
 .profile-menu-trigger:focus-visible {
@@ -656,9 +672,9 @@ select:disabled {
   border-radius: 8px;
   background: var(--panel);
   padding: 8px;
-  box-shadow: 0 10px 22px rgba(31, 48, 58, 0.16);
+  box-shadow: var(--shadow-menu);
   transform-origin: top right;
-  animation: profile-menu-in 0.16s ease-out;
+  animation: profile-menu-in var(--motion-base) var(--ease-out);
 }
 
 .profile-menu-popover[hidden] {
@@ -746,8 +762,8 @@ select:disabled {
   text-align: left;
   text-decoration: none;
   transition:
-    background 0.14s ease,
-    color 0.14s ease;
+    background var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
 
 .profile-menu-item:hover,
@@ -781,7 +797,7 @@ select:disabled {
 
 body[data-theme="dark"] .primary-button {
   color: var(--brand-ink);
-  box-shadow: 0 3px 8px rgba(79, 180, 210, 0.18);
+  box-shadow: var(--shadow-control-active);
 }
 
 body[data-theme="dark"] .ai-gradient-button,
@@ -808,31 +824,31 @@ body[data-theme="dark"] .ai-insights-button {
   color: var(--text);
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    box-shadow 0.16s ease;
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
 }
 
 .theme-toggle::before {
   position: absolute;
   top: 3px;
   left: 3px;
-  z-index: 0;
+  z-index: var(--z-base);
   width: 36px;
   height: 36px;
   border-radius: 50%;
   background: var(--brand);
-  box-shadow: 0 3px 8px rgba(227, 6, 19, 0.2);
+  box-shadow: var(--shadow-control-active);
   content: "";
   transform: translateX(0);
   transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.32s ease,
-    box-shadow 0.32s ease;
+    transform 320ms var(--ease-out),
+    background-color 320ms var(--ease-standard),
+    box-shadow 320ms var(--ease-standard);
 }
 
 body[data-theme="dark"] .theme-toggle::before {
-  box-shadow: 0 3px 8px rgba(79, 180, 210, 0.24);
+  box-shadow: var(--shadow-control-active);
   transform: translateX(34px);
 }
 
@@ -847,7 +863,7 @@ body[data-theme="dark"] .theme-toggle::before {
 
 .theme-toggle-option {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   display: grid;
   width: 36px;
   height: 36px;
@@ -855,8 +871,8 @@ body[data-theme="dark"] .theme-toggle::before {
   border-radius: 50%;
   color: var(--muted);
   transition:
-    color 0.24s ease,
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    color 240ms var(--ease-standard),
+    transform 320ms var(--ease-out);
 }
 
 .theme-toggle-option svg {
@@ -911,7 +927,7 @@ body[data-theme="dark"] .login-page {
 
 .login-card > * {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 
 .login-card-top {
@@ -984,11 +1000,11 @@ body[data-theme="dark"] .login-page {
 
 .login-form input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.12);
+  box-shadow: var(--focus-ring);
 }
 
 body[data-theme="dark"] .login-form input:focus {
-  box-shadow: 0 0 0 3px rgba(79, 180, 210, 0.16);
+  box-shadow: var(--focus-ring);
 }
 
 .login-form .primary-button {
@@ -1294,8 +1310,8 @@ body[data-theme="dark"] .admin-tabs button.active {
   border-radius: 999px;
   background: var(--panel);
   transition:
-    background 0.16s ease,
-    border-color 0.16s ease;
+    background var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard);
 }
 
 .admin-number-switch span::after {
@@ -1309,8 +1325,8 @@ body[data-theme="dark"] .admin-tabs button.active {
   content: "";
   transform: translateY(-50%);
   transition:
-    background 0.16s ease,
-    transform 0.16s ease;
+    background var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 
 .admin-number-switch input:checked + span {
@@ -1638,7 +1654,7 @@ body[data-theme="dark"] .admin-tabs button.active {
 .account-dialog-body select:focus {
   border-color: var(--accent);
   outline: 0;
-  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.12);
+  box-shadow: var(--focus-ring);
 }
 
 .account-dialog-footer {
@@ -1714,14 +1730,14 @@ body[data-theme="dark"] .admin-tabs button.active {
   border: 1px solid var(--line);
   border-radius: 8px;
   background:
-    linear-gradient(110deg, rgba(227, 6, 19, 0.1), transparent 46%),
+    linear-gradient(110deg, color-mix(in srgb, var(--brand) 10%, transparent), transparent 46%),
     var(--panel);
-  box-shadow: 0 3px 8px rgba(31, 48, 58, 0.08);
+  box-shadow: var(--shadow-control);
 }
 
 .identity-row > * {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 
 .section-label {
@@ -1910,7 +1926,7 @@ body[data-theme="dark"] .admin-tabs button.active {
 .upcoming-trip {
   margin-top: 14px;
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 
 .trip-card {
@@ -2603,7 +2619,7 @@ body[data-theme="dark"] .admin-tabs button.active {
   font-size: 16px;
   font-weight: 950;
   line-height: 1;
-  transition: transform 0.16s ease;
+  transition: transform var(--motion-base) var(--ease-standard);
 }
 
 .telegram-account-dropdown.is-open .telegram-account-chevron {
@@ -2612,7 +2628,7 @@ body[data-theme="dark"] .admin-tabs button.active {
 
 .telegram-account-menu {
   position: absolute;
-  z-index: 20;
+  z-index: var(--z-dropdown);
   top: calc(100% + 8px);
   right: 0;
   display: grid;
@@ -2622,7 +2638,7 @@ body[data-theme="dark"] .admin-tabs button.active {
   border: 1px solid color-mix(in srgb, var(--brand) 28%, var(--line));
   border-radius: 12px;
   background: var(--panel);
-  box-shadow: 0 18px 34px rgba(8, 21, 29, 0.24);
+  box-shadow: var(--shadow-menu);
   padding: 6px;
 }
 
@@ -2833,7 +2849,9 @@ body[data-theme="dark"] .admin-tabs button.active {
   border: 1px solid var(--line);
   border-radius: 13px;
   padding: 9px 11px;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    border-color var(--motion-panel) var(--ease-standard),
+    box-shadow var(--motion-panel) var(--ease-standard);
 }
 
 .telegram-bubble.is-highlighted {
@@ -4148,7 +4166,7 @@ body[data-theme="dark"] .admin-tabs button.active {
 
 .note-form textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.12);
+  box-shadow: var(--focus-ring);
 }
 
 .note-form button {
@@ -4432,9 +4450,9 @@ body[data-theme="dark"] .admin-tabs button.active {
   font-size: 12px;
   font-weight: 950;
   transition:
-    transform 0.16s ease,
-    box-shadow 0.16s ease,
-    filter 0.16s ease;
+    transform var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard),
+    filter var(--motion-base) var(--ease-standard);
 }
 
 .booking-action-confirm-button:hover {
@@ -4610,7 +4628,7 @@ body[data-theme="dark"] .admin-tabs button.active {
 
 .monitor-period:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.12);
+  box-shadow: var(--focus-ring);
 }
 
 .monitor-analytics-summary {
@@ -4765,7 +4783,7 @@ body[data-theme="dark"] .admin-tabs button.active {
 .manager-rating-matrix thead th {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: var(--z-active);
   min-height: 58px;
   padding: 12px;
   background: color-mix(in srgb, var(--panel-soft) 88%, var(--panel));
@@ -4780,12 +4798,12 @@ body[data-theme="dark"] .admin-tabs button.active {
 .manager-rating-sticky {
   position: sticky;
   left: 0;
-  z-index: 3;
+  z-index: var(--z-sticky-table);
   background: var(--panel);
 }
 
 .manager-rating-matrix thead .manager-rating-sticky {
-  z-index: 4;
+  z-index: var(--z-sticky-corner);
   background: color-mix(in srgb, var(--panel-soft) 92%, var(--panel));
 }
 
@@ -5361,11 +5379,11 @@ body[data-theme="dark"] .ai-settings-page {
   text-align: center;
   white-space: nowrap;
   transition:
-    transform 0.16s ease,
-    box-shadow 0.16s ease,
-    border-color 0.16s ease,
-    background 0.16s ease,
-    color 0.16s ease;
+    transform var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    color var(--motion-base) var(--ease-standard);
 }
 
 .ai-gradient-button,
@@ -5494,9 +5512,9 @@ body[data-theme="dark"] .ai-settings-page {
   background: var(--ai-card);
   padding: 10px 12px;
   transition:
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    transform 0.16s ease;
+    border-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 
 .ai-type-card {
@@ -5637,7 +5655,7 @@ body[data-theme="dark"] .ai-settings-page {
   border-radius: 999px;
   background: var(--ai-switch-off);
   content: "";
-  transition: background 0.16s ease;
+  transition: background var(--motion-base) var(--ease-standard);
 }
 
 .ai-soldly-switch span {
@@ -5649,7 +5667,7 @@ body[data-theme="dark"] .ai-settings-page {
   border-radius: 999px;
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(17, 24, 39, 0.22);
-  transition: transform 0.16s ease;
+  transition: transform var(--motion-base) var(--ease-standard);
 }
 
 .ai-soldly-switch[data-checked="true"] {
@@ -5996,7 +6014,7 @@ body[data-theme="dark"] .ai-settings-page {
   position: fixed;
   right: 34px;
   bottom: 88px;
-  z-index: 12;
+  z-index: var(--z-floating-action);
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -6272,7 +6290,7 @@ body[data-theme="dark"] .ai-settings-page {
   border-radius: 999px;
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(17, 24, 39, 0.22);
-  transition: transform 0.16s ease;
+  transition: transform var(--motion-base) var(--ease-standard);
 }
 
 .ai-modal-score-toggle input:checked + .ai-toggle-ui {
@@ -6920,7 +6938,7 @@ body[data-theme="dark"] .ai-settings-page {
 .monitor-filter-select:focus-within {
   border-color: var(--accent);
   outline: 0;
-  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.12);
+  box-shadow: var(--focus-ring);
 }
 
 .monitor-list {
@@ -7348,9 +7366,9 @@ body[data-theme="dark"] .monitor-call-identity > span {
 .call-stats-interactive {
   cursor: pointer;
   transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    background-color 0.18s ease;
+    border-color var(--motion-panel) var(--ease-standard),
+    box-shadow var(--motion-panel) var(--ease-standard),
+    background-color var(--motion-panel) var(--ease-standard);
 }
 
 .call-stats-interactive:hover,
@@ -7592,17 +7610,17 @@ body[data-theme="dark"] .monitor-call-identity > span {
   cursor: pointer;
   opacity: calc(0.42 + (var(--heatmap-intensity) * 0.58));
   transition:
-    transform 0.12s ease,
-    border-color 0.12s ease,
-    box-shadow 0.12s ease,
-    opacity 0.12s ease;
+    transform var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
 }
 
 .call-stats-heatmap-cell:hover,
 .call-stats-heatmap-cell:focus-visible,
 .call-stats-heatmap-cell.call-stats-is-selected {
   position: relative;
-  z-index: 2;
+  z-index: var(--z-active);
   border-color: var(--accent);
   outline: none;
   opacity: 1;
@@ -7759,7 +7777,7 @@ body[data-theme="dark"] .call-stats-heatmap-cell.call-stats-is-selected {
 
 .call-stats-list-row > * {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 
 .call-stats-list-row strong {
@@ -7959,7 +7977,7 @@ body[data-theme="dark"] .call-stats-list-row {
   gap: 24px;
   padding: 20px;
   background:
-    linear-gradient(110deg, rgba(227, 6, 19, 0.1), transparent 48%),
+    linear-gradient(110deg, color-mix(in srgb, var(--brand) 10%, transparent), transparent 48%),
     var(--panel);
 }
 
@@ -8644,7 +8662,7 @@ body[data-theme="dark"] .quality-metric-option {
   position: absolute;
   left: 50%;
   bottom: 8px;
-  z-index: 3;
+  z-index: var(--z-active);
   display: grid;
   width: 44px;
   height: 44px;
@@ -8666,7 +8684,7 @@ body[data-theme="dark"] .quality-metric-option {
 
 .audio-play-button span {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   pointer-events: none;
 }
 
@@ -8924,7 +8942,7 @@ body[data-theme="dark"] .phone-search button,
 body[data-theme="dark"] .note-form button,
 body[data-theme="dark"] .primary-button {
   color: var(--brand-ink);
-  box-shadow: 0 3px 8px rgba(79, 180, 210, 0.18);
+  box-shadow: var(--shadow-control-active);
 }
 
 body[data-theme="dark"] .phone-search button:hover,
@@ -8932,7 +8950,7 @@ body[data-theme="dark"] .note-form button:hover,
 body[data-theme="dark"] .primary-button:hover,
 body[data-theme="dark"] .secondary-button:hover {
   color: var(--brand-ink);
-  box-shadow: 0 3px 8px rgba(79, 180, 210, 0.24);
+  box-shadow: var(--shadow-control-active);
 }
 
 body[data-theme="dark"] .calls-section,
