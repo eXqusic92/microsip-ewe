@@ -397,6 +397,64 @@ class SonioxClient {
     }
   }
 
+  async listUsageLogs({ startTime, endTime }) {
+    if (!this.enabled) {
+      throw new Error("SONIOX_API_KEY не налаштований");
+    }
+
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (
+      !Number.isFinite(start.getTime()) ||
+      !Number.isFinite(end.getTime()) ||
+      end <= start
+    ) {
+      throw new Error("Некоректний період для Soniox usage logs");
+    }
+    if (end.getTime() - start.getTime() > 31 * 24 * 60 * 60 * 1000) {
+      throw new Error("Soniox usage logs підтримують період до 31 дня");
+    }
+
+    const usageLogs = [];
+    const seenCursors = new Set();
+    let cursor = "";
+    let pages = 0;
+
+    while (true) {
+      const query = new URLSearchParams({
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        limit: "1000",
+        sort: "end_time_asc"
+      });
+      if (cursor) {
+        query.set("cursor", cursor);
+      }
+
+      const data = await this.request(`usage-logs?${query}`, { method: "GET" });
+      usageLogs.push(...(Array.isArray(data && data.usage_logs) ? data.usage_logs : []));
+      pages += 1;
+
+      const nextCursor = text(data && data.next_page_cursor);
+      if (!nextCursor || seenCursors.has(nextCursor)) {
+        break;
+      }
+      seenCursors.add(nextCursor);
+      cursor = nextCursor;
+
+      if (pages >= 100) {
+        throw new Error("Soniox usage logs повернув забагато сторінок");
+      }
+    }
+
+    return {
+      usageLogs,
+      pages,
+      startTime: start.toISOString(),
+      endTime: end.toISOString()
+    };
+  }
+
   async cleanup(path) {
     try {
       await this.request(path, { method: "DELETE" });

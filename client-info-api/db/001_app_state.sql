@@ -382,6 +382,37 @@ CREATE INDEX IF NOT EXISTS call_summary_metric_results_metric_idx
 CREATE INDEX IF NOT EXISTS call_summary_metric_results_score_idx
   ON call_summary_metric_results (counts_toward_score, score, max_score);
 
+CREATE TABLE IF NOT EXISTS ai_metric_feedback (
+  id uuid PRIMARY KEY,
+  call_id text NOT NULL REFERENCES call_summaries(call_id) ON DELETE CASCADE,
+  metric_result_id bigint,
+  metric_key text NOT NULL,
+  feedback_text text NOT NULL,
+  created_by_user_id text NOT NULL DEFAULT '',
+  created_by_username text NOT NULL DEFAULT '',
+  created_by_name text NOT NULL DEFAULT '',
+  updated_by_user_id text NOT NULL DEFAULT '',
+  updated_by_username text NOT NULL DEFAULT '',
+  updated_by_name text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT ai_metric_feedback_call_metric_uniq UNIQUE (call_id, metric_key),
+  CONSTRAINT ai_metric_feedback_metric_result_fk
+    FOREIGN KEY (metric_result_id)
+    REFERENCES call_summary_metric_results(id)
+    ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS ai_metric_feedback_updated_at_idx
+  ON ai_metric_feedback (updated_at DESC);
+CREATE INDEX IF NOT EXISTS ai_metric_feedback_metric_result_idx
+  ON ai_metric_feedback (metric_result_id);
+CREATE INDEX IF NOT EXISTS ai_metric_feedback_metric_idx
+  ON ai_metric_feedback (metric_key, updated_at DESC);
+CREATE INDEX IF NOT EXISTS ai_metric_feedback_payload_gin_idx
+  ON ai_metric_feedback USING gin (payload);
+
 CREATE TABLE IF NOT EXISTS call_summary_usage (
   id bigserial PRIMARY KEY,
   call_id text NOT NULL REFERENCES call_summaries(call_id) ON DELETE CASCADE,

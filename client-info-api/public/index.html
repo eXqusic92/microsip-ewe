@@ -650,6 +650,7 @@
           <label class="monitor-period analytics-period">
             <span>Період аналізу</span>
             <select id="monitor-analytics-period">
+              <option value="today">Сьогодні (UTC)</option>
               <option value="7">7 днів</option>
               <option value="30" selected>30 днів</option>
               <option value="all">Весь час</option>
@@ -685,9 +686,9 @@
               <small id="analytics-tokens-caption">usage ще не зібрано</small>
             </div>
             <div>
-              <span>Орієнтовна вартість</span>
+              <span>Вартість API</span>
               <strong id="analytics-cost">$0.00</strong>
-              <small id="analytics-cost-caption">Transcription + OpenAI summary</small>
+              <small id="analytics-cost-caption">Soniox + OpenAI</small>
             </div>
             <div>
               <span>Ескалації</span>
@@ -920,6 +921,7 @@
         <div class="admin-tabs" aria-label="Розділи адмінки">
           <button class="active" type="button" data-admin-tab="users">Користувачі</button>
           <button type="button" data-admin-tab="analysis-numbers">AI-номери</button>
+          <button type="button" data-admin-tab="metric-feedback">AI-правки</button>
           <button type="button" data-admin-tab="telegram">Telegram</button>
         </div>
 
@@ -950,6 +952,18 @@
           </div>
           <p class="form-message" id="admin-analysis-numbers-message" aria-live="polite"></p>
           <div class="admin-numbers-list" id="admin-analysis-numbers-list"></div>
+        </section>
+
+        <section class="admin-panel hidden" id="admin-metric-feedback-panel" data-admin-panel="metric-feedback">
+          <div class="section-heading admin-number-heading">
+            <div>
+              <p class="section-label">AI-аналіз</p>
+              <h2>Правки до метрик</h2>
+            </div>
+            <span class="muted" id="admin-metric-feedback-count">Завантаження...</span>
+          </div>
+          <p class="form-message" id="admin-metric-feedback-message" aria-live="polite"></p>
+          <div class="admin-feedback-list" id="admin-metric-feedback-list"></div>
         </section>
 
         <section class="admin-panel hidden" id="admin-telegram-panel" data-admin-panel="telegram">
@@ -1235,6 +1249,63 @@
           <div class="manager-rating-modal-metrics" id="manager-rating-modal-metrics"></div>
         </div>
       </div>
+    </dialog>
+
+    <dialog class="account-dialog metric-feedback-dialog" id="metric-feedback-modal" aria-labelledby="metric-feedback-title">
+      <form id="metric-feedback-form" method="dialog">
+        <header class="account-dialog-head">
+          <div>
+            <p class="section-label">AI-метрика</p>
+            <h2 id="metric-feedback-title">Правка метрики</h2>
+          </div>
+          <button class="modal-close" id="metric-feedback-close" type="button" aria-label="Закрити">
+            ×
+          </button>
+        </header>
+        <div class="account-dialog-body metric-feedback-body">
+          <p class="metric-feedback-subtitle" id="metric-feedback-subtitle"></p>
+          <label>
+            <span>Пояснення або виправлення</span>
+            <textarea
+              id="metric-feedback-text"
+              maxlength="4000"
+              rows="5"
+              required
+              placeholder="Що саме AI оцінив неточно?"
+            ></textarea>
+          </label>
+          <p class="form-message" id="metric-feedback-message" aria-live="polite"></p>
+        </div>
+        <footer class="account-dialog-footer">
+          <button class="secondary-button metric-feedback-delete hidden" id="metric-feedback-delete" type="button">Видалити</button>
+          <button class="secondary-button" id="metric-feedback-cancel" type="button">Скасувати</button>
+          <button class="primary-button" id="metric-feedback-submit" type="submit">Зберегти</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="account-dialog metric-prompt-dialog" id="metric-prompt-modal" aria-labelledby="metric-prompt-title">
+      <form id="metric-prompt-form" method="dialog">
+        <header class="account-dialog-head">
+          <div>
+            <p class="section-label">AI-prompt</p>
+            <h2 id="metric-prompt-title">Застосувати правку</h2>
+          </div>
+          <button class="modal-close" id="metric-prompt-close" type="button" aria-label="Закрити">
+            ×
+          </button>
+        </header>
+        <div class="account-dialog-body metric-prompt-body">
+          <p class="metric-feedback-subtitle" id="metric-prompt-subtitle"></p>
+          <div class="metric-prompt-diff" id="metric-prompt-diff"></div>
+          <p class="form-message" id="metric-prompt-message" aria-live="polite"></p>
+        </div>
+        <footer class="account-dialog-footer">
+          <button class="secondary-button" id="metric-prompt-regenerate" type="button">Згенерувати ще раз</button>
+          <button class="secondary-button" id="metric-prompt-cancel" type="button">Скасувати</button>
+          <button class="primary-button" id="metric-prompt-submit" type="submit">Застосувати</button>
+        </footer>
+      </form>
     </dialog>
 
     <template id="ticket-template">

@@ -71,11 +71,17 @@
   --shadow-menu: 0 10px 22px color-mix(in srgb, var(--ink) 16%, transparent);
   --focus-ring: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent);
   --focus-ring-strong: 0 0 0 3px color-mix(in srgb, var(--brand) 24%, transparent);
+  --motion-press: 110ms;
   --motion-fast: 140ms;
   --motion-base: 160ms;
   --motion-panel: 180ms;
+  --motion-entry: 220ms;
+  --motion-stagger-step: 34ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-emphasized-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-emphasized-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -159,6 +165,110 @@ body {
   transition:
     color 160ms ease,
     background-color 160ms ease;
+}
+
+@keyframes ui-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-list-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.965);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-attention {
+  0% {
+    transform: scale(0.992);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ui-bar-fill {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.motion-enter {
+  animation: ui-surface-in var(--motion-entry) var(--ease-emphasized-out) both;
+}
+
+.motion-item {
+  animation: ui-list-item-in var(--motion-entry) var(--ease-emphasized-out) both;
+  animation-delay: calc(var(--motion-index, 0) * var(--motion-stagger-step));
+  will-change: opacity, transform;
+}
+
+.telegram-bubble.motion-item {
+  animation-name: ui-message-in;
 }
 
 button,
@@ -361,7 +471,9 @@ body[data-theme="dark"] .app-tabs a.active {
     border-color var(--motion-base) var(--ease-standard),
     background var(--motion-base) var(--ease-standard),
     color var(--motion-base) var(--ease-standard),
-    box-shadow var(--motion-base) var(--ease-standard);
+    box-shadow var(--motion-base) var(--ease-standard),
+    filter var(--motion-base) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
 }
 
 .phone-search button {
@@ -397,6 +509,132 @@ body[data-theme="dark"] .app-tabs a.active {
 
 .secondary-button:hover {
   color: #ffffff;
+}
+
+:where(
+  .secondary-action,
+  .custom-select-button,
+  .custom-select-option,
+  .profile-menu-item,
+  .theme-toggle,
+  .messaging-tab,
+  .telegram-account-trigger,
+  .telegram-account-option,
+  .telegram-reply-button,
+  .telegram-reply-preview,
+  .telegram-media-photo,
+  .telegram-media-file,
+  .modal-close,
+  .admin-icon-button,
+  .monitor-page-button,
+  .manager-rating-person-button,
+  .ai-gradient-button,
+  .ai-white-button,
+  .ai-quiet-button,
+  .ai-icon-button-soft,
+  .ai-type-open,
+  .ai-metric-open,
+  .ai-side-accordion,
+  .ai-side-toggle,
+  .ai-modal-type-button,
+  .ai-color-choice,
+  .ai-dialog-head button,
+  .ai-word-input button,
+  .audio-play-button,
+  .audio-speed,
+  .transcript-play
+) {
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard),
+    color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard),
+    filter var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :where(
+    .phone-search button,
+    .note-form button,
+    .primary-button,
+    .secondary-button,
+    .secondary-action,
+    .custom-select-button,
+    .theme-toggle,
+    .messaging-tab,
+    .telegram-account-trigger,
+    .telegram-account-option,
+    .telegram-reply-button,
+    .telegram-reply-preview,
+    .telegram-media-file,
+    .modal-close,
+    .admin-icon-button,
+    .monitor-page-button,
+    .manager-rating-person-button,
+    .ai-gradient-button,
+    .ai-white-button,
+    .ai-quiet-button,
+    .ai-icon-button-soft,
+    .ai-type-open,
+    .ai-metric-open,
+    .ai-side-accordion,
+    .ai-side-toggle,
+    .ai-modal-type-button,
+    .ai-color-choice,
+    .ai-dialog-head button,
+    .ai-word-input button,
+    .audio-speed,
+    .transcript-play
+  ):not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+}
+
+:where(
+  .phone-search button,
+  .note-form button,
+  .primary-button,
+  .secondary-button,
+  .secondary-action,
+  .custom-select-button,
+  .profile-menu-trigger,
+  .profile-menu-item,
+  .theme-toggle,
+  .messaging-tab,
+  .telegram-account-trigger,
+  .telegram-account-option,
+  .telegram-reply-button,
+  .telegram-reply-preview,
+  .telegram-media-photo,
+  .telegram-media-file,
+  .modal-close,
+  .order-link,
+  .admin-icon-button,
+  .note-action-button,
+  .booking-action-confirm-button,
+  .monitor-page-button,
+  .manager-rating-person-button,
+  .ai-gradient-button,
+  .ai-white-button,
+  .ai-quiet-button,
+  .ai-icon-button-soft,
+  .ai-type-open,
+  .ai-metric-open,
+  .ai-side-accordion,
+  .ai-side-toggle,
+  .ai-modal-type-button,
+  .ai-color-choice,
+  .ai-dialog-head button,
+  .ai-word-input button,
+  .audio-play-button,
+  .audio-speed,
+  .transcript-play
+):not(:disabled):active {
+  transform: scale(0.97);
+  transition-duration: var(--motion-press);
 }
 
 button:disabled,
@@ -446,7 +684,8 @@ select:disabled {
   transition:
     border-color var(--motion-base) var(--ease-standard),
     box-shadow var(--motion-base) var(--ease-standard),
-    background var(--motion-base) var(--ease-standard);
+    background var(--motion-base) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
 }
 
 .custom-select-button::after {
@@ -497,11 +736,14 @@ select:disabled {
   background: var(--panel);
   padding: 6px;
   box-shadow: var(--shadow-menu);
+  transform-origin: top left;
+  animation: ui-popover-in var(--motion-panel) var(--ease-emphasized-out) both;
 }
 
 .monitor-period .custom-select-menu {
   left: auto;
   right: 0;
+  transform-origin: top right;
 }
 
 .custom-select-menu[hidden] {
@@ -536,10 +778,19 @@ select:disabled {
   border-bottom: 2px solid currentColor;
   opacity: 0;
   transform: translateY(-2px) rotate(-45deg);
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-emphasized-out);
 }
 
 .custom-select-option.is-active::before {
   opacity: 1;
+}
+
+.custom-select-option:hover::before,
+.custom-select-option:focus-visible::before {
+  opacity: 0.46;
+  transform: translateY(-2px) rotate(-45deg) scale(0.9);
 }
 
 .custom-select-option:hover,
@@ -567,7 +818,8 @@ select:disabled {
     border-color var(--motion-base) var(--ease-standard),
     background var(--motion-base) var(--ease-standard),
     color var(--motion-base) var(--ease-standard),
-    opacity var(--motion-base) var(--ease-standard);
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
 }
 
 .secondary-action:hover,
@@ -697,7 +949,7 @@ select:disabled {
   padding: 8px;
   box-shadow: var(--shadow-menu);
   transform-origin: top right;
-  animation: profile-menu-in var(--motion-base) var(--ease-out);
+  animation: ui-popover-in var(--motion-panel) var(--ease-emphasized-out) both;
 }
 
 .profile-menu-popover[hidden] {
@@ -786,7 +1038,8 @@ select:disabled {
   text-decoration: none;
   transition:
     background var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard);
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
 }
 
 .profile-menu-item:hover,
@@ -947,6 +1200,7 @@ body[data-theme="dark"] .login-page {
   border-radius: 8px;
   background: var(--panel);
   box-shadow: 0 3px 8px rgba(31, 48, 58, 0.08);
+  animation: ui-surface-in 260ms var(--ease-emphasized-out) both;
 }
 
 .login-card > * {
@@ -1487,6 +1741,185 @@ body[data-theme="dark"] .admin-tabs button.active {
   text-align: center;
 }
 
+.admin-feedback-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-feedback-card {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.35fr) 82px minmax(190px, 0.95fr) minmax(150px, 0.72fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 76px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 10px 12px;
+}
+
+.admin-feedback-main,
+.admin-feedback-call,
+.admin-feedback-meta,
+.admin-feedback-score {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.admin-feedback-main strong,
+.admin-feedback-call strong,
+.admin-feedback-meta strong,
+.admin-feedback-score strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-feedback-main span,
+.admin-feedback-call span,
+.admin-feedback-meta span,
+.admin-feedback-score span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-feedback-main p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.admin-feedback-score strong {
+  justify-self: start;
+  min-width: 52px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  color: var(--brand-readable);
+  padding: 7px 9px;
+  text-align: center;
+}
+
+.admin-feedback-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: 0;
+}
+
+.admin-feedback-prompt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--brand-readable) 30%, var(--line-strong));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--brand-readable) 9%, var(--panel));
+  color: var(--brand-readable);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    color var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
+}
+
+.admin-feedback-prompt .ai-svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.6;
+}
+
+.admin-feedback-prompt:hover,
+.admin-feedback-prompt:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  color: var(--accent);
+  outline: 0;
+  transform: translateY(-1px);
+}
+
+.admin-feedback-prompt:disabled {
+  cursor: default;
+  opacity: 0.76;
+  transform: none;
+}
+
+.admin-feedback-prompt.is-applied {
+  border-color: color-mix(in srgb, var(--success) 36%, var(--line));
+  background: color-mix(in srgb, var(--success) 10%, var(--panel));
+  color: var(--success);
+}
+
+.admin-feedback-link,
+.admin-feedback-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--muted);
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    color var(--motion-base) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
+}
+
+.admin-feedback-delete {
+  color: var(--danger);
+}
+
+.admin-feedback-link .ai-svg,
+.admin-feedback-delete .ai-svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2.5;
+}
+
+.admin-feedback-link:hover,
+.admin-feedback-link:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: 0;
+  transform: translateY(-1px);
+}
+
+.admin-feedback-delete:hover,
+.admin-feedback-delete:focus-visible {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, var(--panel));
+  color: var(--danger);
+  outline: 0;
+  transform: translateY(-1px);
+}
+
 .admin-telegram-add {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
@@ -1607,12 +2040,22 @@ body[data-theme="dark"] .admin-tabs button.active {
 
 .account-dialog form {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   max-height: min(88vh, 720px);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel);
   box-shadow: 0 24px 72px rgba(0, 0, 0, 0.35);
+}
+
+:where(.account-dialog, .tickets-modal, .telegram-photo-modal, .ai-soldly-dialog)[open]::backdrop {
+  animation: ui-backdrop-in var(--motion-panel) var(--ease-standard) both;
+}
+
+:where(.account-dialog[open] form, .tickets-modal[open] .tickets-modal-panel, .telegram-photo-modal[open] .telegram-photo-modal-panel, .ai-soldly-dialog[open] form) {
+  transform-origin: center;
+  animation: ui-dialog-in 240ms var(--ease-drawer) both;
 }
 
 .account-dialog-head,
@@ -1645,6 +2088,7 @@ body[data-theme="dark"] .admin-tabs button.active {
 .account-dialog-body {
   display: grid;
   gap: 14px;
+  min-height: 0;
   overflow: auto;
   padding: 20px;
 }
@@ -1662,7 +2106,8 @@ body[data-theme="dark"] .admin-tabs button.active {
 }
 
 .account-dialog-body input,
-.account-dialog-body select {
+.account-dialog-body select,
+.account-dialog-body textarea {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--field-border);
@@ -1674,11 +2119,153 @@ body[data-theme="dark"] .admin-tabs button.active {
   font-weight: 800;
 }
 
+.account-dialog-body textarea {
+  min-height: 128px;
+  resize: vertical;
+  padding-block: 10px;
+  line-height: 1.45;
+}
+
 .account-dialog-body input:focus,
-.account-dialog-body select:focus {
+.account-dialog-body select:focus,
+.account-dialog-body textarea:focus {
   border-color: var(--accent);
   outline: 0;
   box-shadow: var(--focus-ring);
+}
+
+.metric-feedback-subtitle {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.metric-prompt-dialog {
+  width: min(980px, calc(100% - 28px));
+}
+
+.metric-prompt-diff {
+  display: grid;
+  gap: 12px;
+}
+
+.metric-prompt-diff-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 12px;
+}
+
+.metric-prompt-diff-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.metric-prompt-diff-head strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 950;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-prompt-diff-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.metric-prompt-diff-field {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.metric-prompt-diff-label {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 6px;
+}
+
+.metric-prompt-diff-label strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.25;
+}
+
+.metric-prompt-diff-label span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.metric-prompt-before,
+.metric-prompt-after {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.metric-prompt-before > span,
+.metric-prompt-after > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.metric-prompt-before p {
+  min-height: 96px;
+  max-height: 190px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.metric-prompt-after textarea {
+  min-height: 96px;
+  resize: vertical;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.metric-prompt-rationale {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  color: var(--ink);
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.45;
 }
 
 .account-dialog-footer {
@@ -1689,6 +2276,18 @@ body[data-theme="dark"] .admin-tabs button.active {
 .account-dialog-footer .primary-button,
 .account-dialog-footer .secondary-button {
   flex: 1;
+}
+
+.metric-feedback-delete {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--line-strong));
+  color: var(--danger);
+}
+
+.metric-feedback-delete:hover,
+.metric-feedback-delete:focus-visible {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--panel));
+  outline: 0;
 }
 
 .account-form-grid {
@@ -2668,6 +3267,8 @@ body[data-theme="dark"] .admin-tabs button.active {
   background: var(--panel);
   box-shadow: var(--shadow-menu);
   padding: 6px;
+  transform-origin: top right;
+  animation: ui-popover-in var(--motion-panel) var(--ease-emphasized-out) both;
 }
 
 .telegram-account-option {
@@ -2768,6 +3369,7 @@ body[data-theme="dark"] .admin-tabs button.active {
     linear-gradient(135deg, color-mix(in srgb, var(--brand) 10%, transparent), transparent 62%),
     var(--surface);
   padding: 10px 12px;
+  animation: ui-list-item-in var(--motion-entry) var(--ease-emphasized-out) both;
 }
 
 .telegram-thread-avatar {
@@ -2879,12 +3481,14 @@ body[data-theme="dark"] .admin-tabs button.active {
   padding: 9px 11px;
   transition:
     border-color var(--motion-panel) var(--ease-standard),
-    box-shadow var(--motion-panel) var(--ease-standard);
+    box-shadow var(--motion-panel) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
 }
 
 .telegram-bubble.is-highlighted {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+  animation: ui-attention 220ms var(--ease-emphasized-out) both;
 }
 
 .telegram-bubble p {
@@ -3176,6 +3780,7 @@ body[data-theme="dark"] .admin-tabs button.active {
   border-radius: 10px;
   background: color-mix(in srgb, var(--brand) 9%, var(--panel));
   padding: 8px 10px;
+  animation: ui-list-item-in var(--motion-entry) var(--ease-emphasized-out) both;
 }
 
 .telegram-reply-bar div {
@@ -3322,6 +3927,13 @@ body[data-theme="dark"] .admin-tabs button.active {
   min-height: 44px;
   padding: 10px 0;
   border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
 }
 
 .ticket-row {
@@ -3350,7 +3962,9 @@ body[data-theme="dark"] .admin-tabs button.active {
   overflow: visible;
   transition:
     background 160ms ease,
-    border-color 160ms ease;
+    border-color 160ms ease,
+    box-shadow var(--motion-base) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
 }
 
 .order-row-main {
@@ -3364,7 +3978,26 @@ body[data-theme="dark"] .admin-tabs button.active {
 .order-row:hover,
 .order-row:focus-visible {
   background: color-mix(in srgb, var(--call-outgoing) 5%, transparent);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--call-outgoing) 10%, transparent);
   outline: none;
+}
+
+.call-row[href]:hover,
+.call-row[href]:focus-visible {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
+  outline: 0;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.order-row:active,
+.call-row[href]:active,
+.monitor-call-link:active,
+.call-stats-interactive:active {
+  transform: scale(0.992);
+  transition-duration: var(--motion-press);
 }
 
 .order-main {
@@ -4241,6 +4874,7 @@ body[data-theme="dark"] .admin-tabs button.active {
   border-radius: 7px;
   background: var(--state-danger-bg);
   padding: 8px 10px;
+  animation: ui-list-item-in var(--motion-entry) var(--ease-emphasized-out) both;
 }
 
 .form-message:not(:empty)::before {
@@ -4385,6 +5019,22 @@ body[data-theme="dark"] .admin-tabs button.active {
   inset: 0;
   z-index: var(--z-confirm-layer);
   background: rgba(7, 17, 22, 0.08);
+  animation: ui-backdrop-in var(--motion-panel) var(--ease-standard) both;
+}
+
+.booking-action-confirm-dialog {
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  color: inherit;
+}
+
+.booking-action-confirm-dialog::backdrop {
+  background: transparent;
 }
 
 .booking-action-confirm-popover {
@@ -4735,6 +5385,8 @@ body[data-theme="dark"] .admin-tabs button.active {
   min-width: 3px;
   height: 100%;
   background: var(--chart-color);
+  transform-origin: left center;
+  animation: ui-bar-fill 360ms var(--ease-emphasized-out) both;
 }
 
 .call-type-chart {
@@ -6915,6 +7567,8 @@ body[data-theme="dark"] .ai-settings-page {
   height: 100%;
   border-radius: inherit;
   background: var(--chart-color);
+  transform-origin: left center;
+  animation: ui-bar-fill 360ms var(--ease-emphasized-out) both;
 }
 
 .call-type-percentage {
@@ -7013,13 +7667,17 @@ body[data-theme="dark"] .ai-settings-page {
   text-decoration: none;
   transition:
     border-color 160ms ease,
-    background-color 160ms ease;
+    background-color 160ms ease,
+    box-shadow var(--motion-base) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
 }
 
 .monitor-call-link:hover,
 .monitor-call-link:focus-visible {
   border-color: var(--accent);
   background-color: var(--panel-soft);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 10%, transparent);
   outline: 0;
 }
 
@@ -7420,13 +8078,15 @@ body[data-theme="dark"] .monitor-call-identity > span {
   transition:
     border-color var(--motion-panel) var(--ease-standard),
     box-shadow var(--motion-panel) var(--ease-standard),
-    background-color var(--motion-panel) var(--ease-standard);
+    background-color var(--motion-panel) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
 }
 
 .call-stats-interactive:hover,
 .call-stats-interactive:focus-visible,
 .call-stats-is-selected {
   border-color: color-mix(in srgb, var(--accent) 74%, var(--line));
+  transform: translateY(-1px);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
@@ -7714,10 +8374,15 @@ body[data-theme="dark"] .call-stats-heatmap-cell.call-stats-is-selected {
   overflow-wrap: anywhere;
   pointer-events: none;
   white-space: pre-line;
+  transform-origin: center bottom;
 }
 
 .call-stats-heatmap-tooltip[hidden] {
   display: none;
+}
+
+.call-stats-heatmap-tooltip.is-visible {
+  animation: ui-popover-in 150ms var(--ease-emphasized-out) both;
 }
 
 .call-stats-table-card {
@@ -7826,6 +8491,8 @@ body[data-theme="dark"] .call-stats-heatmap-cell.call-stats-is-selected {
   width: var(--bar-width, 0%);
   pointer-events: none;
   background: color-mix(in srgb, var(--row-color) 14%, transparent);
+  transform-origin: left center;
+  animation: ui-bar-fill 360ms var(--ease-emphasized-out) both;
 }
 
 .call-stats-list-row > * {
@@ -8604,12 +9271,96 @@ body[data-theme="dark"] .quality-metric-option {
   white-space: nowrap;
 }
 
+.quality-metric-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.quality-feedback-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  min-height: 30px;
+  border: 1px solid color-mix(in srgb, var(--metric-color) 24%, var(--line));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--metric-color) 8%, var(--panel));
+  color: color-mix(in srgb, var(--metric-color) 70%, var(--ink));
+  padding: 0;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    color var(--motion-base) var(--ease-standard),
+    transform var(--motion-press) var(--ease-emphasized-out);
+}
+
+.quality-feedback-button .ai-svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.5;
+}
+
+.quality-feedback-button:hover,
+.quality-feedback-button:focus-visible,
+.quality-metric-item.has-feedback .quality-feedback-button {
+  border-color: color-mix(in srgb, var(--metric-color) 48%, var(--line));
+  background: color-mix(in srgb, var(--metric-color) 15%, var(--panel));
+  color: color-mix(in srgb, var(--metric-color) 82%, var(--ink));
+  outline: 0;
+}
+
+.quality-feedback-button:hover,
+.quality-feedback-button:focus-visible {
+  transform: translateY(-1px);
+}
+
 .quality-metric-item p {
   padding-left: 21px;
 }
 
 .quality-metric-item .quality-improvement {
   padding-left: 21px;
+}
+
+.quality-feedback-note {
+  display: grid;
+  gap: 5px;
+  margin-left: 21px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  padding: 9px 10px;
+}
+
+.quality-feedback-note strong {
+  color: color-mix(in srgb, var(--accent) 76%, var(--ink));
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.25;
+}
+
+.quality-feedback-note p {
+  padding-left: 0;
+}
+
+.quality-feedback-note small {
+  color: var(--muted);
+}
+
+.quality-feedback-applied {
+  justify-self: start;
+  border: 1px solid color-mix(in srgb, var(--success) 34%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--success) 10%, var(--panel));
+  color: var(--success);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 950;
+  line-height: 1;
 }
 
 .quality-notes {
@@ -8746,6 +9497,10 @@ body[data-theme="dark"] .quality-metric-option {
   background: var(--accent);
   color: #ffffff;
   outline: 0;
+}
+
+.audio-play-button:not(:disabled):active {
+  transform: translateX(-50%) scale(0.97);
 }
 
 .audio-controls {
@@ -9659,6 +10414,65 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
     gap: 6px;
   }
 
+  .admin-feedback-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px 10px;
+    padding: 10px 12px;
+  }
+
+  .admin-feedback-main {
+    grid-column: 1 / -1;
+  }
+
+  .admin-feedback-score {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .admin-feedback-call,
+  .admin-feedback-meta {
+    grid-column: 1 / -1;
+  }
+
+  .admin-feedback-actions {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .admin-feedback-prompt {
+    width: 44px;
+    padding: 0;
+  }
+
+  .admin-feedback-prompt span {
+    display: none;
+  }
+
+  .metric-prompt-diff-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .metric-prompt-diff-head strong,
+  .metric-prompt-diff-head span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .metric-prompt-diff-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metric-prompt-diff-label {
+    padding-top: 0;
+  }
+
   .admin-panel-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -10046,6 +10860,19 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
 
   .detail-panel {
     padding: 16px;
+  }
+
+  .quality-metric-header {
+    gap: 8px;
+  }
+
+  .quality-metric-actions {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
+  .quality-feedback-note {
+    margin-left: 0;
   }
 
   .transcript-item {
@@ -10555,6 +11382,62 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .quality-item p {
     font-size: 13px;
   }
+}
+
+:where(
+  .phone-search button,
+  .note-form button,
+  .primary-button,
+  .secondary-button,
+  .secondary-action,
+  .custom-select-button,
+  .profile-menu-trigger,
+  .profile-menu-item,
+  .theme-toggle,
+  .messaging-tab,
+  .telegram-account-trigger,
+  .telegram-account-option,
+  .telegram-reply-button,
+  .telegram-reply-preview,
+  .telegram-media-photo,
+  .telegram-media-file,
+  .modal-close,
+  .order-link,
+  .admin-icon-button,
+  .note-action-button,
+  .booking-action-confirm-button,
+  .monitor-page-button,
+  .manager-rating-person-button,
+  .ai-gradient-button,
+  .ai-white-button,
+  .ai-quiet-button,
+  .ai-icon-button-soft,
+  .ai-type-open,
+  .ai-metric-open,
+  .ai-side-accordion,
+  .ai-side-toggle,
+  .ai-modal-type-button,
+  .ai-color-choice,
+  .ai-dialog-head button,
+  .ai-word-input button,
+  .audio-speed,
+  .transcript-play
+):not(:disabled):active {
+  transform: scale(0.97);
+  transition-duration: var(--motion-press);
+}
+
+.audio-play-button:not(:disabled):active {
+  transform: translateX(-50%) scale(0.97);
+  transition-duration: var(--motion-press);
+}
+
+.order-row:active,
+.call-row[href]:active,
+.monitor-call-link:active,
+.call-stats-interactive:active {
+  transform: scale(0.992);
+  transition-duration: var(--motion-press);
 }
 
 @media (prefers-reduced-motion: reduce) {

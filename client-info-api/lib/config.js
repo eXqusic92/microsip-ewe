@@ -99,6 +99,8 @@ const demoMode = String(process.env.DEMO_MODE || "auto").toLowerCase();
 const binotelKey = process.env.BINOTEL_KEY || "";
 const binotelSecret = process.env.BINOTEL_SECRET || "";
 const openAiKey = process.env.OPENAI_API_KEY || "";
+const openAiAdminKey = process.env.OPENAI_ADMIN_API_KEY || "";
+const openAiCostProjectId = process.env.OPENAI_COST_PROJECT_ID || "";
 const sonioxKey = process.env.SONIOX_API_KEY || "";
 const appStateDbPassword = process.env.APP_STATE_DB_PASSWORD || "";
 const dispatcherApiBaseUrl = process.env.DISPATCHER_API_BASE_URL || "";
@@ -401,10 +403,13 @@ module.exports = {
   openai: {
     enabled: parseBoolean(process.env.OPENAI_ENABLED, Boolean(openAiKey)),
     apiKey: openAiKey,
+    adminApiKey: openAiAdminKey,
+    costProjectId: openAiCostProjectId,
     baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
     summaryModel: process.env.OPENAI_SUMMARY_MODEL || "gpt-5.4-nano",
+    promptRewriteModel: process.env.OPENAI_PROMPT_REWRITE_MODEL || "gpt-5.4",
     summaryVersion:
-      process.env.OPENAI_SUMMARY_VERSION || "20260608-call-script-rubric-1",
+      process.env.OPENAI_SUMMARY_VERSION || "20260709-call-analysis-compact-1",
     timeoutMillis: parsePositiveNumber(process.env.OPENAI_TIMEOUT_MS, 300000),
     maxRetries: parseNonNegativeNumber(process.env.OPENAI_MAX_RETRIES, 3),
     retryInitialMillis: parsePositiveNumber(
