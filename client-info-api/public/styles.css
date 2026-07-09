@@ -73,6 +73,10 @@
   --motion-panel: 180ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
   --z-base: 0;
   --z-raised: 1;
   --z-active: 2;
@@ -144,6 +148,8 @@ body[data-theme="dark"] {
 body {
   margin: 0;
   min-width: 320px;
+  padding-right: var(--safe-right);
+  padding-left: var(--safe-left);
   color: var(--ink);
   background: var(--page);
   transition:
@@ -905,8 +911,9 @@ body[data-theme="dark"] .theme-toggle-option.is-moon {
 .login-page {
   display: grid;
   min-height: 100vh;
+  min-height: 100dvh;
   place-items: center;
-  padding: 24px;
+  padding: max(24px, var(--safe-top)) 24px max(24px, var(--safe-bottom));
   background: var(--page);
 }
 
@@ -6012,8 +6019,8 @@ body[data-theme="dark"] .ai-settings-page {
 
 .ai-insights-button {
   position: fixed;
-  right: 34px;
-  bottom: 88px;
+  right: max(34px, calc(var(--safe-right) + 18px));
+  bottom: max(88px, calc(var(--safe-bottom) + 34px));
   z-index: var(--z-floating-action);
   display: inline-flex;
   align-items: center;
@@ -6730,8 +6737,8 @@ body[data-theme="dark"] .ai-settings-page {
   }
 
   .ai-insights-button {
-    right: 16px;
-    bottom: 22px;
+    right: max(16px, calc(var(--safe-right) + 12px));
+    bottom: max(22px, calc(var(--safe-bottom) + 16px));
     min-height: 48px;
     padding: 0 18px;
     font-size: 14px;
@@ -9271,7 +9278,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
     align-items: stretch;
     flex-direction: column;
     gap: 12px;
-    padding: 10px 12px;
+    padding: calc(10px + var(--safe-top)) 12px 10px;
   }
 
   .header-actions {
@@ -10003,7 +10010,7 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
 
   .page-shell {
     width: min(100% - 20px, 1320px);
-    padding: 10px 0 32px;
+    padding: 10px 0 calc(32px + var(--safe-bottom));
   }
 
   .identity-row,
