@@ -913,7 +913,212 @@ async function handleRequest(req, res) {
       return;
     }
 
+    if (call.ai && appStateDatabase.aiMetricFeedbackStore) {
+      const summaryCallId = String(
+        call.ai.callId ||
+        call.ai.generalCallId ||
+        call.generalCallId ||
+        call.id ||
+        callId
+      ).trim();
+      call.ai.metricFeedback = summaryCallId
+        ? await appStateDatabase.aiMetricFeedbackStore.listForCall(summaryCallId)
+        : [];
+    }
+
     sendJson(res, 200, call);
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/ai-metric-feedback") {
+    const auth = await authService.requireAuth(req, res);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      if (req.method === "POST") {
+        const payload = await readJsonBody(req, 64 * 1024);
+        const feedback = await appStateDatabase.aiMetricFeedbackStore.save(
+          payload,
+          auth.user
+        );
+        sendJson(res, 200, {
+          ok: true,
+          feedback,
+          items: await appStateDatabase.aiMetricFeedbackStore.listForCall(feedback.callId)
+        });
+        return;
+      }
+
+      if (req.method === "GET") {
+        const callId = String(requestUrl.searchParams.get("callId") || "").trim();
+        if (!callId) {
+          sendJson(res, 400, {
+            ok: false,
+            error: "callId query parameter is required"
+          });
+          return;
+        }
+        sendJson(res, 200, {
+          ok: true,
+          items: await appStateDatabase.aiMetricFeedbackStore.listForCall(callId)
+        });
+        return;
+      }
+
+      if (req.method === "DELETE") {
+        const callId = String(requestUrl.searchParams.get("callId") || "").trim();
+        const metricKey = String(requestUrl.searchParams.get("metricKey") || "").trim();
+        const deleted = await appStateDatabase.aiMetricFeedbackStore.deleteForMetric({
+          callId,
+          metricKey
+        });
+        sendJson(res, 200, {
+          ok: true,
+          deleted,
+          items: await appStateDatabase.aiMetricFeedbackStore.listForCall(callId)
+        });
+        return;
+      }
+
+      res.writeHead(405, { Allow: "GET, POST, DELETE" });
+      res.end("Method not allowed");
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : Number(error.statusCode) || 500;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: error.publicError || error.message || "metric_feedback_failed"
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/admin/ai-metric-feedback") {
+    const auth = await authService.requireAdmin(req, res);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      sendJson(
+        res,
+        200,
+        {
+          ok: true,
+          ...(await appStateDatabase.aiMetricFeedbackStore.listRecent({
+            limit: requestUrl.searchParams.get("limit") || 100,
+            offset: requestUrl.searchParams.get("offset") || 0
+          }))
+        }
+      );
+    } catch (error) {
+      sendJson(res, Number(error.statusCode) || 500, {
+        ok: false,
+        error: error.publicError || error.message || "metric_feedback_admin_failed"
+      });
+    }
+    return;
+  }
+
+  const metricFeedbackAdminItemMatch = requestUrl.pathname.match(
+    /^\/api\/admin\/ai-metric-feedback\/([^/]+)$/
+  );
+  if (metricFeedbackAdminItemMatch) {
+    const auth = await authService.requireAdmin(req, res);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      if (req.method !== "DELETE") {
+        res.writeHead(405, { Allow: "DELETE" });
+        res.end("Method not allowed");
+        return;
+      }
+      const feedbackId = decodeURIComponent(metricFeedbackAdminItemMatch[1] || "");
+      sendJson(res, 200, {
+        ok: true,
+        deleted: await appStateDatabase.aiMetricFeedbackStore.deleteById(feedbackId)
+      });
+    } catch (error) {
+      sendJson(res, Number(error.statusCode) || 500, {
+        ok: false,
+        error: error.publicError || error.message || "metric_feedback_delete_failed"
+      });
+    }
+    return;
+  }
+
+  const metricFeedbackPromptMatch = requestUrl.pathname.match(
+    /^\/api\/admin\/ai-metric-feedback\/([^/]+)\/prompt-update$/
+  );
+  if (metricFeedbackPromptMatch) {
+    const auth = await authService.requireAdmin(req, res);
+    if (!auth) {
+      return;
+    }
+
+    try {
+      const feedbackId = decodeURIComponent(metricFeedbackPromptMatch[1] || "");
+      if (req.method === "GET") {
+        const preview = await appStateDatabase.aiMetricFeedbackStore.promptUpdatePreview(feedbackId);
+        const regenerate = ["1", "true", "yes"].includes(
+          String(requestUrl.searchParams.get("regenerate") || "").trim().toLowerCase()
+        );
+        if (!regenerate && preview.promptUpdateDraft && preview.promptUpdateDraft.proposal) {
+          sendJson(res, 200, {
+            ok: true,
+            ...preview,
+            proposal: preview.promptUpdateDraft.proposal
+          });
+          return;
+        }
+
+        const proposal = await store.openAiClient.rewriteMetricPrompt(preview);
+        const cachedDraft = await appStateDatabase.aiMetricFeedbackStore.savePromptUpdateDraft(
+          feedbackId,
+          proposal,
+          auth.user
+        );
+        sendJson(res, 200, {
+          ok: true,
+          ...cachedDraft,
+          proposal: cachedDraft.proposal
+        });
+        return;
+      }
+
+      if (req.method === "POST") {
+        const payload = await readJsonBody(req, 64 * 1024);
+        sendJson(res, 200, {
+          ok: true,
+          ...(await appStateDatabase.aiMetricFeedbackStore.applyPromptUpdate(
+            feedbackId,
+            payload,
+            auth.user
+          ))
+        });
+        return;
+      }
+
+      res.writeHead(405, { Allow: "GET, POST" });
+      res.end("Method not allowed");
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : Number(error.statusCode) || 500;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: error.publicError || error.message || "metric_feedback_prompt_update_failed"
+      });
+    }
     return;
   }
 
@@ -959,14 +1164,24 @@ async function handleRequest(req, res) {
   if (req.method === "GET" && requestUrl.pathname === "/api/binotel-monitor/analytics") {
     const query = requestUrl.searchParams.get("q") || "";
     const requestedPeriod = requestUrl.searchParams.get("period") || "30";
+    const utcNow = new Date();
+    const utcTodayStart = new Date(Date.UTC(
+      utcNow.getUTCFullYear(),
+      utcNow.getUTCMonth(),
+      utcNow.getUTCDate()
+    )).toISOString();
     const periodDays = requestedPeriod === "all"
       ? null
-      : [7, 30].includes(Number(requestedPeriod))
-        ? Number(requestedPeriod)
-        : 30;
-    const since = periodDays
-      ? new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString()
-      : null;
+      : requestedPeriod === "today"
+        ? 1
+        : [7, 30].includes(Number(requestedPeriod))
+          ? Number(requestedPeriod)
+          : 30;
+    const since = requestedPeriod === "today"
+      ? utcTodayStart
+      : periodDays
+        ? new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString()
+        : null;
 
     const [analytics, managerRating] = await Promise.all([
       binotelMonitor.callTypeAnalytics({

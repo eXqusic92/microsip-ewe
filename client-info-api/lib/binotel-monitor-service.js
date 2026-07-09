@@ -79,6 +79,10 @@ function roundMoney(value) {
   return Math.round(numeric(value) * 10000) / 10000;
 }
 
+function roundCost(value) {
+  return Math.round(numeric(value) * 1_000_000) / 1_000_000;
+}
+
 function optionalNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -583,6 +587,110 @@ class BinotelMonitorService {
       clearTimeout(this.timer);
       this.timer = null;
     }
+  }
+
+  providerCostWindow(items, options = {}) {
+    const end = new Date();
+    const configuredStart = options.since ? new Date(options.since) : null;
+    const callStarts = (Array.isArray(items) ? items : [])
+      .map((item) => (item && item.call) || item)
+      .map((call) => new Date(call && call.startedAt).getTime())
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const earliestCallStart = callStarts.length ? Math.min(...callStarts) : 0;
+    const requestedStart =
+      configuredStart && Number.isFinite(configuredStart.getTime())
+        ? configuredStart
+        : earliestCallStart
+          ? new Date(earliestCallStart)
+          : null;
+
+    if (!requestedStart || requestedStart >= end) {
+      return null;
+    }
+
+    const sonioxEarliest = new Date(end.getTime() - 31 * 24 * 60 * 60 * 1000);
+    const sonioxStart = requestedStart < sonioxEarliest
+      ? sonioxEarliest
+      : requestedStart;
+
+    return {
+      startTime: requestedStart.toISOString(),
+      endTime: end.toISOString(),
+      sonioxStartTime: sonioxStart.toISOString(),
+      sonioxCoverageComplete: sonioxStart.getTime() === requestedStart.getTime()
+    };
+  }
+
+  async providerCostSnapshots(items, options = {}) {
+    if (String(options.query || "").trim()) {
+      return {
+        window: null,
+        soniox: { available: false, reason: "query_filtered" },
+        openAi: { available: false, reason: "query_filtered" }
+      };
+    }
+
+    const window = this.providerCostWindow(items, options);
+    if (!window) {
+      return {
+        window: null,
+        soniox: { available: false, reason: "no_calls" },
+        openAi: { available: false, reason: "no_calls" }
+      };
+    }
+
+    const transcriptionClient = this.callSummaryService &&
+      this.callSummaryService.transcriptionClient;
+    const openAiClient = this.callSummaryService && this.callSummaryService.openAiClient;
+    const sonioxPromise = !transcriptionClient ||
+      transcriptionClient.provider !== "soniox" ||
+      typeof transcriptionClient.listUsageLogs !== "function"
+      ? Promise.resolve({ available: false, reason: "not_configured" })
+      : transcriptionClient.listUsageLogs({
+        startTime: window.sonioxStartTime,
+        endTime: window.endTime
+      }).then((result) => {
+        const usageLogs = Array.isArray(result && result.usageLogs) ? result.usageLogs : [];
+        const costUsd = usageLogs.reduce(
+          (total, entry) => total + numeric(entry && entry.cost_usd),
+          0
+        );
+        const audioDurationSeconds = usageLogs.reduce(
+          (total, entry) => total + numeric(entry && entry.input_audio_duration_ms) / 1000,
+          0
+        );
+        return {
+          available: true,
+          source: "provider_api",
+          costUsd,
+          entries: usageLogs.length,
+          pages: numeric(result && result.pages),
+          audioDurationSeconds,
+          startTime: window.sonioxStartTime,
+          endTime: window.endTime,
+          coverageComplete: window.sonioxCoverageComplete
+        };
+      }).catch((error) => {
+        console.warn(`Soniox usage logs unavailable: ${error.message}`);
+        return { available: false, reason: "provider_error" };
+      });
+    const openAiPromise = !openAiClient ||
+      typeof openAiClient.organizationCosts !== "function"
+      ? Promise.resolve({ available: false, reason: "not_configured" })
+      : openAiClient.organizationCosts({
+        startTime: window.startTime,
+        endTime: window.endTime
+      }).catch((error) => {
+        console.warn(`OpenAI costs unavailable: ${error.message}`);
+        return { available: false, reason: "provider_error" };
+      });
+    const [soniox, openAi] = await Promise.all([sonioxPromise, openAiPromise]);
+
+    return {
+      window,
+      soniox,
+      openAi
+    };
   }
 
   schedule(delayMillis) {
@@ -1336,6 +1444,7 @@ class BinotelMonitorService {
     const result = typeof this.store.analytics === "function"
       ? await this.store.analytics(listOptions)
       : await this.store.list(listOptions);
+    const providerCostsPromise = this.providerCostSnapshots(result.calls, options);
     const categoryMap = new Map();
     const questionMap = new Map();
     const churnRiskMap = new Map();
@@ -1360,6 +1469,7 @@ class BinotelMonitorService {
     let transcriptionUnpricedCalls = 0;
     let transcriptionMissingModelCalls = 0;
     let transcriptionPricedSeconds = 0;
+    let nonSonioxTranscriptionCost = 0;
     const transcriptionProviderCounts = new Map();
     const openAiSummaryUsage = {
       inputTokens: 0,
@@ -1451,6 +1561,9 @@ class BinotelMonitorService {
           transcriptionUnpricedCalls += 1;
         } else {
           transcriptionCost += estimate.costUsd;
+          if (provider !== "soniox") {
+            nonSonioxTranscriptionCost += estimate.costUsd;
+          }
           transcriptionPricedCalls += 1;
           transcriptionPricedSeconds += recordingSeconds;
         }
@@ -1527,6 +1640,19 @@ class BinotelMonitorService {
     const currentSummaryPricing = openAiTextPricing(
       this.rootConfig.openai && this.rootConfig.openai.summaryModel
     );
+    const providerCosts = await providerCostsPromise;
+    const sonioxActual = providerCosts.soniox && providerCosts.soniox.available &&
+      providerCosts.soniox.coverageComplete
+      ? providerCosts.soniox
+      : null;
+    const openAiActual = providerCosts.openAi && providerCosts.openAi.available
+      ? providerCosts.openAi
+      : null;
+    const resolvedTranscriptionCostUsd = sonioxActual
+      ? sonioxActual.costUsd + nonSonioxTranscriptionCost
+      : transcriptionCost;
+    const openAiCostUsd = openAiActual ? openAiActual.costUsd : openAiSummaryCost;
+    const totalCostUsd = openAiCostUsd + resolvedTranscriptionCostUsd;
 
     const analytics = {
       periodDays: options.periodDays || null,
@@ -1563,7 +1689,10 @@ class BinotelMonitorService {
         transcriptionProvider,
         openAiSummary: {
           ...openAiSummaryUsage,
-          estimatedCostUsd: roundMoney(openAiSummaryCost),
+          estimatedCostUsd: roundCost(openAiSummaryCost),
+          costUsd: roundCost(openAiCostUsd),
+          actualCostUsd: openAiActual ? roundCost(openAiActual.costUsd) : null,
+          costSource: openAiActual ? "provider_api" : "local_usage",
           pricedCalls: openAiSummaryPricedCalls,
           unpricedCalls: openAiSummaryUnpricedCalls,
           pricing: currentSummaryPricing,
@@ -1574,8 +1703,15 @@ class BinotelMonitorService {
           providers: transcriptionProviders,
           audioHours: Math.round((transcriptionPricedSeconds / 3600) * 100) / 100,
           estimatedCostUsd: transcriptionPricedCalls
-            ? roundMoney(transcriptionCost)
+            ? roundCost(transcriptionCost)
             : null,
+          costUsd: transcriptionPricedCalls || sonioxActual
+            ? roundCost(resolvedTranscriptionCostUsd)
+            : null,
+          actualSonioxCostUsd: sonioxActual
+            ? roundCost(sonioxActual.costUsd)
+            : null,
+          costSource: sonioxActual ? "provider_api" : "duration_estimate",
           pricedCalls: transcriptionPricedCalls,
           unpricedCalls: transcriptionUnpricedCalls,
           missingModelCalls: transcriptionMissingModelCalls,
@@ -1584,7 +1720,13 @@ class BinotelMonitorService {
             openai: OPENAI_TRANSCRIPTION_PRICING_USD_BY_MODEL
           }
         },
-        estimatedTotalCostUsd: roundMoney(openAiSummaryCost + transcriptionCost)
+        providerCosts: {
+          window: providerCosts.window,
+          soniox: providerCosts.soniox,
+          openAi: providerCosts.openAi
+        },
+        totalCostUsd: roundCost(totalCostUsd),
+        estimatedTotalCostUsd: roundCost(openAiSummaryCost + transcriptionCost)
       }
     };
 

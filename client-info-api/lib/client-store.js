@@ -1271,6 +1271,7 @@ function createClientStore(config, appStateDatabase) {
     store.getAiClientContext(phone)
   );
   store.aiAnalysisSettingsStore = aiAnalysisSettingsStore;
+  store.openAiClient = openAiClient;
   store.getAiAnalysisSettings = () =>
     aiAnalysisSettingsStore.getPublicSettings();
   store.updateAiAnalysisSettings = (settings) =>

@@ -1433,6 +1433,1011 @@ class PostgresCallSummaryStore {
   }
 }
 
+function appStateRequestError(message, error = "invalid_request", statusCode = 400) {
+  const problem = new Error(message);
+  problem.publicError = error;
+  problem.statusCode = statusCode;
+  return problem;
+}
+
+function jsonObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function feedbackActor(user = {}) {
+  const username = text(user.username);
+  const name = text(user.name, username) || username || "Користувач";
+  return {
+    id: text(user.id),
+    username,
+    name
+  };
+}
+
+function feedbackOperatorName(row) {
+  const employee = jsonObject(row && row.employee_payload);
+  const pbxNumber = jsonObject(row && row.pbx_number_payload);
+  return (
+    text(employee.name) ||
+    text(employee.fullName) ||
+    text(employee.full_name) ||
+    text(employee.email) ||
+    text(pbxNumber.name) ||
+    text(pbxNumber.label) ||
+    text(row && row.internal_additional_data) ||
+    text(row && row.internal_number)
+  );
+}
+
+function feedbackMetricSnapshot(row) {
+  return {
+    key: text(row && row.metric_key),
+    label: text(row && row.metric_label),
+    group: text(row && row.metric_group),
+    selectedOptionKey: text(row && row.selected_option_key),
+    selectedOptionLabel: text(row && row.selected_option_label),
+    score: optionalNumber(row && row.score),
+    maxScore: optionalNumber(row && row.max_score),
+    color: text(row && row.color, "#94a3b8"),
+    countsTowardScore: !row || row.counts_toward_score !== false,
+    evidence: text(row && row.evidence),
+    improvement: text(row && row.improvement),
+    confidence: optionalNumber(row && row.confidence),
+    payload: cloneJson(row && row.metric_payload, {}) || {}
+  };
+}
+
+function feedbackCallContext(row) {
+  const employee = cloneJson(row && row.employee_payload, {}) || {};
+  const pbxNumber = cloneJson(row && row.pbx_number_payload, {}) || {};
+  const callPayload = cloneJson(row && row.call_payload, {}) || {};
+  const startedAt =
+    optionalTimestamp(row && row.call_started_at) ||
+    optionalTimestamp(row && row.source_started_at);
+
+  return {
+    callId: text(row && row.summary_call_id),
+    generalCallId: text(row && row.summary_general_call_id),
+    sourceCallId: text(row && row.source_call_id),
+    phone: text(row && row.summary_phone),
+    phoneDigits: text(row && row.summary_phone_digits),
+    externalNumber: text(row && row.external_number),
+    internalNumber: text(row && row.internal_number),
+    internalAdditionalData: text(row && row.internal_additional_data),
+    operatorName: feedbackOperatorName(row),
+    startedAt,
+    durationSec: integer(row && (row.call_duration_sec || row.bill_sec), 0),
+    disposition: text(row && row.disposition),
+    dispositionLabel: text(row && row.disposition_label),
+    callType: text(row && row.call_type),
+    callTypeLabel: text(row && row.call_type_label),
+    analysis: {
+      schemaVersion: text(row && row.analysis_schema_version),
+      revision: text(row && row.analysis_revision),
+      semanticRevision: text(row && row.analysis_semantic_revision),
+      scoringRevision: text(row && row.analysis_scoring_revision)
+    },
+    employee,
+    pbxNumber,
+    callPayload
+  };
+}
+
+function metricFeedbackPayload(row) {
+  if (!row) {
+    return null;
+  }
+
+  const payload = cloneJson(row.payload, {}) || {};
+  const context = feedbackCallContext(row);
+  const metric = feedbackMetricSnapshot(row);
+
+  return {
+    id: text(row.id),
+    callId: text(row.call_id),
+    metricResultId: row.metric_result_id === null || row.metric_result_id === undefined
+      ? null
+      : Number(row.metric_result_id),
+    metricKey: text(row.metric_key),
+    text: text(row.feedback_text),
+    feedbackText: text(row.feedback_text),
+    createdAt: optionalTimestamp(row.created_at),
+    updatedAt: optionalTimestamp(row.updated_at),
+    createdBy: {
+      id: text(row.created_by_user_id),
+      username: text(row.created_by_username),
+      name: text(row.created_by_name)
+    },
+    updatedBy: {
+      id: text(row.updated_by_user_id),
+      username: text(row.updated_by_username),
+      name: text(row.updated_by_name)
+    },
+    call: {
+      id: text(row.call_id),
+      callId: text(row.call_id),
+      startedAt: context.startedAt,
+      type: text(context.callType),
+      typeLabel: text(context.callTypeLabel),
+      phone: text(context.phone),
+      phoneDigits: text(context.phoneDigits),
+      externalNumber: text(context.externalNumber),
+      internalNumber: text(context.internalNumber),
+      operatorName: text(context.operatorName)
+    },
+    analysis: context.analysis,
+    metric,
+    context,
+    promptUpdate:
+      payload.promptUpdate && typeof payload.promptUpdate === "object"
+        ? cloneJson(payload.promptUpdate, {})
+        : null,
+    promptUpdateDraft:
+      payload.promptUpdateDraft && typeof payload.promptUpdateDraft === "object"
+        ? cloneJson(payload.promptUpdateDraft, {})
+        : null,
+    payload
+  };
+}
+
+function metricFeedbackPromptText(value, maxLength = 6000) {
+  return text(value)
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .slice(0, maxLength)
+    .trim();
+}
+
+function metricFeedbackScoreLine(feedback) {
+  const metric = (feedback && feedback.metric) || {};
+  if (metric.score === null || metric.score === undefined || !Number.isFinite(Number(metric.score))) {
+    return "";
+  }
+  if (metric.maxScore !== null && metric.maxScore !== undefined && Number(metric.maxScore) > 0) {
+    return `${metric.score}/${metric.maxScore}`;
+  }
+  return String(metric.score);
+}
+
+function metricFeedbackTargetHint(feedback) {
+  const context = (feedback && feedback.context) || {};
+  const call = (feedback && feedback.call) || {};
+  return {
+    callTypeKey: text(context.callType || call.type),
+    callTypeLabel: text(context.callTypeLabel || call.typeLabel),
+    metricKey: text(feedback && feedback.metricKey),
+    metricLabel: text(feedback && feedback.metric && feedback.metric.label)
+  };
+}
+
+function findMetricPromptTarget(settings, feedback) {
+  const normalized = normalizeAiAnalysisSettings(settings);
+  const hint = metricFeedbackTargetHint(feedback);
+  const callTypes = Array.isArray(normalized.callTypes) ? normalized.callTypes : [];
+  const candidates = [
+    ...callTypes.filter((callType) => text(callType.key) === hint.callTypeKey),
+    ...callTypes.filter((callType) => text(callType.key) !== hint.callTypeKey)
+  ];
+
+  for (const callType of candidates) {
+    const metrics = Array.isArray(callType.metrics) ? callType.metrics : [];
+    const metric = metrics.find((item) => text(item.key) === hint.metricKey);
+    if (metric) {
+      return {
+        settings: normalized,
+        callType,
+        metric,
+        target: {
+          callTypeKey: text(callType.key),
+          callTypeLabel: text(callType.label),
+          metricKey: text(metric.key),
+          metricLabel: text(metric.label)
+        }
+      };
+    }
+  }
+
+  return {
+    settings: normalized,
+    callType: null,
+    metric: null,
+    target: {
+      callTypeKey: hint.callTypeKey,
+      callTypeLabel: hint.callTypeLabel,
+      metricKey: hint.metricKey,
+      metricLabel: hint.metricLabel
+    }
+  };
+}
+
+function metricOptionPromptBundle(optionItem = {}) {
+  return {
+    key: text(optionItem.key),
+    label: text(optionItem.label),
+    score: optionItem.score === null || optionItem.score === undefined
+      ? null
+      : optionalNumber(optionItem.score),
+    color: text(optionItem.color, "#94a3b8"),
+    countsTowardScore: optionItem.countsTowardScore !== false,
+    order: numeric(optionItem.order, 0),
+    aiInstructions: text(optionItem.aiInstructions),
+    aiBrief: text(optionItem.aiBrief)
+  };
+}
+
+function metricPromptBundle(metric = {}) {
+  return {
+    metric: {
+      key: text(metric.key),
+      label: text(metric.label),
+      group: text(metric.group),
+      description: text(metric.description),
+      aiInstructions: text(metric.aiInstructions),
+      aiBrief: text(metric.aiBrief),
+      weight: numeric(metric.weight, 1)
+    },
+    options: [...(Array.isArray(metric.options) ? metric.options : [])]
+      .sort((a, b) => numeric(a && a.order, 0) - numeric(b && b.order, 0))
+      .map(metricOptionPromptBundle)
+  };
+}
+
+function normalizePromptRewriteProposal(proposal = {}, metric = {}) {
+  const source = proposal.proposal || proposal.rewrite || proposal;
+  const sourceMetric = source.metric && typeof source.metric === "object"
+    ? source.metric
+    : {};
+  const sourceOptions = Array.isArray(source.options) ? source.options : [];
+  const existingOptions = Array.isArray(metric.options) ? metric.options : [];
+  const optionsByKey = new Map(
+    sourceOptions.map((optionItem) => [text(optionItem && optionItem.key), optionItem])
+  );
+
+  const normalized = {
+    metric: {
+      description: metricFeedbackPromptText(sourceMetric.description, 5000),
+      aiInstructions: metricFeedbackPromptText(sourceMetric.aiInstructions, 8000),
+      aiBrief: ""
+    },
+    options: [],
+    rationale: metricFeedbackPromptText(source.rationale, 2000),
+    model: text(source.model),
+    usage: source.usage && typeof source.usage === "object"
+      ? cloneJson(source.usage, null)
+      : null
+  };
+
+  if (!normalized.metric.description) {
+    normalized.metric.description = text(metric.description);
+  }
+  if (!normalized.metric.aiInstructions) {
+    throw appStateRequestError("AI не повернув prompt для метрики.", "metric_prompt_missing");
+  }
+
+  for (const existingOption of existingOptions) {
+    const key = text(existingOption && existingOption.key);
+    const optionProposal = optionsByKey.get(key);
+    if (!optionProposal) {
+      throw appStateRequestError(
+        `AI не повернув prompt для оцінки ${key || "без ключа"}.`,
+        "metric_option_prompt_missing"
+      );
+    }
+    const optionPrompt = {
+      key,
+      aiInstructions: metricFeedbackPromptText(optionProposal.aiInstructions, 6000),
+      aiBrief: ""
+    };
+    if (!optionPrompt.aiInstructions) {
+      throw appStateRequestError(
+        `AI повернув порожній prompt для оцінки ${key || "без ключа"}.`,
+        "metric_option_prompt_empty"
+      );
+    }
+    normalized.options.push(optionPrompt);
+  }
+
+  return normalized;
+}
+
+function metricPromptDraftSourceHash(feedback = {}, target = {}, currentPrompt = {}, revision = "") {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify({
+      feedbackId: text(feedback.id),
+      feedbackText: text(feedback.text || feedback.feedbackText),
+      target,
+      settingsRevision: text(revision),
+      currentPrompt
+    }))
+    .digest("hex");
+}
+
+function metricPromptDraftFromPayload(draft, sourceHash = "") {
+  if (!draft || typeof draft !== "object") {
+    return null;
+  }
+  if (sourceHash && text(draft.sourceHash) !== sourceHash) {
+    return null;
+  }
+  if (!draft.proposal || typeof draft.proposal !== "object") {
+    return null;
+  }
+  return cloneJson(draft, {});
+}
+
+class PostgresAiMetricFeedbackStore {
+  constructor(pool, aiAnalysisSettingsStore = null) {
+    this.pool = pool;
+    this.aiAnalysisSettingsStore = aiAnalysisSettingsStore;
+    this.schemaReady = null;
+  }
+
+  setAiAnalysisSettingsStore(store) {
+    this.aiAnalysisSettingsStore = store;
+  }
+
+  requireAiAnalysisSettingsStore() {
+    if (!this.aiAnalysisSettingsStore) {
+      throw appStateRequestError("AI settings store is not configured", "ai_settings_store_missing", 500);
+    }
+    return this.aiAnalysisSettingsStore;
+  }
+
+  async ensureSchema() {
+    if (!this.schemaReady) {
+      this.schemaReady = this.pool.query(`
+        CREATE TABLE IF NOT EXISTS ai_metric_feedback (
+          id uuid PRIMARY KEY,
+          call_id text NOT NULL REFERENCES call_summaries(call_id) ON DELETE CASCADE,
+          metric_result_id bigint,
+          metric_key text NOT NULL,
+          feedback_text text NOT NULL,
+          created_by_user_id text NOT NULL DEFAULT '',
+          created_by_username text NOT NULL DEFAULT '',
+          created_by_name text NOT NULL DEFAULT '',
+          updated_by_user_id text NOT NULL DEFAULT '',
+          updated_by_username text NOT NULL DEFAULT '',
+          updated_by_name text NOT NULL DEFAULT '',
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+          CONSTRAINT ai_metric_feedback_call_metric_uniq UNIQUE (call_id, metric_key)
+        );
+
+        ALTER TABLE ai_metric_feedback
+          ADD COLUMN IF NOT EXISTS metric_result_id bigint;
+
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conname = 'ai_metric_feedback_metric_result_fk'
+          ) THEN
+            ALTER TABLE ai_metric_feedback
+              ADD CONSTRAINT ai_metric_feedback_metric_result_fk
+              FOREIGN KEY (metric_result_id)
+              REFERENCES call_summary_metric_results(id)
+              ON DELETE SET NULL;
+          END IF;
+        END $$;
+
+        CREATE INDEX IF NOT EXISTS ai_metric_feedback_updated_at_idx
+          ON ai_metric_feedback (updated_at DESC);
+        CREATE INDEX IF NOT EXISTS ai_metric_feedback_metric_result_idx
+          ON ai_metric_feedback (metric_result_id);
+        CREATE INDEX IF NOT EXISTS ai_metric_feedback_metric_idx
+          ON ai_metric_feedback (metric_key, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS ai_metric_feedback_payload_gin_idx
+          ON ai_metric_feedback USING gin (payload);
+      `).catch((error) => {
+        this.schemaReady = null;
+        throw error;
+      });
+    }
+
+    return this.schemaReady;
+  }
+
+  async metricContext(callId, metricKey) {
+    const result = await this.pool.query(
+      `
+        SELECT
+          summaries.call_id AS summary_call_id,
+          summaries.general_call_id AS summary_general_call_id,
+          summaries.phone AS summary_phone,
+          summaries.phone_digits AS summary_phone_digits,
+          summaries.call_started_at,
+          summaries.call_duration_sec,
+          summaries.call_type,
+          summaries.call_type_label,
+          summaries.analysis_schema_version,
+          summaries.analysis_revision,
+          summaries.analysis_semantic_revision,
+          summaries.analysis_scoring_revision,
+          metrics.id AS metric_result_id,
+          metrics.metric_key,
+          metrics.metric_label,
+          metrics.metric_group,
+          metrics.selected_option_key,
+          metrics.selected_option_label,
+          metrics.score,
+          metrics.max_score,
+          metrics.color,
+          metrics.counts_toward_score,
+          metrics.evidence,
+          metrics.improvement,
+          metrics.confidence,
+          metrics.payload AS metric_payload,
+          calls.call_id AS source_call_id,
+          calls.started_at AS source_started_at,
+          calls.external_number,
+          calls.internal_number,
+          calls.internal_additional_data,
+          calls.bill_sec,
+          calls.disposition,
+          calls.disposition_label,
+          calls.employee_payload,
+          calls.pbx_number_payload,
+          calls.payload AS call_payload
+        FROM call_summaries summaries
+        JOIN call_summary_metric_results metrics
+          ON metrics.call_id = summaries.call_id
+         AND metrics.metric_key = $2
+        LEFT JOIN LATERAL (
+          SELECT *
+          FROM binotel_calls source_calls
+          WHERE source_calls.general_call_id = summaries.call_id
+             OR source_calls.call_id = summaries.call_id
+          ORDER BY source_calls.started_at DESC NULLS LAST, source_calls.call_id DESC
+          LIMIT 1
+        ) calls ON true
+        WHERE summaries.call_id = $1
+        LIMIT 1
+      `,
+      [text(callId), text(metricKey)]
+    );
+    return result.rows[0] || null;
+  }
+
+  async existing(callId, metricKey) {
+    const result = await this.pool.query(
+      "SELECT * FROM ai_metric_feedback WHERE call_id = $1 AND metric_key = $2",
+      [text(callId), text(metricKey)]
+    );
+    return result.rows[0] || null;
+  }
+
+  feedbackSelectSql(extraSelect = "") {
+    return `
+      SELECT
+        feedback.id,
+        feedback.call_id,
+        feedback.metric_result_id,
+        feedback.metric_key,
+        feedback.feedback_text,
+        feedback.created_by_user_id,
+        feedback.created_by_username,
+        feedback.created_by_name,
+        feedback.updated_by_user_id,
+        feedback.updated_by_username,
+        feedback.updated_by_name,
+        feedback.created_at,
+        feedback.updated_at,
+        feedback.payload,
+        summaries.general_call_id AS summary_general_call_id,
+        summaries.phone AS summary_phone,
+        summaries.phone_digits AS summary_phone_digits,
+        summaries.call_started_at,
+        summaries.call_duration_sec,
+        summaries.call_type,
+        summaries.call_type_label,
+        summaries.analysis_schema_version,
+        summaries.analysis_revision,
+        summaries.analysis_semantic_revision,
+        summaries.analysis_scoring_revision,
+        metrics.metric_label,
+        metrics.metric_group,
+        metrics.selected_option_key,
+        metrics.selected_option_label,
+        metrics.score,
+        metrics.max_score,
+        metrics.color,
+        metrics.counts_toward_score,
+        metrics.evidence,
+        metrics.improvement,
+        metrics.confidence,
+        metrics.payload AS metric_payload,
+        calls.call_id AS source_call_id,
+        calls.started_at AS source_started_at,
+        calls.external_number,
+        calls.internal_number,
+        calls.internal_additional_data,
+        calls.bill_sec,
+        calls.disposition,
+        calls.disposition_label,
+        calls.employee_payload,
+        calls.pbx_number_payload,
+        calls.payload AS call_payload
+        ${extraSelect}
+      FROM ai_metric_feedback feedback
+      LEFT JOIN call_summaries summaries
+        ON summaries.call_id = feedback.call_id
+      LEFT JOIN LATERAL (
+        SELECT metric_rows.*
+        FROM call_summary_metric_results metric_rows
+        WHERE metric_rows.id = feedback.metric_result_id
+           OR (
+             metric_rows.call_id = feedback.call_id
+             AND metric_rows.metric_key = feedback.metric_key
+           )
+        ORDER BY
+          CASE WHEN metric_rows.id = feedback.metric_result_id THEN 0 ELSE 1 END,
+          metric_rows.id DESC
+        LIMIT 1
+      ) metrics ON true
+      LEFT JOIN LATERAL (
+        SELECT source_calls.*
+        FROM binotel_calls source_calls
+        WHERE source_calls.general_call_id = feedback.call_id
+           OR source_calls.call_id = feedback.call_id
+        ORDER BY source_calls.started_at DESC NULLS LAST, source_calls.call_id DESC
+        LIMIT 1
+      ) calls ON true
+    `;
+  }
+
+  async getById(id) {
+    const result = await this.pool.query(
+      `
+        ${this.feedbackSelectSql()}
+        WHERE feedback.id = $1
+        LIMIT 1
+      `,
+      [text(id)]
+    );
+    return metricFeedbackPayload(result.rows[0]);
+  }
+
+  async deleteById(id) {
+    await this.ensureSchema();
+    const feedback = await this.getById(id);
+    if (!feedback) {
+      throw appStateRequestError("Правку метрики не знайдено.", "metric_feedback_not_found", 404);
+    }
+
+    await this.pool.query(
+      "DELETE FROM ai_metric_feedback WHERE id = $1",
+      [text(id)]
+    );
+    return feedback;
+  }
+
+  async deleteForMetric(input = {}) {
+    await this.ensureSchema();
+    const callId = text(input.callId);
+    const metricKey = text(input.metricKey);
+    if (!callId) {
+      throw appStateRequestError("callId is required", "call_id_required");
+    }
+    if (!metricKey) {
+      throw appStateRequestError("metricKey is required", "metric_key_required");
+    }
+
+    const existing = await this.getByCallMetric(callId, metricKey);
+    if (!existing) {
+      throw appStateRequestError("Правку метрики не знайдено.", "metric_feedback_not_found", 404);
+    }
+    await this.pool.query(
+      "DELETE FROM ai_metric_feedback WHERE call_id = $1 AND metric_key = $2",
+      [callId, metricKey]
+    );
+    return existing;
+  }
+
+  async getByCallMetric(callId, metricKey) {
+    const result = await this.pool.query(
+      `
+        ${this.feedbackSelectSql()}
+        WHERE feedback.call_id = $1
+          AND feedback.metric_key = $2
+        LIMIT 1
+      `,
+      [text(callId), text(metricKey)]
+    );
+    return metricFeedbackPayload(result.rows[0]);
+  }
+
+  feedbackHistory(existingRow) {
+    if (!existingRow) {
+      return [];
+    }
+
+    const payload = cloneJson(existingRow.payload, {}) || {};
+    const history = Array.isArray(payload.history) ? payload.history : [];
+    return [
+      ...history,
+      {
+        text: text(existingRow.feedback_text),
+        updatedAt: optionalTimestamp(existingRow.updated_at),
+        updatedBy: {
+          id: text(existingRow.updated_by_user_id),
+          username: text(existingRow.updated_by_username),
+          name: text(existingRow.updated_by_name)
+        },
+        metricResultId: existingRow.metric_result_id === null ||
+          existingRow.metric_result_id === undefined
+          ? null
+          : Number(existingRow.metric_result_id)
+      }
+    ].filter((item) => item.text).slice(-25);
+  }
+
+  async save(input = {}, user = {}) {
+    await this.ensureSchema();
+    const callId = text(input.callId);
+    const metricKey = text(input.metricKey);
+    const feedbackText = text(input.text || input.feedbackText);
+
+    if (!callId) {
+      throw appStateRequestError("callId is required", "call_id_required");
+    }
+    if (!metricKey) {
+      throw appStateRequestError("metricKey is required", "metric_key_required");
+    }
+    if (!feedbackText) {
+      throw appStateRequestError("Текст примітки обовʼязковий.", "feedback_text_required");
+    }
+    if (feedbackText.length > 4000) {
+      throw appStateRequestError("Примітка має бути до 4000 символів.", "feedback_text_too_long");
+    }
+
+    const contextRow = await this.metricContext(callId, metricKey);
+    if (!contextRow) {
+      throw appStateRequestError("Метрику для цього дзвінка не знайдено.", "metric_not_found", 404);
+    }
+
+    const existingRow = await this.existing(callId, metricKey);
+    const actor = feedbackActor(user);
+    const createdBy = existingRow
+      ? {
+          id: text(existingRow.created_by_user_id),
+          username: text(existingRow.created_by_username),
+          name: text(existingRow.created_by_name)
+        }
+      : actor;
+    const id = existingRow ? text(existingRow.id) : crypto.randomUUID();
+    const current = nowIso();
+    const metricResultId = Number(contextRow.metric_result_id);
+    const existingPayload = cloneJson(existingRow && existingRow.payload, {}) || {};
+    const payload = {
+      id,
+      callId,
+      metricKey,
+      metricResultId: Number.isFinite(metricResultId) ? metricResultId : null,
+      feedbackText,
+      createdBy,
+      updatedBy: actor,
+      updatedAt: current,
+      source: "manager_metric_feedback",
+      history: this.feedbackHistory(existingRow)
+    };
+    if (existingPayload.promptUpdate && typeof existingPayload.promptUpdate === "object") {
+      payload.promptUpdate = existingPayload.promptUpdate;
+    }
+    if (
+      existingPayload.promptUpdateDraft &&
+      typeof existingPayload.promptUpdateDraft === "object" &&
+      feedbackText === text(existingRow && existingRow.feedback_text)
+    ) {
+      payload.promptUpdateDraft = existingPayload.promptUpdateDraft;
+    }
+
+    const result = await this.pool.query(
+      `
+        INSERT INTO ai_metric_feedback (
+          id,
+          call_id,
+          metric_result_id,
+          metric_key,
+          feedback_text,
+          created_by_user_id,
+          created_by_username,
+          created_by_name,
+          updated_by_user_id,
+          updated_by_username,
+          updated_by_name,
+          payload
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8,
+          $9, $10, $11, $12::jsonb
+        )
+        ON CONFLICT (call_id, metric_key) DO UPDATE SET
+          feedback_text = EXCLUDED.feedback_text,
+          metric_result_id = EXCLUDED.metric_result_id,
+          updated_by_user_id = EXCLUDED.updated_by_user_id,
+          updated_by_username = EXCLUDED.updated_by_username,
+          updated_by_name = EXCLUDED.updated_by_name,
+          updated_at = now(),
+          payload = EXCLUDED.payload
+        RETURNING id
+      `,
+      [
+        id,
+        callId,
+        Number.isFinite(metricResultId) ? metricResultId : null,
+        metricKey,
+        feedbackText,
+        text(createdBy.id),
+        text(createdBy.username),
+        text(createdBy.name),
+        text(actor.id),
+        text(actor.username),
+        text(actor.name),
+        JSON.stringify(payload)
+      ]
+    );
+
+    return this.getById(result.rows[0] && result.rows[0].id);
+  }
+
+  async promptUpdatePreview(id) {
+    await this.ensureSchema();
+    const settingsStore = this.requireAiAnalysisSettingsStore();
+    const feedback = await this.getById(id);
+    if (!feedback) {
+      throw appStateRequestError("Правку метрики не знайдено.", "metric_feedback_not_found", 404);
+    }
+
+    const settings = await settingsStore.get();
+    const target = findMetricPromptTarget(settings, feedback);
+    if (!target.metric) {
+      throw appStateRequestError(
+        "Метрику в поточних AI-налаштуваннях не знайдено.",
+        "metric_settings_not_found",
+        404
+      );
+    }
+
+    const currentPrompt = metricPromptBundle(target.metric);
+    const revision = settingsRevision(target.settings);
+    const draftSourceHash = metricPromptDraftSourceHash(
+      feedback,
+      target.target,
+      currentPrompt,
+      revision
+    );
+    const promptUpdateDraft = metricPromptDraftFromPayload(
+      feedback.promptUpdateDraft,
+      draftSourceHash
+    );
+
+    return {
+      feedback,
+      target: target.target,
+      currentPrompt,
+      settingsRevision: revision,
+      draftSourceHash,
+      promptUpdate: feedback.promptUpdate || null,
+      promptUpdateDraft: promptUpdateDraft
+        ? {
+            ...promptUpdateDraft,
+            cached: true
+          }
+        : null
+    };
+  }
+
+  async savePromptUpdateDraft(id, proposalInput = {}, user = {}) {
+    await this.ensureSchema();
+    const settingsStore = this.requireAiAnalysisSettingsStore();
+    const feedback = await this.getById(id);
+    if (!feedback) {
+      throw appStateRequestError("Правку метрики не знайдено.", "metric_feedback_not_found", 404);
+    }
+
+    const settings = await settingsStore.get();
+    const target = findMetricPromptTarget(settings, feedback);
+    if (!target.metric) {
+      throw appStateRequestError(
+        "Метрику в поточних AI-налаштуваннях не знайдено.",
+        "metric_settings_not_found",
+        404
+      );
+    }
+
+    const currentPrompt = metricPromptBundle(target.metric);
+    const revision = settingsRevision(target.settings);
+    const proposal = normalizePromptRewriteProposal(proposalInput, target.metric);
+    const actor = feedbackActor(user);
+    const draft = {
+      id: crypto.randomUUID(),
+      generatedAt: nowIso(),
+      generatedBy: actor,
+      settingsRevision: revision,
+      sourceHash: metricPromptDraftSourceHash(
+        feedback,
+        target.target,
+        currentPrompt,
+        revision
+      ),
+      target: target.target,
+      proposal
+    };
+    const payload = cloneJson(feedback.payload, {}) || {};
+    payload.promptUpdateDraft = draft;
+
+    await this.pool.query(
+      `
+        UPDATE ai_metric_feedback
+        SET payload = $2::jsonb
+        WHERE id = $1
+      `,
+      [
+        text(feedback.id),
+        JSON.stringify(payload)
+      ]
+    );
+
+    const updatedFeedback = await this.getById(feedback.id);
+    return {
+      feedback: updatedFeedback,
+      target: target.target,
+      currentPrompt,
+      settingsRevision: revision,
+      draftSourceHash: draft.sourceHash,
+      promptUpdate: updatedFeedback && updatedFeedback.promptUpdate
+        ? updatedFeedback.promptUpdate
+        : null,
+      promptUpdateDraft: {
+        ...draft,
+        cached: false
+      },
+      proposal
+    };
+  }
+
+  async applyPromptUpdate(id, input = {}, user = {}) {
+    await this.ensureSchema();
+    const settingsStore = this.requireAiAnalysisSettingsStore();
+    const feedback = await this.getById(id);
+    if (!feedback) {
+      throw appStateRequestError("Правку метрики не знайдено.", "metric_feedback_not_found", 404);
+    }
+    if (feedback.promptUpdate && feedback.promptUpdate.appliedAt && !input.force) {
+      throw appStateRequestError("Цю правку вже застосовано до prompt.", "metric_feedback_already_applied", 409);
+    }
+
+    const settings = await settingsStore.get();
+    const target = findMetricPromptTarget(settings, feedback);
+    if (!target.metric) {
+      throw appStateRequestError(
+        "Метрику в поточних AI-налаштуваннях не знайдено.",
+        "metric_settings_not_found",
+        404
+      );
+    }
+    const proposal = normalizePromptRewriteProposal(input.proposal || input.rewrite || input, target.metric);
+    const currentPrompt = metricPromptBundle(target.metric);
+
+    const revisionBefore = settingsRevision(target.settings);
+    target.metric.description = proposal.metric.description;
+    target.metric.aiInstructions = proposal.metric.aiInstructions;
+    target.metric.aiBrief = proposal.metric.aiBrief;
+
+    const optionsByKey = new Map(proposal.options.map((optionItem) => [optionItem.key, optionItem]));
+    for (const optionItem of target.metric.options || []) {
+      const optionPrompt = optionsByKey.get(text(optionItem.key));
+      if (!optionPrompt) {
+        continue;
+      }
+      optionItem.aiInstructions = optionPrompt.aiInstructions;
+      optionItem.aiBrief = optionPrompt.aiBrief;
+    }
+
+    const settingsResult = await settingsStore.update(target.settings);
+    const revisionAfter = text(settingsResult && settingsResult.revision) ||
+      settingsRevision(settingsResult && settingsResult.settings);
+    const actor = feedbackActor(user);
+    const promptUpdate = {
+      appliedAt: nowIso(),
+      appliedBy: actor,
+      settingsRevisionBefore: revisionBefore,
+      settingsRevisionAfter: revisionAfter,
+      target: target.target,
+      type: "ai_metric_prompt_rewrite",
+      model: proposal.model,
+      usage: proposal.usage,
+      rationale: proposal.rationale,
+      before: currentPrompt,
+      after: {
+        metric: {
+          ...currentPrompt.metric,
+          description: proposal.metric.description,
+          aiInstructions: proposal.metric.aiInstructions,
+          aiBrief: proposal.metric.aiBrief
+        },
+        options: currentPrompt.options.map((optionItem) => {
+          const optionPrompt = optionsByKey.get(optionItem.key);
+          return optionPrompt
+            ? {
+                ...optionItem,
+                aiInstructions: optionPrompt.aiInstructions,
+                aiBrief: optionPrompt.aiBrief
+              }
+            : optionItem;
+        })
+      }
+    };
+    const payload = cloneJson(feedback.payload, {}) || {};
+    payload.promptUpdate = promptUpdate;
+    delete payload.promptUpdateDraft;
+
+    await this.pool.query(
+      `
+        UPDATE ai_metric_feedback
+        SET
+          updated_by_user_id = $2,
+          updated_by_username = $3,
+          updated_by_name = $4,
+          updated_at = now(),
+          payload = $5::jsonb
+        WHERE id = $1
+      `,
+      [
+        text(feedback.id),
+        text(actor.id),
+        text(actor.username),
+        text(actor.name),
+        JSON.stringify(payload)
+      ]
+    );
+
+    return {
+      feedback: await this.getById(feedback.id),
+      target: target.target,
+      settings: settingsResult,
+      promptUpdate
+    };
+  }
+
+  async listForCall(callId) {
+    await this.ensureSchema();
+    const result = await this.pool.query(
+      `
+        ${this.feedbackSelectSql()}
+        WHERE feedback.call_id = $1
+        ORDER BY feedback.updated_at DESC, feedback.metric_key
+      `,
+      [text(callId)]
+    );
+    return result.rows.map(metricFeedbackPayload);
+  }
+
+  async listRecent(options = {}) {
+    await this.ensureSchema();
+    const limit = Math.max(1, Math.min(integer(options.limit, 100), 500));
+    const offset = Math.max(0, integer(options.offset, 0));
+    const result = await this.pool.query(
+      `
+        ${this.feedbackSelectSql(", count(*) OVER()::int AS total_count")}
+        ORDER BY feedback.updated_at DESC, feedback.created_at DESC
+        LIMIT $1 OFFSET $2
+      `,
+      [limit, offset]
+    );
+
+    return {
+      total: result.rows[0] ? integer(result.rows[0].total_count, 0) : 0,
+      limit,
+      offset,
+      items: result.rows.map(metricFeedbackPayload)
+    };
+  }
+}
+
 function syncFromRow(row) {
   return {
     monitorSinceTimestamp: integer(row && row.monitor_since_timestamp, 0),
@@ -2737,12 +3742,18 @@ class PostgresRecordingCacheStore {
 
 function createAppStateDatabase(config) {
   const pool = createAppStatePool(config);
+  const aiAnalysisSettingsStore = new PostgresAiAnalysisSettingsStore(pool);
+  const aiMetricFeedbackStore = new PostgresAiMetricFeedbackStore(
+    pool,
+    aiAnalysisSettingsStore
+  );
 
   return {
     pool,
     notesStore: new PostgresLocalNotesStore(pool, config.noteAuthor),
-    aiAnalysisSettingsStore: new PostgresAiAnalysisSettingsStore(pool),
+    aiAnalysisSettingsStore,
     callSummaryStore: new PostgresCallSummaryStore(pool),
+    aiMetricFeedbackStore,
     binotelMonitorStore: new PostgresBinotelMonitorStore(pool, {
       maxCalls: config.binotelMonitor && config.binotelMonitor.maxStoredCalls
     }),
@@ -2755,6 +3766,7 @@ function createAppStateDatabase(config) {
 }
 
 module.exports = {
+  PostgresAiMetricFeedbackStore,
   PostgresAiAnalysisSettingsStore,
   PostgresBinotelMonitorStore,
   PostgresCallSummaryStore,

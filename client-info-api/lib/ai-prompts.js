@@ -393,6 +393,25 @@ function cloneSchema(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function compactSchemaForModel(value) {
+  if (Array.isArray(value)) {
+    return value.map(compactSchemaForModel);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      // Schema descriptions are useful for people but repeat the prompt guidance
+      // in every request. Keep a property named "description" when it is part of
+      // the response shape; remove only JSON-schema annotation strings.
+      .filter(([key, item]) => !(key === "description" && typeof item === "string"))
+      .map(([key, item]) => [key, compactSchemaForModel(item)])
+  );
+}
+
 function text(value) {
   return value === null || value === undefined ? "" : String(value).trim();
 }
@@ -991,7 +1010,7 @@ function buildCallTypeClassificationSchema(profileOrSettings) {
   const callTypes = analysisCallTypes(profileOrSettings);
   const callTypeKeys = uniqueValues(callTypes.map((callType) => callType.key));
 
-  return {
+  return compactSchemaForModel({
     type: "object",
     additionalProperties: false,
     required: ["callType", "confidence", "reason"],
@@ -1010,25 +1029,17 @@ function buildCallTypeClassificationSchema(profileOrSettings) {
           "One short Ukrainian sentence explaining the main intent of the call."
       }
     }
-  };
+  });
 }
 
 function buildCallTypeClassificationSystemPrompt(profileOrSettings) {
   const callTypes = analysisCallTypes(profileOrSettings);
 
   return `
-Ти класифікуєш телефонний дзвінок автобусної компанії DUMA / East West Eurolines.
+Класифікуй дзвінок DUMA / East West Eurolines: обери рівно один callType, без оцінки метрик.
+Відповідай українською. Обирай головний намір клієнта або дію оператора; за кількох тем — ту, що головна або потребує найбільшої дії. За слабкої транскрипції/неясного типу confidence=0.2-0.5. DUMA/EWE — назва компанії.
 
-Завдання: обрати рівно один callType з доступного списку. На цьому етапі НЕ оцінюй метрики, НЕ рахуй бали і НЕ роби детальний аналіз якості.
-
-Правила:
-- Відповідай українською.
-- Обирай тип за головним практичним наміром клієнта або дією, яку має зробити оператор.
-- Якщо тем кілька, вибирай ту, яка була основною або потребує найбільшої дії.
-- Якщо транскрипція слабка або тип неочевидний, confidence має бути 0.2-0.5.
-- East West Eurolines / EWE / DUMA - це компанія, не маршрут і не ім'я клієнта.
-
-Доступні типи дзвінків:
+Типи:
 ${callTypes.map(formatCallTypeBriefForPrompt).join("\n")}
 `.trim();
 }
@@ -1036,17 +1047,22 @@ ${callTypes.map(formatCallTypeBriefForPrompt).join("\n")}
 function formatMetricForEvaluationPrompt(metric) {
   const options = [...(metric.options || [])]
     .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
-    .map((optionItem) =>
-      `    - optionKey="${optionItem.key}" label="${optionItem.label}": ${optionInstructionForPrompt(optionItem)}`
-    )
+    .filter((optionItem) => optionItem.countsTowardScore !== false)
+    .map((optionItem) => `    - ${optionItem.key}: ${optionInstructionForPrompt(optionItem)}`)
     .join("\n");
+  const nonScoredKeys = [...(metric.options || [])]
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+    .filter((optionItem) => optionItem.countsTowardScore === false)
+    .map((optionItem) => text(optionItem.key))
+    .filter(Boolean);
 
   return [
-    `- metricKey="${metric.key}" label="${metric.label}"`,
-    metric.group ? `  group="${metric.group}"` : "",
-    `  що оцінювати: ${metricInstructionForPrompt(metric)}`,
-    "  варіанти, з яких AI має обрати рівно один:",
-    options
+    `- metricKey="${metric.key}" (${metric.label}): ${metricInstructionForPrompt(metric)}`,
+    "  обери один optionKey:",
+    options,
+    nonScoredKeys.length
+      ? `  неоцінюваний optionKey: ${nonScoredKeys.join(", ")} — тільки коли критерій неактуальний або доказів немає.`
+      : ""
   ].filter(Boolean).join("\n");
 }
 
@@ -1141,7 +1157,7 @@ function buildCallEvaluationSchema(profileOrSettings, callTypeKey) {
     callType.key
   );
 
-  return schema;
+  return compactSchemaForModel(schema);
 }
 
 function buildCallEvaluationSystemPrompt(profileOrSettings, callTypeKey) {
@@ -1151,70 +1167,21 @@ function buildCallEvaluationSystemPrompt(profileOrSettings, callTypeKey) {
   return `
 ${COMPACT_EVALUATION_GUARDRAILS_PROMPT}
 
-Ти аналізуєш транскрипт телефонної розмови автобусної компанії DUMA / East West Eurolines.
+Аналізуй дзвінок DUMA / East West Eurolines. Тип уже визначено: ${callType.key} (${callType.label}); ${compactInstruction(callType.description) || "без додаткового опису"}.
+Заповни лише JSON schema: короткий підсумок, головне питання, наступну дію, ескалацію, ризик, ролі та enabled metrics цього типу. Бекенд сам додасть тип, профіль і технічні дані option.
 
-Тип дзвінка вже класифіковано на попередньому етапі:
-- callType="${callType.key}"
-- callTypeLabel="${callType.label}"
-- опис: ${compactInstruction(callType.description) || "без додаткового опису"}
+Для кожної metric обери рівно один optionKey тільки за її описом. Для customEvaluation.metrics повертай тільки metricKey, selectedOptionKey, evidence, improvement, confidence.
+Текст українською: summary до 160 символів; reason/evidence/improvement і customEvaluation.summary до 110 символів; null замість формальних пояснень. Не повторюй тип у summary.
 
-Завдання цього етапу:
-- Дати короткий підсумок дзвінка.
-- Заповнити операційні поля: головне питання клієнта, наступна дія, ескалація, ризик втрати.
-- Визначити ролі спікерів.
-- Оцінити тільки enabled metrics для цього callType.
-
-Важливо про токени й локальну логіку:
-- Повертай тільки поля, описані в JSON schema. Усі технічні атрибути варіантів бекенд знайде й порахує локально за selectedOptionKey.
-- У customEvaluation.metrics для кожної метрики поверни тільки metricKey, selectedOptionKey, evidence, improvement, confidence.
-- Для кожної metric обери рівно один optionKey з її списку.
-- Якщо критерій неактуальний для конкретного дзвінка, обери optionKey, який у налаштуваннях описує неактуальність/прочерк, якщо такий є.
-- Для вибору optionKey використовуй саме описи варіантів нижче, а не власну шкалу.
-- Не повертай технічні атрибути варіантів, профілю або типу дзвінка: це бекенд додасть локально.
-
-Кастомні метрики для цього типу:
+Метрики:
 ${metrics.length
     ? metrics.map(formatMetricForEvaluationPrompt).join("\n\n")
     : "- Немає налаштованих метрик; поверни порожній масив metrics."}
 
-Загальні правила:
-- Відповідай українською незалежно від мови розмови.
-- Не вигадуй фактів. Якщо наступна дія або причина не визначена, став null або action = none.
-- Якщо у user input є clientContext, використовуй його лише як допоміжний CRM-контекст, а не як заміну транскрипту.
-- Транскрипт може містити ASR-помилки. Нормалізуй очевидні назви міст і компанії тільки коли це випливає з контексту.
-- Усі текстові поля тримай короткими: 1 речення або null.
-
-Ролі спікерів:
-- У speakers поверни кожен distinct speaker label із transcript. speaker має бути точним label із транскрипту, наприклад speaker_1, speaker_2, A або B.
-- role: operator для працівника DUMA / East West Eurolines; client для клієнта/пасажира/партнерської каси; unknown тільки якщо роль справді неможливо встановити.
-- Оператор часто вітається від імені компанії, каже "чим можу допомогти", бачить бронювання/CRM, дає відповіді й наступні дії.
-- Якщо рівно два speaker labels і один очевидно operator, другий зазвичай client.
-
-Підсумок дзвінка:
-- summary має бути одним коротким реченням до 180 символів.
-- Якщо в розмові немає корисної інформації для картки, summary має прямо сказати це.
-- Тип дзвінка вже визначено, не дублюй його у відповіді.
-
-Операційні поля:
-- operatorNextStep.action:
-  - none: після дзвінка нічого робити не потрібно.
-  - call_back: треба передзвонити клієнту.
-  - send_update: треба надіслати або озвучити оновлення.
-  - check_booking: треба перевірити бронювання/замовлення/квиток.
-  - contact_dispatcher: треба зв'язатися з диспетчером.
-  - contact_driver: треба зв'язатися з водієм.
-  - create_complaint: треба оформити або передати скаргу.
-  - process_refund: треба запустити/перевірити повернення.
-  - other: інша конкретна дія.
-- escalation.needed = true тільки якщо питання треба передати іншій ролі або керівнику.
-- escalation.department: dispatcher, quality, manager, accounting, technical, driver, other або null.
-- churnRisk.level: low, medium, high або unknown.
-- customerQuestions - тільки 1 головне питання клієнта. Якщо питань не було, поверни порожній масив. Обирай type/label із цього списку:
-${CUSTOMER_QUESTION_TYPES.map((type, index) => `  - ${type} / "${CUSTOMER_QUESTION_LABELS[index]}"`).join("\n")}
-
-Додаткові джерела:
-- Основним джерелом є diarizedTranscript.
-- promptedTranscript або originalPromptedTranscript використовуй лише як допоміжний текст для слів, які могли бути розпізнані краще без speaker labels.
+Транскрипт — головне джерело; clientContext лише підтверджує очевидний збіг. Не вигадуй фактів: action=none або null, якщо дії/причини немає. Нормалізуй ASR-помилки лише з явного контексту.
+У speakers поверни всі точні labels із транскрипту; operator — працівник DUMA/EWE, client — клієнт/агенція, unknown лише коли роль неясна. За двох спікерів, якщо один очевидно operator, другий зазвичай client.
+escalation.needed=true тільки для передачі іншій ролі; customerQuestions містить не більше одного головного питання.
+promptedTranscript і originalPromptedTranscript, якщо є, — лише допоміжні джерела без speaker labels.
 `.trim();
 }
 

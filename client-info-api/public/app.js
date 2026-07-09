@@ -153,6 +153,9 @@ const elements = {
   adminAnalysisNumbersSave: document.querySelector("#admin-analysis-numbers-save"),
   adminAnalysisEnableAll: document.querySelector("#admin-analysis-enable-all"),
   adminAnalysisDisableAll: document.querySelector("#admin-analysis-disable-all"),
+  adminMetricFeedbackCount: document.querySelector("#admin-metric-feedback-count"),
+  adminMetricFeedbackMessage: document.querySelector("#admin-metric-feedback-message"),
+  adminMetricFeedbackList: document.querySelector("#admin-metric-feedback-list"),
   adminTelegramCount: document.querySelector("#admin-telegram-count"),
   adminTelegramForm: document.querySelector("#admin-telegram-form"),
   adminTelegramLabel: document.querySelector("#admin-telegram-label"),
@@ -209,6 +212,26 @@ const elements = {
   managerRatingModalSubtitle: document.querySelector("#manager-rating-modal-subtitle"),
   managerRatingModalSummary: document.querySelector("#manager-rating-modal-summary"),
   managerRatingModalMetrics: document.querySelector("#manager-rating-modal-metrics"),
+  metricFeedbackModal: document.querySelector("#metric-feedback-modal"),
+  metricFeedbackForm: document.querySelector("#metric-feedback-form"),
+  metricFeedbackTitle: document.querySelector("#metric-feedback-title"),
+  metricFeedbackSubtitle: document.querySelector("#metric-feedback-subtitle"),
+  metricFeedbackText: document.querySelector("#metric-feedback-text"),
+  metricFeedbackMessage: document.querySelector("#metric-feedback-message"),
+  metricFeedbackSubmit: document.querySelector("#metric-feedback-submit"),
+  metricFeedbackDelete: document.querySelector("#metric-feedback-delete"),
+  metricFeedbackClose: document.querySelector("#metric-feedback-close"),
+  metricFeedbackCancel: document.querySelector("#metric-feedback-cancel"),
+  metricPromptModal: document.querySelector("#metric-prompt-modal"),
+  metricPromptForm: document.querySelector("#metric-prompt-form"),
+  metricPromptTitle: document.querySelector("#metric-prompt-title"),
+  metricPromptSubtitle: document.querySelector("#metric-prompt-subtitle"),
+  metricPromptDiff: document.querySelector("#metric-prompt-diff"),
+  metricPromptMessage: document.querySelector("#metric-prompt-message"),
+  metricPromptSubmit: document.querySelector("#metric-prompt-submit"),
+  metricPromptRegenerate: document.querySelector("#metric-prompt-regenerate"),
+  metricPromptClose: document.querySelector("#metric-prompt-close"),
+  metricPromptCancel: document.querySelector("#metric-prompt-cancel"),
   aiSettingsStatus: document.querySelector("#ai-settings-status"),
   aiSettingsMessage: document.querySelector("#ai-settings-message"),
   aiSettingsTabs: document.querySelector("#ai-settings-tabs"),
@@ -367,6 +390,9 @@ let detailPollTimer = null;
 let monitorPage = 1;
 let monitorPageSize = 10;
 let monitorTotalCalls = 0;
+let currentUiState = "";
+let currentAdminMotionTab = "";
+let currentAiSettingsMotionTab = "";
 let currentCallStats = null;
 let currentTelegram = null;
 let currentViber = null;
@@ -381,6 +407,7 @@ let ticketsModalBackView = null;
 let ticketsModalOrderGroups = [];
 let currentDetailCallId = "";
 let currentDetailTickets = [];
+let currentDetailCall = null;
 let detailTicketsPhone = "";
 let detailTicketsLoaded = false;
 let detailTicketsLoading = false;
@@ -455,11 +482,29 @@ const adminState = {
   analysisNumbersLoading: false,
   analysisNumbersSaving: false,
   analysisNumbersDirty: false,
+  metricFeedback: [],
+  metricFeedbackTotal: 0,
+  metricFeedbackLoading: false,
   telegramAccounts: [],
   telegramConfigured: false,
   telegramEnabled: false,
   telegramLoading: false,
   telegramSaving: false
+};
+const metricFeedbackState = {
+  callId: "",
+  metricKey: "",
+  saving: false,
+  deleting: false
+};
+const metricPromptUpdateState = {
+  feedbackId: "",
+  saving: false,
+  loading: false,
+  feedback: null,
+  target: null,
+  currentPrompt: null,
+  proposal: null
 };
 const callStatsCharts = new Map();
 const CALL_STATS_WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
@@ -507,6 +552,30 @@ function formatInternalNumbersCount(numbers) {
   const enabled = list.filter((item) => item.enabled !== false).length;
   const disabled = Math.max(0, list.length - enabled);
   return `${enabled} увімкнено · ${disabled} вимкнено`;
+}
+
+function formatMetricFeedbackCount(count) {
+  const value = Number(count) || 0;
+  const mod10 = value % 10;
+  const mod100 = value % 100;
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${value} правка`;
+  }
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${value} правки`;
+  }
+  return `${value} правок`;
+}
+
+function metricFeedbackPromptUpdate(feedback) {
+  const direct = feedback && feedback.promptUpdate;
+  if (direct && typeof direct === "object") {
+    return direct;
+  }
+  const payload = feedback && feedback.payload;
+  return payload && payload.promptUpdate && typeof payload.promptUpdate === "object"
+    ? payload.promptUpdate
+    : null;
 }
 
 async function apiFetch(input, options = {}) {
@@ -604,6 +673,38 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function prefersReducedMotion() {
+  return Boolean(
+    window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+function replayMotion(element, className = "motion-enter") {
+  if (!element || prefersReducedMotion()) {
+    return;
+  }
+  element.classList.remove(className);
+  void element.offsetWidth;
+  element.classList.add(className);
+}
+
+function stageMotionItems(container, selector = ":scope > *", options = {}) {
+  if (!container || !container.querySelectorAll || prefersReducedMotion()) {
+    return;
+  }
+  const maxIndex = Number.isFinite(Number(options.maxIndex))
+    ? Number(options.maxIndex)
+    : 8;
+  const className = options.className || "motion-item";
+  [...container.querySelectorAll(selector)]
+    .filter((item) => !item.hidden && !item.classList.contains("hidden"))
+    .forEach((item, index) => {
+      item.style.setProperty("--motion-index", String(Math.min(index, maxIndex)));
+      item.classList.add(className);
+    });
 }
 
 function selectedCustomSelectOption(select) {
@@ -879,6 +980,15 @@ function formatUsd(value) {
     currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 4
+  }).format(Number(value || 0));
+}
+
+function formatApiUsd(value) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6
   }).format(Number(value || 0));
 }
 
@@ -1207,6 +1317,15 @@ function renderAiSettingsTabs() {
   elements.aiSettingsTabAi.classList.toggle("hidden", aiSettingsState.activeTab !== "ai");
   elements.aiSettingsTabExclusions.classList.toggle("hidden", aiSettingsState.activeTab !== "exclusions");
   elements.aiSettingsTabBlocked.classList.toggle("hidden", aiSettingsState.activeTab !== "blocked");
+  const activePanel = {
+    ai: elements.aiSettingsTabAi,
+    exclusions: elements.aiSettingsTabExclusions,
+    blocked: elements.aiSettingsTabBlocked
+  }[aiSettingsState.activeTab];
+  if (aiSettingsState.activeTab !== currentAiSettingsMotionTab) {
+    replayMotion(activePanel);
+    currentAiSettingsMotionTab = aiSettingsState.activeTab;
+  }
 }
 
 function renderAiCallTypeList() {
@@ -1228,6 +1347,7 @@ function renderAiCallTypeList() {
       ? "Типів аналізу ще немає."
       : "Активних типів немає. Увімкніть показ неактивних.";
     elements.aiCallTypeList.append(message);
+    stageMotionItems(elements.aiCallTypeList, ":scope > .ai-soldly-empty", { maxIndex: 0 });
     return;
   }
 
@@ -1251,6 +1371,7 @@ function renderAiCallTypeList() {
       </div>`;
     elements.aiCallTypeList.append(row);
   }
+  stageMotionItems(elements.aiCallTypeList, ":scope > .ai-type-card", { maxIndex: 8 });
 }
 
 function renderAiMetricList() {
@@ -1265,6 +1386,7 @@ function renderAiMetricList() {
     message.className = "ai-soldly-empty";
     message.textContent = "Метрик для цього типу ще немає.";
     elements.aiMetricList.append(message);
+    stageMotionItems(elements.aiMetricList, ":scope > .ai-soldly-empty", { maxIndex: 0 });
     return;
   }
 
@@ -1288,6 +1410,7 @@ function renderAiMetricList() {
       </div>`;
     elements.aiMetricList.append(row);
   }
+  stageMotionItems(elements.aiMetricList, ":scope > .ai-metric-card", { maxIndex: 8 });
 }
 
 function clearAiMetricDragTargets() {
@@ -1886,6 +2009,7 @@ function renderAiModalOptionList() {
     message.className = "ai-soldly-empty";
     message.textContent = "Варіантів відповіді ще немає.";
     elements.aiModalOptionList.append(message);
+    stageMotionItems(elements.aiModalOptionList, ":scope > .ai-soldly-empty", { maxIndex: 0 });
     return;
   }
 
@@ -1910,6 +2034,7 @@ function renderAiModalOptionList() {
     elements.aiModalOptionList.append(row);
   }
   enhanceCustomSelects(elements.aiModalOptionList);
+  stageMotionItems(elements.aiModalOptionList, ":scope > .ai-modal-option-row", { maxIndex: 6 });
 }
 
 function openAiMetricModal(key) {
@@ -2204,6 +2329,7 @@ function renderAdminUsers() {
     message.className = "admin-empty";
     message.textContent = "Завантажуємо користувачів...";
     elements.adminUsersList.append(message);
+    stageMotionItems(elements.adminUsersList, ":scope > .admin-empty", { maxIndex: 0 });
     return;
   }
 
@@ -2212,6 +2338,7 @@ function renderAdminUsers() {
     message.className = "admin-empty";
     message.textContent = "Користувачів ще немає.";
     elements.adminUsersList.append(message);
+    stageMotionItems(elements.adminUsersList, ":scope > .admin-empty", { maxIndex: 0 });
     return;
   }
 
@@ -2243,6 +2370,7 @@ function renderAdminUsers() {
     `;
     elements.adminUsersList.append(row);
   }
+  stageMotionItems(elements.adminUsersList, ":scope > .admin-user-card", { maxIndex: 8 });
 }
 
 function renderAdminChrome() {
@@ -2255,6 +2383,10 @@ function renderAdminChrome() {
     "analysis-numbers": {
       title: "AI-номери",
       description: "Внутрішні номери, дзвінки яких потрапляють в AI-аналіз та статистику."
+    },
+    "metric-feedback": {
+      title: "AI-правки",
+      description: "Менеджерські пояснення до оцінених метрик і застосування цих правок до prompt-інструкцій."
     },
     telegram: {
       title: "Telegram",
@@ -2278,8 +2410,13 @@ function renderAdminChrome() {
     button.classList.toggle("active", button.dataset.adminTab === tab);
   }
   for (const panel of elements.adminPanels || []) {
-    panel.classList.toggle("hidden", panel.dataset.adminPanel !== tab);
+    const active = panel.dataset.adminPanel === tab;
+    panel.classList.toggle("hidden", !active);
+    if (active && tab !== currentAdminMotionTab) {
+      replayMotion(panel);
+    }
   }
+  currentAdminMotionTab = tab;
 }
 
 function telegramAccountStatusLabel(status) {
@@ -2339,6 +2476,7 @@ function renderAdminTelegramAccounts() {
       ? "Додайте TELEGRAM_API_ID та TELEGRAM_API_HASH у .env, щоб логінити акаунти."
       : "Telegram User API вимкнений у конфігурації.";
     elements.adminTelegramList.append(message);
+    stageMotionItems(elements.adminTelegramList, ":scope > .admin-empty", { maxIndex: 0 });
     return;
   }
 
@@ -2347,6 +2485,7 @@ function renderAdminTelegramAccounts() {
     message.className = "admin-empty";
     message.textContent = "Завантажуємо Telegram акаунти...";
     elements.adminTelegramList.append(message);
+    stageMotionItems(elements.adminTelegramList, ":scope > .admin-empty", { maxIndex: 0 });
     return;
   }
 
@@ -2355,6 +2494,7 @@ function renderAdminTelegramAccounts() {
     message.className = "admin-empty";
     message.textContent = "Додайте перший Telegram акаунт, щоб шукати переписки по номеру.";
     elements.adminTelegramList.append(message);
+    stageMotionItems(elements.adminTelegramList, ":scope > .admin-empty", { maxIndex: 0 });
     return;
   }
 
@@ -2396,6 +2536,7 @@ function renderAdminTelegramAccounts() {
     `;
     elements.adminTelegramList.append(row);
   }
+  stageMotionItems(elements.adminTelegramList, ":scope > .admin-telegram-card", { maxIndex: 8 });
 }
 
 function renderAdminAnalysisNumbers() {
@@ -2422,6 +2563,7 @@ function renderAdminAnalysisNumbers() {
     message.className = "admin-empty";
     message.textContent = "Завантажуємо внутрішні номери...";
     elements.adminAnalysisNumbersList.append(message);
+    stageMotionItems(elements.adminAnalysisNumbersList, ":scope > .admin-empty", { maxIndex: 0 });
     return;
   }
 
@@ -2430,6 +2572,7 @@ function renderAdminAnalysisNumbers() {
     message.className = "admin-empty";
     message.textContent = "Внутрішніх номерів ще немає в історії дзвінків.";
     elements.adminAnalysisNumbersList.append(message);
+    stageMotionItems(elements.adminAnalysisNumbersList, ":scope > .admin-empty", { maxIndex: 0 });
     return;
   }
 
@@ -2463,6 +2606,125 @@ function renderAdminAnalysisNumbers() {
     `;
     elements.adminAnalysisNumbersList.append(row);
   }
+  stageMotionItems(elements.adminAnalysisNumbersList, ":scope > .admin-number-card", { maxIndex: 8 });
+}
+
+function metricFeedbackScoreText(feedback) {
+  const metric = feedback && feedback.metric || {};
+  const score = metric.score;
+  const maxScore = metric.maxScore;
+  if (
+    score === null ||
+    score === undefined ||
+    !Number.isFinite(Number(score))
+  ) {
+    return "—";
+  }
+  if (Number.isFinite(Number(maxScore)) && Number(maxScore) > 0) {
+    return `${formatMetricNumber(score)}/${formatMetricNumber(maxScore)}`;
+  }
+  return formatMetricNumber(score);
+}
+
+function adminMetricFeedbackById(id) {
+  return (adminState.metricFeedback || []).find((item) => String(item.id || "") === String(id || "")) || null;
+}
+
+function renderAdminMetricFeedback() {
+  if (!elements.adminMetricFeedbackList) {
+    return;
+  }
+
+  const items = Array.isArray(adminState.metricFeedback)
+    ? adminState.metricFeedback
+    : [];
+  elements.adminMetricFeedbackCount.textContent = adminState.metricFeedbackLoading
+    ? "Завантаження..."
+    : formatMetricFeedbackCount(adminState.metricFeedbackTotal || items.length);
+  elements.adminMetricFeedbackList.replaceChildren();
+
+  if (adminState.metricFeedbackLoading) {
+    const message = document.createElement("p");
+    message.className = "admin-empty";
+    message.textContent = "Завантажуємо правки до AI-метрик...";
+    elements.adminMetricFeedbackList.append(message);
+    stageMotionItems(elements.adminMetricFeedbackList, ":scope > .admin-empty", { maxIndex: 0 });
+    return;
+  }
+
+  if (!items.length) {
+    const message = document.createElement("p");
+    message.className = "admin-empty";
+    message.textContent = "Менеджери ще не додавали правки до оцінених метрик.";
+    elements.adminMetricFeedbackList.append(message);
+    stageMotionItems(elements.adminMetricFeedbackList, ":scope > .admin-empty", { maxIndex: 0 });
+    return;
+  }
+
+  for (const feedback of items) {
+    const call = feedback.call || {};
+    const metric = feedback.metric || {};
+    const callIdValue = feedback.callId || call.callId || call.id || "";
+    const promptUpdate = metricFeedbackPromptUpdate(feedback);
+    const promptApplied = Boolean(promptUpdate && promptUpdate.appliedAt);
+    const meta = [
+      call.typeLabel || call.type || "",
+      call.operatorName ? `оператор: ${call.operatorName}` : "",
+      call.startedAt ? formatDateTime(call.startedAt) : ""
+    ].filter(Boolean);
+    const row = document.createElement("article");
+    row.className = "admin-feedback-card";
+    row.dataset.feedbackId = feedback.id || "";
+    row.innerHTML = `
+      <div class="admin-feedback-main">
+        <strong>${escapeHtml(metric.label || feedback.metricKey || "Метрика")}</strong>
+        <span>${escapeHtml([metric.group, metric.selectedOptionLabel].filter(Boolean).join(" · ") || "AI-метрика")}</span>
+        <p>${escapeHtml(feedback.text || "")}</p>
+      </div>
+      <div class="admin-feedback-score">
+        <strong>${escapeHtml(metricFeedbackScoreText(feedback))}</strong>
+        <span>${escapeHtml(metric.selectedOptionLabel || "Оцінка")}</span>
+      </div>
+      <div class="admin-feedback-call">
+        <strong>${escapeHtml(formatCallPhone(call.externalNumber || call.phone || callIdValue))}</strong>
+        <span>${escapeHtml(meta.join(" · ") || "Дзвінок")}</span>
+      </div>
+      <div class="admin-feedback-meta">
+        <strong>${escapeHtml(feedbackAuthorLabel(feedback))}</strong>
+        <span>${escapeHtml(formatDateTime(feedback.updatedAt))}</span>
+      </div>
+      <div class="admin-feedback-actions">
+        <button
+          class="admin-feedback-prompt ${promptApplied ? "is-applied" : ""}"
+          type="button"
+          data-admin-feedback-action="prompt-update"
+          data-feedback-id="${escapeHtml(feedback.id || "")}"
+          aria-label="${promptApplied ? "Правку вже застосовано до prompt" : "Застосувати правку до prompt"}"
+          title="${promptApplied ? `Застосовано ${escapeHtml(formatDateTime(promptUpdate.appliedAt))}` : "Додати в prompt"}"
+          ${promptApplied ? "disabled" : ""}
+        >
+          ${aiIcon(promptApplied ? "check" : "sparkles")}
+          <span>${promptApplied ? "Застосовано" : "У prompt"}</span>
+        </button>
+        <a class="admin-feedback-link" href="/calls/${encodeURIComponent(callIdValue)}" aria-label="Відкрити дзвінок">
+          ${aiIcon("chevronRight")}
+        </a>
+        <button
+          class="admin-feedback-delete"
+          type="button"
+          data-admin-feedback-action="delete"
+          data-feedback-id="${escapeHtml(feedback.id || "")}"
+          aria-label="Видалити AI-правку"
+          title="Видалити"
+        >
+          ${aiIcon("trash")}
+        </button>
+      </div>
+    `;
+    elements.adminMetricFeedbackList.append(row);
+  }
+
+  stageMotionItems(elements.adminMetricFeedbackList, ":scope > .admin-feedback-card", { maxIndex: 8 });
 }
 
 function hydrateAdminAnalysisNumbers(numbers) {
@@ -2530,6 +2792,422 @@ async function loadAdminAnalysisNumbers() {
   }
 }
 
+async function loadAdminMetricFeedback() {
+  if (!isAdminUser()) {
+    window.location.href = "/client-card";
+    return;
+  }
+
+  adminState.metricFeedbackLoading = true;
+  setMessage(elements.adminMetricFeedbackMessage, "", "neutral");
+  renderAdminMetricFeedback();
+
+  try {
+    const response = await apiFetch("/api/admin/ai-metric-feedback?limit=200");
+    const payload = await readJsonResponse(response, "Не вдалося завантажити правки до метрик.");
+    adminState.metricFeedback = Array.isArray(payload.items) ? payload.items : [];
+    adminState.metricFeedbackTotal = Number(payload.total || adminState.metricFeedback.length) || 0;
+    setMessage(elements.adminMetricFeedbackMessage, "", "neutral");
+  } catch (error) {
+    setMessage(
+      elements.adminMetricFeedbackMessage,
+      error.message || "Не вдалося завантажити правки до метрик."
+    );
+  } finally {
+    adminState.metricFeedbackLoading = false;
+    renderAdminMetricFeedback();
+  }
+}
+
+function setMetricPromptMessage(message, tone = "") {
+  setMessage(elements.metricPromptMessage, message, tone);
+}
+
+function setMetricPromptActionState() {
+  const hasProposal = Boolean(metricPromptUpdateState.currentPrompt && metricPromptUpdateState.proposal);
+  if (elements.metricPromptSubmit) {
+    elements.metricPromptSubmit.disabled =
+      metricPromptUpdateState.loading ||
+      metricPromptUpdateState.saving ||
+      !hasProposal;
+    if (metricPromptUpdateState.saving) {
+      elements.metricPromptSubmit.textContent = "Застосовуємо...";
+    } else if (metricPromptUpdateState.loading && !hasProposal) {
+      elements.metricPromptSubmit.textContent = "Завантажуємо...";
+    } else {
+      elements.metricPromptSubmit.textContent = "Застосувати";
+    }
+  }
+  if (elements.metricPromptRegenerate) {
+    elements.metricPromptRegenerate.disabled =
+      metricPromptUpdateState.loading ||
+      metricPromptUpdateState.saving ||
+      !metricPromptUpdateState.feedbackId ||
+      !hasProposal;
+    elements.metricPromptRegenerate.textContent =
+      metricPromptUpdateState.loading && hasProposal
+        ? "Генеруємо..."
+        : "Згенерувати ще раз";
+  }
+}
+
+function closeMetricPromptModal() {
+  metricPromptUpdateState.feedbackId = "";
+  metricPromptUpdateState.saving = false;
+  metricPromptUpdateState.loading = false;
+  metricPromptUpdateState.feedback = null;
+  metricPromptUpdateState.target = null;
+  metricPromptUpdateState.currentPrompt = null;
+  metricPromptUpdateState.proposal = null;
+  elements.metricPromptDiff?.replaceChildren();
+  setMetricPromptActionState();
+  closeAiDialog(elements.metricPromptModal);
+}
+
+function metricPromptTargetTitle(target = {}, feedback = {}) {
+  const metric = feedback.metric || {};
+  const label = target.metricLabel || metric.label || feedback.metricKey || "Метрика";
+  const callType = target.callTypeLabel || (feedback.call && feedback.call.typeLabel) || "";
+  return [label, callType].filter(Boolean).join(" · ");
+}
+
+function metricPromptOptionMeta(optionItem = {}) {
+  const parts = [];
+  if (optionItem.score === null || optionItem.score === undefined) {
+    parts.push("без бала");
+  } else {
+    parts.push(`${formatMetricNumber(optionItem.score)} балів`);
+  }
+  if (optionItem.countsTowardScore === false) {
+    parts.push("не входить у середню");
+  }
+  return parts.join(" · ");
+}
+
+function metricPromptFieldValue(value) {
+  return String(value || "").trim();
+}
+
+function appendMetricPromptDiffField(container, config = {}) {
+  const row = document.createElement("section");
+  row.className = "metric-prompt-diff-field";
+
+  const label = document.createElement("div");
+  label.className = "metric-prompt-diff-label";
+  const strong = document.createElement("strong");
+  strong.textContent = config.label || "Prompt";
+  label.append(strong);
+  if (config.caption) {
+    const span = document.createElement("span");
+    span.textContent = config.caption;
+    label.append(span);
+  }
+
+  const before = document.createElement("div");
+  before.className = "metric-prompt-before";
+  const beforeTitle = document.createElement("span");
+  beforeTitle.textContent = "Було";
+  const beforeText = document.createElement("p");
+  beforeText.textContent = metricPromptFieldValue(config.before) || "—";
+  before.append(beforeTitle, beforeText);
+
+  const after = document.createElement("label");
+  after.className = "metric-prompt-after";
+  const afterTitle = document.createElement("span");
+  afterTitle.textContent = "Стане";
+  const textarea = document.createElement("textarea");
+  textarea.value = metricPromptFieldValue(config.after);
+  textarea.rows = config.rows || 3;
+  textarea.maxLength = config.maxLength || 6000;
+  textarea.required = true;
+  textarea.dataset.promptScope = config.scope || "";
+  textarea.dataset.promptKey = config.key || "";
+  textarea.dataset.promptField = config.field || "";
+  after.append(afterTitle, textarea);
+
+  row.append(label, before, after);
+  container.append(row);
+}
+
+function renderMetricPromptDiff(currentPrompt, proposal) {
+  if (!elements.metricPromptDiff) {
+    return;
+  }
+
+  elements.metricPromptDiff.replaceChildren();
+  if (!currentPrompt || !proposal) {
+    const message = document.createElement("p");
+    message.className = "admin-empty";
+    message.textContent = "AI готує diff prompt-налаштувань...";
+    elements.metricPromptDiff.append(message);
+    return;
+  }
+
+  const currentMetric = currentPrompt.metric || {};
+  const proposalMetric = proposal.metric || {};
+  const metricSection = document.createElement("article");
+  metricSection.className = "metric-prompt-diff-section";
+  const metricHead = document.createElement("header");
+  metricHead.className = "metric-prompt-diff-head";
+  const metricTitle = document.createElement("strong");
+  metricTitle.textContent = currentMetric.label || "Метрика";
+  const metricCaption = document.createElement("span");
+  metricCaption.textContent = [currentMetric.group, "метрика"].filter(Boolean).join(" · ");
+  metricHead.append(metricTitle, metricCaption);
+  metricSection.append(metricHead);
+  appendMetricPromptDiffField(metricSection, {
+    label: "Опис",
+    caption: "видиме поле «Опис» у AI-налаштуваннях",
+    before: currentMetric.description,
+    after: proposalMetric.description,
+    scope: "metric",
+    field: "description",
+    rows: 3,
+    maxLength: 5000
+  });
+  appendMetricPromptDiffField(metricSection, {
+    label: "Інструкція для оцінювання",
+    caption: "основний prompt метрики",
+    before: currentMetric.aiInstructions,
+    after: proposalMetric.aiInstructions,
+    scope: "metric",
+    field: "aiInstructions",
+    rows: 5,
+    maxLength: 8000
+  });
+  elements.metricPromptDiff.append(metricSection);
+
+  const optionsByKey = new Map(
+    (Array.isArray(proposal.options) ? proposal.options : [])
+      .map((optionItem) => [String(optionItem.key || ""), optionItem])
+  );
+  for (const optionItem of currentPrompt.options || []) {
+    const proposalOption = optionsByKey.get(String(optionItem.key || "")) || {};
+    const optionSection = document.createElement("article");
+    optionSection.className = "metric-prompt-diff-section";
+    const optionHead = document.createElement("header");
+    optionHead.className = "metric-prompt-diff-head";
+    const optionTitle = document.createElement("strong");
+    optionTitle.textContent = optionItem.label || optionItem.key || "Оцінка";
+    const optionCaption = document.createElement("span");
+    optionCaption.textContent = metricPromptOptionMeta(optionItem);
+    optionHead.append(optionTitle, optionCaption);
+    optionSection.append(optionHead);
+    appendMetricPromptDiffField(optionSection, {
+      label: "Prompt оцінки",
+      caption: "видиме поле критеріїв для цього варіанту",
+      before: optionItem.aiInstructions,
+      after: proposalOption.aiInstructions,
+      scope: "option",
+      key: optionItem.key,
+      field: "aiInstructions",
+      rows: 4,
+      maxLength: 6000
+    });
+    elements.metricPromptDiff.append(optionSection);
+  }
+
+  if (proposal.rationale) {
+    const rationale = document.createElement("p");
+    rationale.className = "metric-prompt-rationale";
+    rationale.textContent = proposal.rationale;
+    elements.metricPromptDiff.append(rationale);
+  }
+}
+
+function collectMetricPromptProposal() {
+  const currentPrompt = metricPromptUpdateState.currentPrompt || {};
+  const previousProposal = metricPromptUpdateState.proposal || {};
+  const proposal = {
+    metric: {
+      description: "",
+      aiInstructions: "",
+      aiBrief: ""
+    },
+    options: [],
+    rationale: previousProposal.rationale || "",
+    model: previousProposal.model || "",
+    usage: previousProposal.usage || null
+  };
+
+  for (const textarea of elements.metricPromptDiff?.querySelectorAll("textarea[data-prompt-scope]") || []) {
+    const scope = textarea.dataset.promptScope;
+    const field = textarea.dataset.promptField;
+    const value = String(textarea.value || "").trim();
+    if (scope === "metric" && Object.prototype.hasOwnProperty.call(proposal.metric, field)) {
+      proposal.metric[field] = value;
+      continue;
+    }
+    if (scope === "option") {
+      const key = textarea.dataset.promptKey || "";
+      let option = proposal.options.find((item) => item.key === key);
+      if (!option) {
+        option = { key, aiInstructions: "", aiBrief: "" };
+        proposal.options.push(option);
+      }
+      if (field === "aiInstructions") {
+        option[field] = value;
+      }
+    }
+  }
+
+  const knownOptionKeys = new Set(
+    (Array.isArray(currentPrompt.options) ? currentPrompt.options : [])
+      .map((optionItem) => String(optionItem.key || ""))
+  );
+  proposal.options = proposal.options.filter((optionItem) => knownOptionKeys.has(optionItem.key));
+  return proposal;
+}
+
+async function loadMetricPromptUpdate(feedbackId, { regenerate = false } = {}) {
+  const localFeedback = metricPromptUpdateState.feedback || adminMetricFeedbackById(feedbackId);
+  if (!feedbackId || !localFeedback || metricPromptUpdateState.loading) {
+    return;
+  }
+
+  metricPromptUpdateState.loading = true;
+  if (!regenerate) {
+    metricPromptUpdateState.currentPrompt = null;
+    metricPromptUpdateState.proposal = null;
+    renderMetricPromptDiff(null, null);
+  }
+  setMetricPromptActionState();
+  setMetricPromptMessage(
+    regenerate
+      ? "Генеруємо новий draft і оновлюємо кеш..."
+      : "Готуємо AI rewrite prompt-налаштувань...",
+    "neutral"
+  );
+
+  try {
+    const query = regenerate ? "?regenerate=1" : "";
+    const response = await apiFetch(
+      `/api/admin/ai-metric-feedback/${encodeURIComponent(feedbackId)}/prompt-update${query}`,
+      { headers: { Accept: "application/json" } }
+    );
+    const payload = await readJsonResponse(response, "Не вдалося підготувати зміну prompt.");
+    metricPromptUpdateState.feedback = payload.feedback || localFeedback;
+    metricPromptUpdateState.target = payload.target || null;
+    metricPromptUpdateState.currentPrompt = payload.currentPrompt || null;
+    metricPromptUpdateState.proposal = payload.proposal || null;
+    if (elements.metricPromptTitle) {
+      elements.metricPromptTitle.textContent = metricPromptTargetTitle(
+        payload.target,
+        payload.feedback || localFeedback
+      );
+    }
+    const draft = payload.promptUpdateDraft || null;
+    if (elements.metricPromptSubtitle) {
+      elements.metricPromptSubtitle.textContent =
+        draft && draft.cached
+          ? "Показано збережений draft. Якщо треба іншу версію, натисніть «Згенерувати ще раз»."
+          : "Перегляньте diff: AI переписав prompt метрики та кожної оцінки без одноразового контексту дзвінка.";
+    }
+    renderMetricPromptDiff(payload.currentPrompt, payload.proposal);
+    setMetricPromptMessage(
+      draft && draft.cached
+        ? "Використано draft з кешу БД."
+        : "",
+      draft && draft.cached ? "neutral" : ""
+    );
+    elements.metricPromptDiff?.querySelector("textarea")?.focus();
+  } catch (error) {
+    setMetricPromptMessage(error.message || "Не вдалося підготувати зміну prompt.");
+  } finally {
+    metricPromptUpdateState.loading = false;
+    setMetricPromptActionState();
+  }
+}
+
+async function openMetricPromptModal(feedbackId) {
+  const localFeedback = adminMetricFeedbackById(feedbackId);
+  if (!feedbackId || !localFeedback || metricPromptUpdateState.loading) {
+    return;
+  }
+
+  metricPromptUpdateState.feedbackId = feedbackId;
+  metricPromptUpdateState.saving = false;
+  metricPromptUpdateState.feedback = localFeedback;
+  metricPromptUpdateState.target = null;
+  metricPromptUpdateState.currentPrompt = null;
+  metricPromptUpdateState.proposal = null;
+
+  if (elements.metricPromptTitle) {
+    elements.metricPromptTitle.textContent = localFeedback.metric && localFeedback.metric.label
+      ? localFeedback.metric.label
+      : "Застосувати правку";
+  }
+  if (elements.metricPromptSubtitle) {
+    elements.metricPromptSubtitle.textContent = "AI переписує інструкції метрики й усіх оцінок на основі цієї правки.";
+  }
+  renderMetricPromptDiff(null, null);
+  setMetricPromptActionState();
+  showAiDialog(elements.metricPromptModal);
+  await loadMetricPromptUpdate(feedbackId);
+}
+
+async function regenerateMetricPromptDraft() {
+  const feedbackId = metricPromptUpdateState.feedbackId;
+  if (!feedbackId || metricPromptUpdateState.loading || metricPromptUpdateState.saving) {
+    return;
+  }
+  await loadMetricPromptUpdate(feedbackId, { regenerate: true });
+}
+
+async function saveMetricPromptUpdate(event) {
+  event.preventDefault();
+  const feedbackId = metricPromptUpdateState.feedbackId;
+
+  if (!feedbackId || metricPromptUpdateState.saving || metricPromptUpdateState.loading) {
+    return;
+  }
+  const proposal = collectMetricPromptProposal();
+  if (!proposal.metric.aiInstructions) {
+    setMetricPromptMessage("Заповніть prompt метрики в колонці «Стане».");
+    return;
+  }
+  if ((metricPromptUpdateState.currentPrompt?.options || []).some((optionItem) => {
+    const option = proposal.options.find((entry) => entry.key === optionItem.key);
+    return !option || !option.aiInstructions;
+  })) {
+    setMetricPromptMessage("Заповніть prompt для кожної оцінки.");
+    return;
+  }
+
+  metricPromptUpdateState.saving = true;
+  setMetricPromptActionState();
+  setMetricPromptMessage("Оновлюємо AI-налаштування...", "neutral");
+
+  try {
+    const response = await apiFetch(
+      `/api/admin/ai-metric-feedback/${encodeURIComponent(feedbackId)}/prompt-update`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ proposal })
+      }
+    );
+    const payload = await readJsonResponse(response, "Не вдалося застосувати правку до prompt.");
+    const index = adminState.metricFeedback.findIndex(
+      (item) => String(item.id || "") === String(feedbackId)
+    );
+    if (index >= 0 && payload.feedback) {
+      adminState.metricFeedback[index] = payload.feedback;
+    }
+    renderAdminMetricFeedback();
+    setMessage(elements.adminMetricFeedbackMessage, "Prompt метрики оновлено.", "success");
+    closeMetricPromptModal();
+  } catch (error) {
+    setMetricPromptMessage(error.message || "Не вдалося застосувати правку до prompt.");
+  } finally {
+    metricPromptUpdateState.saving = false;
+    setMetricPromptActionState();
+  }
+}
+
 async function loadAdminTelegramAccounts() {
   if (!isAdminUser()) {
     window.location.href = "/client-card";
@@ -2570,13 +3248,14 @@ async function loadAdminPage(tab = adminState.activeTab || "users") {
   await Promise.all([
     loadAdminUsers(),
     loadAdminAnalysisNumbers(),
+    loadAdminMetricFeedback(),
     loadAdminTelegramAccounts()
   ]);
   renderAdminChrome();
 }
 
 function setAdminTab(tab) {
-  adminState.activeTab = ["users", "analysis-numbers", "telegram"].includes(tab)
+  adminState.activeTab = ["users", "analysis-numbers", "metric-feedback", "telegram"].includes(tab)
     ? tab
     : "users";
   renderAdminChrome();
@@ -2841,6 +3520,43 @@ async function deleteAdminUser(userId, anchor = null) {
   }
 }
 
+async function deleteAdminMetricFeedback(feedbackId, anchor = null) {
+  const feedback = adminMetricFeedbackById(feedbackId);
+  if (!feedback) {
+    return;
+  }
+  const promptUpdate = metricFeedbackPromptUpdate(feedback);
+  const confirmed = await showUiConfirmDialog({
+    title: "Видалити AI-правку?",
+    message: promptUpdate && promptUpdate.appliedAt
+      ? "Правка зникне зі списку, але вже застосовані AI-налаштування не будуть відкочені."
+      : "Правка зникне з адмінки та з картки відповідного дзвінка.",
+    confirmLabel: "Видалити",
+    cancelLabel: "Скасувати",
+    tone: "danger",
+    anchor
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  setMessage(elements.adminMetricFeedbackMessage, "Видаляємо AI-правку...", "neutral");
+  try {
+    const response = await apiFetch(`/api/admin/ai-metric-feedback/${encodeURIComponent(feedbackId)}`, {
+      method: "DELETE"
+    });
+    await readJsonResponse(response, "Не вдалося видалити AI-правку.");
+    adminState.metricFeedback = adminState.metricFeedback.filter(
+      (item) => String(item.id || "") !== String(feedbackId)
+    );
+    adminState.metricFeedbackTotal = Math.max(0, Number(adminState.metricFeedbackTotal || 0) - 1);
+    renderAdminMetricFeedback();
+    setMessage(elements.adminMetricFeedbackMessage, "AI-правку видалено.", "success");
+  } catch (error) {
+    setMessage(elements.adminMetricFeedbackMessage, error.message || "Не вдалося видалити AI-правку.");
+  }
+}
+
 function handleAdminUsersClick(event) {
   const button = event.target.closest("[data-admin-action]");
   if (!button) {
@@ -2851,6 +3567,18 @@ function handleAdminUsersClick(event) {
     openAdminUserModal(adminUserById(userId));
   } else if (button.dataset.adminAction === "delete-user") {
     void deleteAdminUser(userId, button);
+  }
+}
+
+function handleAdminMetricFeedbackClick(event) {
+  const button = event.target.closest("[data-admin-feedback-action]");
+  if (!button) {
+    return;
+  }
+  if (button.dataset.adminFeedbackAction === "prompt-update") {
+    void openMetricPromptModal(button.dataset.feedbackId || "");
+  } else if (button.dataset.adminFeedbackAction === "delete") {
+    void deleteAdminMetricFeedback(button.dataset.feedbackId || "", button);
   }
 }
 
@@ -3756,6 +4484,22 @@ function setState(state) {
     }
   }
 
+  if (state !== currentUiState) {
+    const surfaceByState = {
+      empty: elements.emptyState,
+      loading: elements.loadingState,
+      card: elements.clientCard,
+      monitor: elements.monitorPage,
+      callStats: elements.callStatsPage,
+      analytics: elements.analyticsPage,
+      aiSettings: elements.aiSettingsPage,
+      admin: elements.adminPage,
+      detail: elements.callDetailPage
+    };
+    replayMotion(surfaceByState[state]);
+    currentUiState = state;
+  }
+
   if (state === "detail") {
     requestAnimationFrame(() => {
       syncDetailPanelHeights();
@@ -3776,6 +4520,7 @@ function renderWarnings(warnings) {
     item.textContent = warning;
     elements.warningStack.append(item);
   }
+  stageMotionItems(elements.warningStack, ":scope > .warning", { maxIndex: 4 });
 }
 
 function renderPassengers(passengers) {
@@ -3786,6 +4531,7 @@ function renderPassengers(passengers) {
     message.className = "muted";
     message.textContent = "Пасажирів ще не знайдено";
     elements.passengerList.append(message);
+    stageMotionItems(elements.passengerList, ":scope > .muted", { maxIndex: 0 });
     return;
   }
 
@@ -3795,6 +4541,7 @@ function renderPassengers(passengers) {
     item.textContent = passenger;
     elements.passengerList.append(item);
   }
+  stageMotionItems(elements.passengerList, ":scope > .passenger", { maxIndex: 5 });
 }
 
 function ticketTransferSegments(ticket) {
@@ -4287,6 +5034,8 @@ function renderUpcoming(ticket, options = {}) {
       openRelatedTicketsModal(relatedTickets, ticket);
     });
   }
+  stageMotionItems(elements.upcomingTrip, ":scope > .trip-card", { maxIndex: 0 });
+  stageMotionItems(elements.upcomingTrip, ".trip-segment-card, .trip-info-item", { maxIndex: 6 });
 }
 
 function renderTickets(tickets) {
@@ -4302,6 +5051,7 @@ function renderTickets(tickets) {
     message.className = "no-data";
     message.textContent = "За цим номером замовлень не знайдено.";
     elements.ticketList.append(message);
+    stageMotionItems(elements.ticketList, ":scope > .no-data", { maxIndex: 0 });
     return;
   }
 
@@ -4320,6 +5070,7 @@ function renderTickets(tickets) {
     action.append(button);
     elements.ticketList.append(action);
   }
+  stageMotionItems(elements.ticketList, ":scope > .order-row, :scope > .tickets-action", { maxIndex: 4 });
 }
 
 function appendOrderGroup(container, group) {
@@ -4427,6 +5178,7 @@ function renderDetailTicketsMessage(message, countText = "") {
   item.className = "no-data";
   item.textContent = message;
   elements.detailTicketList.append(item);
+  stageMotionItems(elements.detailTicketList, ":scope > .no-data", { maxIndex: 0 });
 }
 
 function openDetailTicketsModal() {
@@ -4466,6 +5218,7 @@ function renderDetailTickets(tickets) {
     action.append(button);
     elements.detailTicketList.append(action);
   }
+  stageMotionItems(elements.detailTicketList, ":scope > .ticket-row, :scope > .tickets-action", { maxIndex: 5 });
 }
 
 async function loadDetailTickets(phone) {
@@ -4804,12 +5557,14 @@ function renderTicketsModal(tickets = currentTickets) {
     message.className = "no-data";
     message.textContent = "Квитків для показу немає.";
     elements.ticketsModalList.append(message);
+    stageMotionItems(elements.ticketsModalList, ":scope > .no-data", { maxIndex: 0 });
     return;
   }
 
   for (const ticket of list) {
     appendModalTicket(elements.ticketsModalList, ticket);
   }
+  stageMotionItems(elements.ticketsModalList, ":scope > .modal-ticket-card", { maxIndex: 7 });
 }
 
 function renderOrderGroupsModal(orderGroups = buildTicketOrderGroups(currentTickets)) {
@@ -4824,12 +5579,14 @@ function renderOrderGroupsModal(orderGroups = buildTicketOrderGroups(currentTick
     message.className = "no-data";
     message.textContent = "Замовлень для показу немає.";
     elements.ticketsModalList.append(message);
+    stageMotionItems(elements.ticketsModalList, ":scope > .no-data", { maxIndex: 0 });
     return;
   }
 
   for (const group of groups) {
     appendOrderGroup(elements.ticketsModalList, group);
   }
+  stageMotionItems(elements.ticketsModalList, ":scope > .order-row", { maxIndex: 7 });
 }
 
 function showTicketsModalDialog() {
@@ -4939,6 +5696,7 @@ function renderCalls(calls) {
     message.className = "no-data";
     message.textContent = "Дзвінків за цим номером у Binotel не знайдено.";
     elements.callList.append(message);
+    stageMotionItems(elements.callList, ":scope > .no-data", { maxIndex: 0 });
     return;
   }
 
@@ -4957,6 +5715,7 @@ function renderCalls(calls) {
     action.append(button);
     elements.callList.append(action);
   }
+  stageMotionItems(elements.callList, ":scope > .call-row, :scope > .tickets-action", { maxIndex: 7 });
 }
 
 function renderCallsLoading() {
@@ -4967,6 +5726,7 @@ function renderCallsLoading() {
   message.className = "no-data async-loading";
   message.innerHTML = `<span class="mini-spinner" aria-hidden="true"></span> Завантажуємо дзвінки Binotel...`;
   elements.callList.append(message);
+  stageMotionItems(elements.callList, ":scope > .no-data", { maxIndex: 0 });
 }
 
 function renderCallsError(messageText) {
@@ -4977,6 +5737,7 @@ function renderCallsError(messageText) {
   message.className = "no-data";
   message.textContent = messageText || "Не вдалося завантажити дзвінки Binotel.";
   elements.callList.append(message);
+  stageMotionItems(elements.callList, ":scope > .no-data", { maxIndex: 0 });
 }
 
 function telegramSetMessage(message, tone = "") {
@@ -5219,6 +5980,7 @@ function renderTelegramEmpty(message, options = {}) {
     ? `<span class="mini-spinner" aria-hidden="true"></span> ${escapeHtml(message)}`
     : escapeHtml(message);
   elements.telegramChat.append(empty);
+  stageMotionItems(elements.telegramChat, ":scope > .telegram-empty", { maxIndex: 0 });
   clearTelegramAccountDropdown();
   elements.telegramRefresh.disabled = options.loading === true || !currentPhone;
   renderTelegramThread(null, options.loading
@@ -5298,6 +6060,7 @@ function renderTelegramAccountSelect(payload) {
     option.append(main, badge);
     elements.telegramAccountMenu?.append(option);
   }
+  stageMotionItems(elements.telegramAccountMenu, ":scope > .telegram-account-option", { maxIndex: 6 });
 }
 
 function telegramMediaUrl(message, accountId) {
@@ -5473,6 +6236,7 @@ function renderTelegramMessages(messages, accountId = selectedTelegramAccountId)
     empty.className = "telegram-empty";
     empty.textContent = "Переписки ще немає. Можна написати перше повідомлення.";
     elements.telegramChat.append(empty);
+    stageMotionItems(elements.telegramChat, ":scope > .telegram-empty", { maxIndex: 0 });
     return;
   }
 
@@ -5505,6 +6269,7 @@ function renderTelegramMessages(messages, accountId = selectedTelegramAccountId)
     bubble.append(footer);
     elements.telegramChat.append(bubble);
   }
+  stageMotionItems(elements.telegramChat, ":scope > .telegram-bubble", { maxIndex: 6 });
   elements.telegramChat.scrollTop = elements.telegramChat.scrollHeight;
 }
 
@@ -5597,6 +6362,7 @@ function setMessagingChannel(channel) {
     !elements.viberTabButton.disabled &&
     !elements.viberTabButton.classList.contains("hidden");
   const next = channel === "viber" && canShowViber ? "viber" : "telegram";
+  const previous = currentMessagingChannel;
   currentMessagingChannel = next;
   elements.messagingTabButtons?.forEach((button) => {
     const active = button.dataset.messagingTab === next;
@@ -5604,7 +6370,11 @@ function setMessagingChannel(channel) {
     button.setAttribute("aria-selected", String(active));
   });
   elements.messagingPanels?.forEach((panel) => {
-    panel.classList.toggle("hidden", panel.dataset.messagingPanel !== next);
+    const active = panel.dataset.messagingPanel === next;
+    panel.classList.toggle("hidden", !active);
+    if (active && next !== previous) {
+      replayMotion(panel);
+    }
   });
 }
 
@@ -5713,6 +6483,7 @@ function renderViberEmpty(message, options = {}) {
     ? `<span class="mini-spinner" aria-hidden="true"></span> ${escapeHtml(message)}`
     : escapeHtml(message);
   elements.viberChat.append(empty);
+  stageMotionItems(elements.viberChat, ":scope > .telegram-empty", { maxIndex: 0 });
   if (elements.viberRefresh) {
     elements.viberRefresh.disabled = options.loading === true || !currentPhone;
   }
@@ -5742,6 +6513,7 @@ function renderViberMessages(messages) {
     empty.className = "telegram-empty";
     empty.textContent = "Переписки у Viber для цього номера не знайдено.";
     elements.viberChat.append(empty);
+    stageMotionItems(elements.viberChat, ":scope > .telegram-empty", { maxIndex: 0 });
     return;
   }
 
@@ -5767,6 +6539,7 @@ function renderViberMessages(messages) {
     bubble.append(footer);
     elements.viberChat.append(bubble);
   }
+  stageMotionItems(elements.viberChat, ":scope > .telegram-bubble", { maxIndex: 6 });
   elements.viberChat.scrollTop = elements.viberChat.scrollHeight;
 }
 
@@ -5849,6 +6622,7 @@ function renderCallsModal() {
   for (const call of currentCalls) {
     appendCall(elements.callsModalList, call);
   }
+  stageMotionItems(elements.callsModalList, ":scope > .call-row", { maxIndex: 8 });
 }
 
 function openCallsModal() {
@@ -6001,38 +6775,21 @@ function createNoteIconButton(action, label, icon, danger = false) {
 }
 
 function animateUiConfirmPopover(popover) {
-  const animeApi = window.anime;
-  if (!popover || !animeApi) {
+  if (!popover || prefersReducedMotion() || typeof popover.animate !== "function") {
     return;
   }
 
-  const modernOptions = {
-    opacity: [0, 1],
-    y: [-6, 0],
-    scale: [0.96, 1],
-    duration: 220,
-    ease: "outCubic",
-    composition: "blend"
-  };
-  const legacyOptions = {
-    opacity: [0, 1],
-    translateY: [-6, 0],
-    scale: [0.98, 1],
-    duration: 220,
-    easing: "easeOutCubic"
-  };
-
-  if (typeof animeApi.animate === "function") {
-    animeApi.animate(popover, modernOptions);
-    return;
-  }
-
-  if (typeof animeApi === "function") {
-    animeApi({
-      targets: popover,
-      ...legacyOptions
-    });
-  }
+  popover.animate(
+    [
+      { opacity: 0, transform: "translateY(-6px) scale(0.96)" },
+      { opacity: 1, transform: "translateY(0) scale(1)" }
+    ],
+    {
+      duration: 220,
+      easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+      fill: "both"
+    }
+  );
 }
 
 function closeUiConfirmDialog(result) {
@@ -6045,6 +6802,9 @@ function closeUiConfirmDialog(result) {
   window.removeEventListener("keydown", dialog.onKeyDown);
   window.removeEventListener("resize", dialog.onReposition);
   window.removeEventListener("scroll", dialog.onReposition, true);
+  if (dialog.layer && typeof dialog.layer.close === "function" && dialog.layer.open) {
+    dialog.layer.close();
+  }
   dialog.layer.remove();
   dialog.resolve(Boolean(result));
 }
@@ -6100,8 +6860,13 @@ function showUiConfirmDialog({
     closeUiConfirmDialog(false);
   }
 
-  const layer = document.createElement("div");
-  layer.className = "booking-action-confirm-layer";
+  const insideOpenDialog = anchor && typeof anchor.closest === "function"
+    ? anchor.closest("dialog[open]")
+    : null;
+  const layer = insideOpenDialog
+    ? document.createElement("dialog")
+    : document.createElement("div");
+  layer.className = `booking-action-confirm-layer${insideOpenDialog ? " booking-action-confirm-dialog" : ""}`;
   layer.innerHTML = `
     <section class="booking-action-confirm-popover is-${escapeHtml(tone)}" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
       <div class="booking-action-confirm-head">
@@ -6117,6 +6882,13 @@ function showUiConfirmDialog({
   `;
   const popover = layer.querySelector(".booking-action-confirm-popover");
   document.body.append(layer);
+  if (insideOpenDialog) {
+    if (typeof layer.showModal === "function") {
+      layer.showModal();
+    } else {
+      layer.setAttribute("open", "");
+    }
+  }
 
   return new Promise((resolve) => {
     const onReposition = () => positionUiConfirmPopover(popover, anchor);
@@ -6131,6 +6903,10 @@ function showUiConfirmDialog({
       if (event.target === layer) {
         closeUiConfirmDialog(false);
       }
+    });
+    layer.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeUiConfirmDialog(false);
     });
     layer
       .querySelector("[data-booking-confirm-cancel]")
@@ -6157,6 +6933,7 @@ function renderNotes(notes) {
     message.className = "no-data";
     message.textContent = "Приміток поки немає.";
     elements.notesList.append(message);
+    stageMotionItems(elements.notesList, ":scope > .no-data", { maxIndex: 0 });
     return;
   }
 
@@ -6212,6 +6989,7 @@ function renderNotes(notes) {
     item.append(body, footer);
     elements.notesList.append(item);
   }
+  stageMotionItems(elements.notesList, ":scope > .note", { maxIndex: 7 });
 }
 
 function setNoteFormMessage(message, tone = "") {
@@ -7132,6 +7910,8 @@ function openManagerRatingModal(managerIndex) {
       appendManagerModalMetric(metric);
     }
   }
+  stageMotionItems(elements.managerRatingModalSummary, ":scope > .manager-rating-modal-stat", { maxIndex: 4 });
+  stageMotionItems(elements.managerRatingModalMetrics, ":scope > .manager-rating-modal-metric, :scope > .no-data", { maxIndex: 6 });
 
   showManagerRatingModalDialog();
 }
@@ -7169,6 +7949,7 @@ function renderManagerRating(rating) {
   for (const [label, value] of summaryItems) {
     elements.managerRatingSummary.append(createManagerRatingChip(label, value));
   }
+  stageMotionItems(elements.managerRatingSummary, ":scope > span", { maxIndex: 4 });
 
   if (!managers.length) {
     return;
@@ -7256,6 +8037,7 @@ function renderManagerRating(rating) {
 
   table.append(thead, tbody);
   elements.managerRatingTable.append(table);
+  stageMotionItems(tbody, ":scope > .manager-rating-matrix-row", { maxIndex: 8 });
 }
 
 function renderCallTypeAnalytics(payload) {
@@ -7299,7 +8081,10 @@ function renderCallTypeAnalytics(payload) {
   elements.analyticsTokens.textContent = formatNumber(openAiSummary.totalTokens || 0);
   elements.analyticsTokensCaption.textContent =
     `cached: ${formatNumber(openAiSummary.cachedInputTokens || 0)} · usage: ${usage.usageCapturedCalls || 0}`;
-  elements.analyticsCost.textContent = formatUsd(usage.estimatedTotalCostUsd || 0);
+  const totalCost = typeof usage.totalCostUsd === "number"
+    ? usage.totalCostUsd
+    : usage.estimatedTotalCostUsd || 0;
+  elements.analyticsCost.textContent = formatApiUsd(totalCost);
   const transcriptionProvider = String(transcription.provider || "").trim();
   const transcriptionLabel = transcriptionProvider === "soniox"
     ? "Soniox"
@@ -7309,13 +8094,36 @@ function renderCallTypeAnalytics(payload) {
   const unpricedTranscriptionCalls =
     Number(transcription.unpricedCalls || 0) +
     Number(transcription.missingModelCalls || 0);
+  const providerCosts = usage.providerCosts || {};
   const costCaptionParts = [];
-  if (typeof transcription.estimatedCostUsd === "number") {
+  const transcriptionCost = typeof transcription.costUsd === "number"
+    ? transcription.costUsd
+    : transcription.estimatedCostUsd;
+  if (typeof transcriptionCost === "number") {
+    const transcriptionSource = transcription.costSource === "provider_api"
+      ? "фактично API"
+      : "за тривалістю";
+    const sonioxEntries = Number(providerCosts.soniox && providerCosts.soniox.entries || 0);
+    const entryCaption = transcription.costSource === "provider_api" && sonioxEntries
+      ? ` · ${formatNumber(sonioxEntries)} запитів`
+      : "";
     costCaptionParts.push(
-      `${transcriptionLabel}: ${formatUsd(transcription.estimatedCostUsd || 0)}`
+      `${transcriptionLabel}: ${formatApiUsd(transcriptionCost)} (${transcriptionSource}${entryCaption})`
     );
   }
-  costCaptionParts.push(`OpenAI: ${formatUsd(openAiSummary.estimatedCostUsd || 0)}`);
+  const openAiCost = typeof openAiSummary.costUsd === "number"
+    ? openAiSummary.costUsd
+    : openAiSummary.estimatedCostUsd || 0;
+  const openAiSource = openAiSummary.costSource === "provider_api"
+    ? "фактично API"
+    : "за usage";
+  costCaptionParts.push(`OpenAI: ${formatApiUsd(openAiCost)} (${openAiSource})`);
+  if (providerCosts.openAi && providerCosts.openAi.reason === "not_configured") {
+    costCaptionParts.push("OpenAI exact: потрібен Admin key");
+  }
+  if (providerCosts.soniox && providerCosts.soniox.coverageComplete === false) {
+    costCaptionParts.push("Soniox exact: останні 31 днів");
+  }
   if (unpricedTranscriptionCalls > 0) {
     costCaptionParts.push(`${formatNumber(unpricedTranscriptionCalls)} без ціни`);
   }
@@ -7362,6 +8170,8 @@ function renderCallTypeAnalytics(payload) {
       fallbackLabel: "Інше"
     });
   }
+  stageMotionItems(elements.callTypeChart, ":scope > .call-type-row", { maxIndex: 7 });
+  stageMotionItems(elements.customerQuestionChart, ":scope > .call-type-row", { maxIndex: 7 });
 }
 
 function renderCallTypeAnalyticsError(message) {
@@ -7535,6 +8345,7 @@ function setCallStatsFocus(focus = {}) {
     value.textContent = "—";
     empty.append(value);
     elements.callStatsFocusMetrics.append(empty);
+    stageMotionItems(elements.callStatsFocusMetrics, ":scope > .call-stats-focus-chip", { maxIndex: 0 });
     return;
   }
 
@@ -7551,6 +8362,7 @@ function setCallStatsFocus(focus = {}) {
     chip.append(label, value);
     elements.callStatsFocusMetrics.append(chip);
   }
+  stageMotionItems(elements.callStatsFocusMetrics, ":scope > .call-stats-focus-chip", { maxIndex: 4 });
 }
 
 function clearCallStatsSelection() {
@@ -7935,6 +8747,9 @@ function wireCallStatsSummaryCards(payload) {
     : [];
   const focuses = callStatsSummaryFocuses(payload);
   cards.forEach((card, index) => makeCallStatsInteractive(card, focuses[index]));
+  if (cards.length) {
+    stageMotionItems(cards[0].parentElement, ":scope > div", { maxIndex: 7 });
+  }
 }
 
 function renderCallStatsSummary(payload) {
@@ -8261,6 +9076,7 @@ function renderCallStatsHeatmap(payload) {
 
     elements.callStatsHeatmap.append(row);
   }
+  stageMotionItems(elements.callStatsHeatmap, ":scope > .call-stats-heatmap-row", { maxIndex: 7 });
 }
 
 function renderCallStatsManagers(payload) {
@@ -8291,6 +9107,7 @@ function renderCallStatsManagers(payload) {
   if (!managers.length) {
     body.innerHTML = `<tr><td colspan="10" class="call-stats-empty-cell">За цей період немає дзвінків.</td></tr>`;
     table.append(body);
+    stageMotionItems(body, ":scope > tr", { maxIndex: 0 });
     return;
   }
 
@@ -8328,6 +9145,7 @@ function renderCallStatsManagers(payload) {
     body.append(row);
   }
   table.append(body);
+  stageMotionItems(body, ":scope > tr", { maxIndex: 8 });
 }
 
 function renderCallStatsList(container, items, options = {}) {
@@ -8342,6 +9160,7 @@ function renderCallStatsList(container, items, options = {}) {
     empty.className = "no-data";
     empty.textContent = "Немає даних за вибраний період.";
     container.append(empty);
+    stageMotionItems(container, ":scope > .no-data", { maxIndex: 0 });
     return;
   }
 
@@ -8382,6 +9201,7 @@ function renderCallStatsList(container, items, options = {}) {
     );
     container.append(row);
   }
+  stageMotionItems(container, ":scope > .call-stats-list-row", { maxIndex: 8 });
 }
 
 function callStatsMaxBy(items, valueGetter) {
@@ -8548,6 +9368,7 @@ function renderCallStatsInsights(payload) {
     makeCallStatsInteractive(row, insight.focus);
     container.append(row);
   }
+  stageMotionItems(container, ":scope > .call-stats-list-row", { maxIndex: 6 });
 }
 
 function renderCallStats(payload) {
@@ -8669,6 +9490,7 @@ function renderMonitorCalls(payload) {
     message.className = "no-data";
     message.textContent = "У локальній історії дзвінків ще немає.";
     elements.monitorList.append(message);
+    stageMotionItems(elements.monitorList, ":scope > .no-data", { maxIndex: 0 });
     renderMonitorPagination();
     return;
   }
@@ -8676,6 +9498,7 @@ function renderMonitorCalls(payload) {
   for (const call of calls) {
     appendMonitorCall(elements.monitorList, call);
   }
+  stageMotionItems(elements.monitorList, ":scope > .monitor-call-link", { maxIndex: 8 });
 
   renderMonitorPagination();
 }
@@ -8742,6 +9565,7 @@ function renderMonitorPagination() {
     });
     elements.monitorPageNumbers.append(button);
   }
+  stageMotionItems(elements.monitorPageNumbers, ":scope > .monitor-page-button", { maxIndex: 6 });
 }
 
 function isEscalationProblem(escalation) {
@@ -9125,10 +9949,69 @@ function customEvaluationGroups(metrics) {
   return groups;
 }
 
+function currentDetailMetricFeedbackItems() {
+  const ai = currentDetailCall && currentDetailCall.ai;
+  return Array.isArray(ai && ai.metricFeedback) ? ai.metricFeedback : [];
+}
+
+function metricFeedbackForKey(metricKey) {
+  const key = String(metricKey || "").trim();
+  return currentDetailMetricFeedbackItems().find(
+    (item) => String(item && item.metricKey || "").trim() === key
+  ) || null;
+}
+
+function currentDetailMetrics() {
+  const summary = currentDetailCall && currentDetailCall.ai && currentDetailCall.ai.summary;
+  const customEvaluation = summary && summary.customEvaluation;
+  return Array.isArray(customEvaluation && customEvaluation.metrics)
+    ? customEvaluation.metrics
+    : [];
+}
+
+function currentDetailMetricByKey(metricKey) {
+  const key = String(metricKey || "").trim();
+  return currentDetailMetrics().find(
+    (metric) => String(metric && metric.metricKey || "").trim() === key
+  ) || null;
+}
+
+function feedbackAuthorLabel(feedback) {
+  const updatedBy = feedback && feedback.updatedBy || {};
+  const createdBy = feedback && feedback.createdBy || {};
+  return (
+    updatedBy.name ||
+    updatedBy.username ||
+    createdBy.name ||
+    createdBy.username ||
+    "Менеджер"
+  );
+}
+
+function feedbackMetaText(feedback) {
+  if (!feedback) {
+    return "";
+  }
+  return [feedbackAuthorLabel(feedback), formatDateTime(feedback.updatedAt)]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function feedbackAppliedText(feedback) {
+  const promptUpdate = metricFeedbackPromptUpdate(feedback);
+  if (!promptUpdate || !promptUpdate.appliedAt) {
+    return "";
+  }
+  return `Застосована${formatDateTime(promptUpdate.appliedAt) ? ` · ${formatDateTime(promptUpdate.appliedAt)}` : ""}`;
+}
+
 function createQualityMetricElement(metric) {
   const item = document.createElement("article");
   item.className = `quality-item quality-metric-item quality-${metricScoreLevel(metric)}`;
   item.style.setProperty("--metric-color", safeMetricColor(metric.color));
+  item.dataset.metricKey = metric.metricKey || "";
+  const feedback = metricFeedbackForKey(metric.metricKey);
+  item.classList.toggle("has-feedback", Boolean(feedback));
 
   const header = document.createElement("div");
   header.className = "quality-metric-header";
@@ -9149,7 +10032,22 @@ function createQualityMetricElement(metric) {
   score.className = "quality-score-pill";
   score.textContent = metricPointScore(metric);
 
-  header.append(titleWrap, score);
+  const actions = document.createElement("div");
+  actions.className = "quality-metric-actions";
+  const feedbackButton = document.createElement("button");
+  feedbackButton.className = "quality-feedback-button";
+  feedbackButton.type = "button";
+  feedbackButton.dataset.metricFeedbackAction = "open";
+  feedbackButton.dataset.metricKey = metric.metricKey || "";
+  feedbackButton.setAttribute(
+    "aria-label",
+    feedback ? "Редагувати примітку до метрики" : "Додати примітку до метрики"
+  );
+  feedbackButton.title = feedback ? "Редагувати примітку" : "Додати примітку";
+  feedbackButton.innerHTML = aiIcon("edit");
+  actions.append(score, feedbackButton);
+
+  header.append(titleWrap, actions);
   item.append(header);
 
   if (metric.evidence) {
@@ -9163,6 +10061,29 @@ function createQualityMetricElement(metric) {
     improvement.className = "quality-improvement";
     improvement.textContent = `Порада: ${metric.improvement}`;
     item.append(improvement);
+  }
+
+  if (feedback && feedback.text) {
+    const note = document.createElement("section");
+    note.className = "quality-feedback-note";
+    const caption = document.createElement("strong");
+    caption.textContent = "Коментар менеджера";
+    const body = document.createElement("p");
+    body.textContent = feedback.text;
+    const meta = document.createElement("small");
+    meta.textContent = feedbackMetaText(feedback);
+    note.append(caption, body);
+    if (meta.textContent) {
+      note.append(meta);
+    }
+    const appliedText = feedbackAppliedText(feedback);
+    if (appliedText) {
+      const applied = document.createElement("span");
+      applied.className = "quality-feedback-applied";
+      applied.textContent = appliedText;
+      note.append(applied);
+    }
+    item.append(note);
   }
 
   return item;
@@ -9332,6 +10253,9 @@ function renderCallQuality(summary) {
     customEvaluation.metrics.length
   ) {
     renderCustomCallQuality(summary);
+    stageMotionItems(elements.detailQualityContext, ":scope > .quality-context-item", { maxIndex: 5 });
+    stageMotionItems(elements.detailQualityCriteria, ":scope > .quality-metric-group", { maxIndex: 5 });
+    stageMotionItems(elements.detailQualityNotes, ":scope > div", { maxIndex: 4 });
     return;
   }
 
@@ -9340,6 +10264,7 @@ function renderCallQuality(summary) {
     elements.detailQualityScore.className = "quality-score quality-empty";
     elements.detailQualitySummary.textContent =
       "Оцінка зʼявиться після повторного AI-аналізу дзвінка.";
+    stageMotionItems(elements.detailQualityContext, ":scope > .quality-context-item", { maxIndex: 3 });
     return;
   }
 
@@ -9394,6 +10319,188 @@ function renderCallQuality(summary) {
     "Що покращити",
     evaluation.improvements || evaluation.risks || []
   );
+  stageMotionItems(elements.detailQualityContext, ":scope > .quality-context-item", { maxIndex: 3 });
+  stageMotionItems(elements.detailQualityCriteria, ":scope > .quality-item", { maxIndex: 5 });
+  stageMotionItems(elements.detailQualityNotes, ":scope > div", { maxIndex: 4 });
+}
+
+function setMetricFeedbackMessage(message, tone = "") {
+  setMessage(elements.metricFeedbackMessage, message, tone);
+}
+
+function openMetricFeedbackModal(metricKey) {
+  const metric = currentDetailMetricByKey(metricKey);
+  if (!metric || !currentDetailCall) {
+    return;
+  }
+
+  const feedback = metricFeedbackForKey(metric.metricKey);
+  const ai = currentDetailCall.ai || {};
+  metricFeedbackState.callId = String(
+    ai.callId ||
+    ai.generalCallId ||
+    currentDetailCall.generalCallId ||
+    currentDetailCallId ||
+    ""
+  ).trim();
+  metricFeedbackState.metricKey = String(metric.metricKey || "").trim();
+  metricFeedbackState.saving = false;
+  metricFeedbackState.deleting = false;
+
+  if (elements.metricFeedbackTitle) {
+    elements.metricFeedbackTitle.textContent = metric.metricLabel || metric.metricKey || "Метрика";
+  }
+  if (elements.metricFeedbackSubtitle) {
+    elements.metricFeedbackSubtitle.textContent = [
+      metric.selectedOptionLabel || "Варіант не вибрано",
+      metricPointScore(metric),
+      ai.summary && (ai.summary.callTypeLabel || ai.summary.callType)
+    ].filter(Boolean).join(" · ");
+  }
+  if (elements.metricFeedbackText) {
+    elements.metricFeedbackText.value = feedback && feedback.text ? feedback.text : "";
+  }
+  if (elements.metricFeedbackSubmit) {
+    elements.metricFeedbackSubmit.disabled = false;
+    elements.metricFeedbackSubmit.textContent = feedback ? "Оновити" : "Зберегти";
+  }
+  if (elements.metricFeedbackDelete) {
+    elements.metricFeedbackDelete.classList.toggle("hidden", !feedback);
+    elements.metricFeedbackDelete.disabled = false;
+  }
+  setMetricFeedbackMessage("");
+  showAiDialog(elements.metricFeedbackModal);
+  elements.metricFeedbackText?.focus();
+}
+
+function closeMetricFeedbackModal() {
+  metricFeedbackState.callId = "";
+  metricFeedbackState.metricKey = "";
+  metricFeedbackState.saving = false;
+  metricFeedbackState.deleting = false;
+  closeAiDialog(elements.metricFeedbackModal);
+}
+
+async function saveMetricFeedback(event) {
+  event.preventDefault();
+  const callId = metricFeedbackState.callId;
+  const metricKey = metricFeedbackState.metricKey;
+  const text = String(elements.metricFeedbackText?.value || "").trim();
+
+  if (!callId || !metricKey || metricFeedbackState.saving || metricFeedbackState.deleting) {
+    return;
+  }
+  if (!text) {
+    setMetricFeedbackMessage("Додайте коротке пояснення або виправлення.");
+    return;
+  }
+
+  metricFeedbackState.saving = true;
+  if (elements.metricFeedbackSubmit) {
+    elements.metricFeedbackSubmit.disabled = true;
+    elements.metricFeedbackSubmit.textContent = "Зберігаємо...";
+  }
+  setMetricFeedbackMessage("Зберігаємо правку...", "neutral");
+
+  try {
+    const response = await apiFetch("/api/ai-metric-feedback", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        callId,
+        metricKey,
+        text
+      })
+    });
+    const payload = await readJsonResponse(response, "Не вдалося зберегти правку метрики.");
+    if (currentDetailCall && currentDetailCall.ai) {
+      currentDetailCall.ai.metricFeedback = Array.isArray(payload.items)
+        ? payload.items
+        : [payload.feedback].filter(Boolean);
+      renderCallQuality(currentDetailCall.ai.summary || {});
+    }
+    closeMetricFeedbackModal();
+  } catch (error) {
+    setMetricFeedbackMessage(error.message || "Не вдалося зберегти правку метрики.");
+  } finally {
+    metricFeedbackState.saving = false;
+    if (elements.metricFeedbackSubmit) {
+      elements.metricFeedbackSubmit.disabled = false;
+      elements.metricFeedbackSubmit.textContent = metricFeedbackForKey(metricKey)
+        ? "Оновити"
+        : "Зберегти";
+    }
+    if (elements.metricFeedbackDelete) {
+      elements.metricFeedbackDelete.disabled = false;
+    }
+  }
+}
+
+async function deleteMetricFeedback(anchor = null) {
+  const callId = metricFeedbackState.callId;
+  const metricKey = metricFeedbackState.metricKey;
+  if (!callId || !metricKey || metricFeedbackState.saving || metricFeedbackState.deleting) {
+    return;
+  }
+
+  const confirmed = await showUiConfirmDialog({
+    title: "Видалити правку метрики?",
+    message: "Примітка менеджера зникне з цієї метрики та зі списку AI-правок в адмінці.",
+    confirmLabel: "Видалити",
+    cancelLabel: "Скасувати",
+    tone: "danger",
+    anchor
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  metricFeedbackState.deleting = true;
+  if (elements.metricFeedbackDelete) {
+    elements.metricFeedbackDelete.disabled = true;
+    elements.metricFeedbackDelete.textContent = "Видаляємо...";
+  }
+  if (elements.metricFeedbackSubmit) {
+    elements.metricFeedbackSubmit.disabled = true;
+  }
+  setMetricFeedbackMessage("Видаляємо правку...", "neutral");
+
+  try {
+    const response = await apiFetch(
+      `/api/ai-metric-feedback?callId=${encodeURIComponent(callId)}&metricKey=${encodeURIComponent(metricKey)}`,
+      { method: "DELETE" }
+    );
+    const payload = await readJsonResponse(response, "Не вдалося видалити правку метрики.");
+    if (currentDetailCall && currentDetailCall.ai) {
+      currentDetailCall.ai.metricFeedback = Array.isArray(payload.items)
+        ? payload.items
+        : [];
+      renderCallQuality(currentDetailCall.ai.summary || {});
+    }
+    closeMetricFeedbackModal();
+  } catch (error) {
+    setMetricFeedbackMessage(error.message || "Не вдалося видалити правку метрики.");
+  } finally {
+    metricFeedbackState.deleting = false;
+    if (elements.metricFeedbackDelete) {
+      elements.metricFeedbackDelete.disabled = false;
+      elements.metricFeedbackDelete.textContent = "Видалити";
+    }
+    if (elements.metricFeedbackSubmit) {
+      elements.metricFeedbackSubmit.disabled = false;
+    }
+  }
+}
+
+function handleMetricFeedbackClick(event) {
+  const button = event.target.closest("[data-metric-feedback-action='open']");
+  if (!button) {
+    return;
+  }
+  openMetricFeedbackModal(button.dataset.metricKey || "");
 }
 
 function segmentTimestamp(seconds) {
@@ -9733,6 +10840,7 @@ function renderTranscript(ai) {
       item.append(play, header, body);
       elements.detailTranscript.append(item);
     }
+    stageMotionItems(elements.detailTranscript, ":scope > .transcript-item", { maxIndex: 8 });
     return;
   }
 
@@ -9741,6 +10849,7 @@ function renderTranscript(ai) {
     textBlock.className = "transcript-plain";
     textBlock.textContent = transcript.text;
     elements.detailTranscript.append(textBlock);
+    stageMotionItems(elements.detailTranscript, ":scope > .transcript-plain", { maxIndex: 0 });
     return;
   }
 
@@ -9750,6 +10859,7 @@ function renderTranscript(ai) {
     ? "Транскрипція ще готується."
     : "Текст розмови поки недоступний.";
   elements.detailTranscript.append(message);
+  stageMotionItems(elements.detailTranscript, ":scope > .no-data", { maxIndex: 0 });
 }
 
 function updateDetailReanalyzeButton(call, ai) {
@@ -9788,6 +10898,7 @@ function renderCallDetail(call) {
     : [];
 
   currentDetailCallId = id;
+  currentDetailCall = call;
   detailAudioState.segments = transcriptSegments;
   detailAudioState.roles = speakerRoles(summary, transcriptSegments);
   elements.detailPhone.textContent = formatCallPhone(call.externalNumber);
@@ -9918,6 +11029,8 @@ function renderCallDetail(call) {
         : ""
   );
   appendDetailValue(elements.detailTechnical, "Остання помилка", ai.error);
+  stageMotionItems(elements.detailAnalysisList, ":scope > .detail-analysis-group", { maxIndex: 5 });
+  stageMotionItems(elements.detailTechnical, ":scope > div", { maxIndex: 8 });
 
   document.title = `${formatCallPhone(call.externalNumber)} · Дзвінок | DUMA`;
   setState("detail");
@@ -9976,6 +11089,7 @@ async function loadCallDetail(callIdValue, showLoading = true, preservePlayback 
       scheduleDetailPoll();
     }
   } catch (error) {
+    currentDetailCall = null;
     setState("detail");
     elements.detailSummary.textContent = error.message;
     detailTicketsPhone = "";
@@ -10396,6 +11510,8 @@ document.addEventListener("keydown", (event) => {
     closeAdminUserModal();
     closeTelegramPhotoModal();
     closeManagerRatingModal();
+    closeMetricFeedbackModal();
+    closeMetricPromptModal();
   }
 });
 
@@ -10412,6 +11528,7 @@ elements.changePasswordModal?.addEventListener("click", (event) => {
 elements.adminAddUser?.addEventListener("click", () => openAdminUserModal());
 elements.adminTabs?.addEventListener("click", handleAdminTabsClick);
 elements.adminUsersList?.addEventListener("click", handleAdminUsersClick);
+elements.adminMetricFeedbackList?.addEventListener("click", handleAdminMetricFeedbackClick);
 elements.adminAnalysisNumbersList?.addEventListener("change", handleAdminAnalysisNumbersChange);
 elements.adminAnalysisEnableAll?.addEventListener("click", () => setAllAdminAnalysisNumbers(true));
 elements.adminAnalysisDisableAll?.addEventListener("click", () => setAllAdminAnalysisNumbers(false));
@@ -10517,6 +11634,31 @@ elements.managerRatingModalClose?.addEventListener("click", closeManagerRatingMo
 elements.managerRatingModal?.addEventListener("click", (event) => {
   if (event.target === elements.managerRatingModal) {
     closeManagerRatingModal();
+  }
+});
+
+elements.detailQualityCriteria?.addEventListener("click", handleMetricFeedbackClick);
+elements.metricFeedbackForm?.addEventListener("submit", saveMetricFeedback);
+elements.metricFeedbackDelete?.addEventListener("click", (event) => {
+  void deleteMetricFeedback(event.currentTarget);
+});
+elements.metricFeedbackClose?.addEventListener("click", closeMetricFeedbackModal);
+elements.metricFeedbackCancel?.addEventListener("click", closeMetricFeedbackModal);
+elements.metricFeedbackModal?.addEventListener("click", (event) => {
+  if (event.target === elements.metricFeedbackModal) {
+    closeMetricFeedbackModal();
+  }
+});
+
+elements.metricPromptForm?.addEventListener("submit", saveMetricPromptUpdate);
+elements.metricPromptRegenerate?.addEventListener("click", () => {
+  void regenerateMetricPromptDraft();
+});
+elements.metricPromptClose?.addEventListener("click", closeMetricPromptModal);
+elements.metricPromptCancel?.addEventListener("click", closeMetricPromptModal);
+elements.metricPromptModal?.addEventListener("click", (event) => {
+  if (event.target === elements.metricPromptModal) {
+    closeMetricPromptModal();
   }
 });
 
