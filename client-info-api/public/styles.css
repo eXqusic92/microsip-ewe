@@ -185,8 +185,8 @@ a {
 .app-tabs a {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
-  padding: 0 12px;
+  min-height: 44px;
+  padding: 0 14px;
   border-radius: 999px;
   color: var(--muted);
   font-size: 12px;
@@ -233,7 +233,7 @@ body[data-theme="dark"] .app-tabs a.active {
   width: min(500px, 42vw);
   max-width: 500px;
   min-width: 0;
-  min-height: 38px;
+  min-height: 44px;
   border: 1px solid var(--field-border);
   background: var(--field);
   border-radius: 7px;
@@ -247,7 +247,8 @@ body[data-theme="dark"] .app-tabs a.active {
 
 .search-icon {
   display: grid;
-  width: 42px;
+  width: 44px;
+  align-self: stretch;
   place-items: center;
   color: var(--muted);
 }
@@ -262,7 +263,7 @@ body[data-theme="dark"] .app-tabs a.active {
 .phone-search input {
   min-width: 0;
   flex: 1;
-  height: 36px;
+  height: 44px;
   border: 0;
   outline: 0;
   color: var(--ink);
@@ -281,7 +282,7 @@ body[data-theme="dark"] .app-tabs a.active {
 .note-form button,
 .primary-button,
 .secondary-button {
-  min-height: 38px;
+  min-height: 44px;
   border: 1px solid var(--brand);
   border-radius: 7px;
   background: var(--brand);
@@ -364,7 +365,7 @@ select:disabled {
   justify-content: space-between;
   gap: 10px;
   width: 100%;
-  min-height: 38px;
+  min-height: 44px;
   border: 1px solid var(--field-border);
   border-radius: 7px;
   background: var(--field);
@@ -482,7 +483,7 @@ select:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
+  min-height: 44px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: var(--panel-soft);
@@ -522,7 +523,7 @@ select:disabled {
   align-items: center;
   flex: 0 0 auto;
   gap: 8px;
-  min-height: 38px;
+  min-height: 44px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -533,7 +534,7 @@ select:disabled {
   align-items: center;
   overflow: hidden;
   max-width: 140px;
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -551,7 +552,7 @@ select:disabled {
 
 .logout-button {
   flex: 0 0 auto;
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 14px;
   border-radius: 7px;
   font-size: 13px;
@@ -567,15 +568,15 @@ select:disabled {
 .profile-menu-trigger {
   position: relative;
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: var(--panel-soft);
   color: var(--ink);
   padding: 0;
-  box-shadow: 0 6px 16px rgba(31, 48, 58, 0.08);
+  box-shadow: 0 3px 8px rgba(31, 48, 58, 0.08);
   transition:
     border-color 0.16s ease,
     background 0.16s ease,
@@ -589,7 +590,7 @@ select:disabled {
   border-color: var(--accent);
   color: var(--accent);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(227, 6, 19, 0.14);
+  box-shadow: 0 3px 8px rgba(227, 6, 19, 0.14);
 }
 
 .profile-menu-trigger svg,
@@ -695,7 +696,7 @@ select:disabled {
   align-items: center;
   gap: 11px;
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -742,7 +743,7 @@ select:disabled {
 
 body[data-theme="dark"] .primary-button {
   color: var(--brand-ink);
-  box-shadow: 0 8px 18px rgba(79, 180, 210, 0.2);
+  box-shadow: 0 3px 8px rgba(79, 180, 210, 0.18);
 }
 
 body[data-theme="dark"] .ai-gradient-button,
@@ -760,8 +761,8 @@ body[data-theme="dark"] .ai-insights-button {
   flex: 0 0 auto;
   justify-content: center;
   gap: 2px;
-  width: 70px;
-  min-height: 38px;
+  width: 78px;
+  min-height: 44px;
   padding: 3px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
@@ -779,8 +780,8 @@ body[data-theme="dark"] .ai-insights-button {
   top: 3px;
   left: 3px;
   z-index: 0;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--brand);
   box-shadow: 0 3px 8px rgba(227, 6, 19, 0.2);
@@ -794,7 +795,7 @@ body[data-theme="dark"] .ai-insights-button {
 
 body[data-theme="dark"] .theme-toggle::before {
   box-shadow: 0 3px 8px rgba(79, 180, 210, 0.24);
-  transform: translateX(32px);
+  transform: translateX(34px);
 }
 
 .theme-toggle:hover {
@@ -810,8 +811,8 @@ body[data-theme="dark"] .theme-toggle::before {
   position: relative;
   z-index: 1;
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   place-items: center;
   border-radius: 50%;
   color: var(--muted);
@@ -852,15 +853,11 @@ body[data-theme="dark"] .theme-toggle-option.is-moon {
   min-height: 100vh;
   place-items: center;
   padding: 24px;
-  background:
-    linear-gradient(135deg, transparent 0 34%, rgba(227, 6, 19, 0.08) 34% 37%, transparent 37%),
-    linear-gradient(160deg, var(--page) 0%, var(--page) 58%, var(--panel-soft) 58% 100%);
+  background: var(--page);
 }
 
 body[data-theme="dark"] .login-page {
-  background:
-    linear-gradient(135deg, transparent 0 34%, rgba(79, 180, 210, 0.12) 34% 37%, transparent 37%),
-    var(--page);
+  background: var(--page);
 }
 
 .login-card {
@@ -871,26 +868,7 @@ body[data-theme="dark"] .login-page {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
-  box-shadow: var(--shadow);
-}
-
-.login-card::after {
-  content: "";
-  position: absolute;
-  right: -130px;
-  bottom: -96px;
-  width: 280px;
-  height: 230px;
-  pointer-events: none;
-  background:
-    linear-gradient(135deg, transparent 34%, rgba(227, 6, 19, 0.16) 35%, rgba(227, 6, 19, 0.16) 39%, transparent 40%),
-    linear-gradient(135deg, transparent 50%, rgba(227, 6, 19, 0.08) 51%, rgba(227, 6, 19, 0.08) 58%, transparent 59%);
-  opacity: 0.52;
-  transform: rotate(8deg);
-}
-
-body[data-theme="dark"] .login-card::after {
-  display: none;
+  box-shadow: 0 3px 8px rgba(31, 48, 58, 0.08);
 }
 
 .login-card > * {
@@ -957,7 +935,7 @@ body[data-theme="dark"] .login-card::after {
 
 .login-form input {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   border: 1px solid var(--field-border);
   border-radius: 7px;
   padding: 9px 11px;
@@ -2314,6 +2292,8 @@ body[data-theme="dark"] .login-form input:focus {
   align-items: center;
   gap: 7px;
   min-width: 0;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .trip-bus-color {
@@ -8713,7 +8693,7 @@ body[data-theme="dark"] .phone-search button,
 body[data-theme="dark"] .note-form button,
 body[data-theme="dark"] .primary-button {
   color: var(--brand-ink);
-  box-shadow: 0 8px 18px rgba(79, 180, 210, 0.2);
+  box-shadow: 0 3px 8px rgba(79, 180, 210, 0.18);
 }
 
 body[data-theme="dark"] .phone-search button:hover,
@@ -8721,7 +8701,7 @@ body[data-theme="dark"] .note-form button:hover,
 body[data-theme="dark"] .primary-button:hover,
 body[data-theme="dark"] .secondary-button:hover {
   color: var(--brand-ink);
-  box-shadow: 0 10px 24px rgba(79, 180, 210, 0.26);
+  box-shadow: 0 3px 8px rgba(79, 180, 210, 0.24);
 }
 
 body[data-theme="dark"] .calls-section,
@@ -10130,6 +10110,101 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   .note-action-button {
     width: 44px;
     height: 44px;
+  }
+
+  .trip-place > span,
+  .trip-departure > span,
+  .trip-info dt,
+  .trip-segment-place > span,
+  .trip-segment-meta b,
+  .trip-subsection-title span,
+  .trip-subsection-title strong,
+  .monitor-status-grid span,
+  .monitor-call-fact span,
+  .monitor-call-identity > span,
+  .monitor-alert-badge,
+  .monitor-analytics-summary span,
+  .monitor-analytics-summary small,
+  .call-stats-summary span,
+  .call-stats-summary small,
+  .call-stats-focus span,
+  .call-stats-focus em,
+  .call-stats-heatmap-hours b,
+  .call-stats-heatmap-row > span,
+  .call-detail-facts span,
+  .detail-analysis-group header p,
+  .detail-analysis-item > span,
+  .detail-technical dt,
+  .quality-context-item span,
+  .quality-group-header small,
+  .quality-item small,
+  .quality-notes strong,
+  .call-type-label small {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .upcoming-section :where(span, small, dt),
+  .tickets-section :where(span, small),
+  .calls-section :where(.status, footer),
+  .notes-section footer,
+  .messaging-section :where(.messaging-channel-title span, .telegram-account-trigger-main small, .telegram-thread-status, .telegram-reply-preview span, .telegram-reply-bar span),
+  .call-stats-table th,
+  .manager-rating-summary small,
+  .manager-rating-matrix th,
+  .manager-rating-metric-head small,
+  .manager-rating-person small,
+  .audio-speed,
+  .transcript-item header strong,
+  .transcript-item header span {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .trip-place small span,
+  .trip-segment-place small span,
+  .order-info-item span,
+  .call-main .status,
+  .messaging-channel-title span,
+  .telegram-account-trigger-main small,
+  .telegram-reply-preview span,
+  .manager-rating-manager-head,
+  .manager-rating-total-head {
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+  }
+
+  .telegram-thread-main span,
+  .telegram-reply-preview strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .trip-place small,
+  .trip-departure small,
+  .trip-segment-place small,
+  .trip-segment-note,
+  .trip-segment-meta > div,
+  .call-stats-list-row span,
+  .quality-metric-option,
+  .telegram-thread-main span,
+  .telegram-bubble time,
+  .telegram-media-file small {
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+
+  .trip-info dd,
+  .trip-segment-place strong,
+  .monitor-call-fact strong,
+  .detail-analysis-item > strong,
+  .detail-technical dd,
+  .quality-context-item strong,
+  .quality-item strong,
+  .quality-item p {
+    font-size: 13px;
   }
 }
 
