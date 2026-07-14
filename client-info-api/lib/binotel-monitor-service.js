@@ -1,5 +1,6 @@
 "use strict";
 
+const AiPrompts = require("./ai-prompts");
 const { canHaveRecording } = require("./call-summary-service");
 
 const OPENAI_TEXT_PRICING_USD_BY_MODEL = {
@@ -68,6 +69,27 @@ function externalPhone(call) {
 
 function internalNumber(call) {
   return String(call && call.internalNumber || "").trim();
+}
+
+function callVisibilityOptions(options = {}) {
+  return {
+    restrictToAssignedInternalNumbers:
+      options.restrictToAssignedInternalNumbers === true,
+    assignedInternalNumbers: [...new Set(
+      (Array.isArray(options.assignedInternalNumbers)
+        ? options.assignedInternalNumbers
+        : [])
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )].sort()
+  };
+}
+
+function callVisibilityCacheKey(options = {}) {
+  const visibility = callVisibilityOptions(options);
+  return visibility.restrictToAssignedInternalNumbers
+    ? visibility.assignedInternalNumbers
+    : "all";
 }
 
 function numeric(value) {
@@ -548,11 +570,16 @@ class BinotelMonitorService {
     this.processStartedAt = nowIso();
     this.analyticsCache = new Map();
     this.analyticsPending = new Map();
+    this.analyticsSourceCache = new Map();
+    this.analyticsSourcePending = new Map();
     this.managerRatingCache = new Map();
     this.managerRatingPending = new Map();
     this.callStatisticsCache = new Map();
     this.callStatisticsPending = new Map();
-    this.analyticsCacheMillis = 10 * 1000;
+    this.providerCostCache = new Map();
+    this.providerCostPending = new Map();
+    this.analyticsCacheMillis = 60 * 1000;
+    this.providerCostCacheMillis = 10 * 60 * 1000;
   }
 
   get enabled() {
@@ -621,24 +648,7 @@ class BinotelMonitorService {
     };
   }
 
-  async providerCostSnapshots(items, options = {}) {
-    if (String(options.query || "").trim()) {
-      return {
-        window: null,
-        soniox: { available: false, reason: "query_filtered" },
-        openAi: { available: false, reason: "query_filtered" }
-      };
-    }
-
-    const window = this.providerCostWindow(items, options);
-    if (!window) {
-      return {
-        window: null,
-        soniox: { available: false, reason: "no_calls" },
-        openAi: { available: false, reason: "no_calls" }
-      };
-    }
-
+  async fetchProviderCostSnapshots(window) {
     const transcriptionClient = this.callSummaryService &&
       this.callSummaryService.transcriptionClient;
     const openAiClient = this.callSummaryService && this.callSummaryService.openAiClient;
@@ -690,6 +700,77 @@ class BinotelMonitorService {
       window,
       soniox,
       openAi
+    };
+  }
+
+  async providerCostSnapshots(items, options = {}) {
+    if (options.restrictToAssignedInternalNumbers === true) {
+      return {
+        window: null,
+        soniox: { available: false, reason: "restricted_scope" },
+        openAi: { available: false, reason: "restricted_scope" }
+      };
+    }
+
+    if (String(options.query || "").trim()) {
+      return {
+        window: null,
+        soniox: { available: false, reason: "query_filtered" },
+        openAi: { available: false, reason: "query_filtered" }
+      };
+    }
+
+    const window = this.providerCostWindow(items, options);
+    if (!window) {
+      return {
+        window: null,
+        soniox: { available: false, reason: "no_calls" },
+        openAi: { available: false, reason: "no_calls" }
+      };
+    }
+
+    const cacheKey = JSON.stringify({
+      startHour: window.startTime.slice(0, 13),
+      sonioxStartHour: window.sonioxStartTime.slice(0, 13),
+      sonioxCoverageComplete: window.sonioxCoverageComplete
+    });
+    const cached = this.providerCostCache.get(cacheKey);
+    if (cached && Date.now() - cached.createdAt < this.providerCostCacheMillis) {
+      return cached.value;
+    }
+
+    if (!this.providerCostPending.has(cacheKey)) {
+      const refresh = this.fetchProviderCostSnapshots(window)
+        .then((value) => {
+          this.providerCostCache.set(cacheKey, {
+            createdAt: Date.now(),
+            value
+          });
+          if (this.providerCostCache.size > 20) {
+            const oldestKey = this.providerCostCache.keys().next().value;
+            this.providerCostCache.delete(oldestKey);
+          }
+          this.analyticsCache.clear();
+          return value;
+        })
+        .catch((error) => {
+          console.warn(`Provider costs unavailable: ${error.message}`);
+          return {
+            window,
+            soniox: { available: false, reason: "provider_error" },
+            openAi: { available: false, reason: "provider_error" }
+          };
+        })
+        .finally(() => {
+          this.providerCostPending.delete(cacheKey);
+        });
+      this.providerCostPending.set(cacheKey, refresh);
+    }
+
+    return {
+      window,
+      soniox: { available: false, reason: "refreshing" },
+      openAi: { available: false, reason: "refreshing" }
     };
   }
 
@@ -1015,7 +1096,7 @@ class BinotelMonitorService {
         break;
       }
 
-      if (!this.isAiEligibleCall(call, { disabledNumbers }) || !canHaveRecording(call)) {
+      if (this.isInternalNumberDisabled(call, disabledNumbers) || !canHaveRecording(call)) {
         continue;
       }
 
@@ -1075,8 +1156,61 @@ class BinotelMonitorService {
 
   clearAnalyticsCache() {
     this.analyticsCache.clear();
+    this.analyticsSourceCache.clear();
     this.managerRatingCache.clear();
     this.callStatisticsCache.clear();
+  }
+
+  analyticsOptionsCacheKey(options = {}) {
+    const periodDays = options.periodDays || null;
+    return JSON.stringify({
+      query: options.query || "",
+      since: periodDays ? null : options.since || null,
+      periodDays,
+      visibility: callVisibilityCacheKey(options)
+    });
+  }
+
+  async analyticsSource(options = {}) {
+    const cacheKey = this.analyticsOptionsCacheKey(options);
+    const cached = this.analyticsSourceCache.get(cacheKey);
+    if (cached && Date.now() - cached.createdAt < this.analyticsCacheMillis) {
+      return cached.value;
+    }
+
+    const pending = this.analyticsSourcePending.get(cacheKey);
+    if (pending) {
+      return pending;
+    }
+
+    const calculation = (async () => {
+      await this.ensureSyncBoundaries(await this.store.syncState());
+      const listOptions = {
+        limit: this.config.maxStoredCalls || 5000,
+        query: options.query || "",
+        since: options.since || null,
+        ...callVisibilityOptions(options)
+      };
+      return typeof this.store.analytics === "function"
+        ? this.store.analytics(listOptions)
+        : this.store.list(listOptions);
+    })();
+    this.analyticsSourcePending.set(cacheKey, calculation);
+
+    try {
+      const source = await calculation;
+      this.analyticsSourceCache.set(cacheKey, {
+        createdAt: Date.now(),
+        value: source
+      });
+      if (this.analyticsSourceCache.size > 10) {
+        const oldestKey = this.analyticsSourceCache.keys().next().value;
+        this.analyticsSourceCache.delete(oldestKey);
+      }
+      return source;
+    } finally {
+      this.analyticsSourcePending.delete(cacheKey);
+    }
   }
 
   async listCalls(options = {}) {
@@ -1164,11 +1298,7 @@ class BinotelMonitorService {
   }
 
   async callTypeAnalytics(options = {}) {
-    const cacheKey = JSON.stringify({
-      query: options.query || "",
-      since: options.since || null,
-      periodDays: options.periodDays || null
-    });
+    const cacheKey = this.analyticsOptionsCacheKey(options);
     const cached = this.analyticsCache.get(cacheKey);
     if (cached && Date.now() - cached.createdAt < this.analyticsCacheMillis) {
       return cached.value;
@@ -1200,11 +1330,7 @@ class BinotelMonitorService {
   }
 
   async managerRating(options = {}) {
-    const cacheKey = JSON.stringify({
-      query: options.query || "",
-      since: options.since || null,
-      periodDays: options.periodDays || null
-    });
+    const cacheKey = this.analyticsOptionsCacheKey(options);
     const cached = this.managerRatingCache.get(cacheKey);
     if (cached && Date.now() - cached.createdAt < this.analyticsCacheMillis) {
       return cached.value;
@@ -1241,7 +1367,8 @@ class BinotelMonitorService {
       from: options.from || null,
       to: options.to || null,
       periodKey: options.periodKey || "",
-      timezone: options.timezone || "Europe/Kyiv"
+      timezone: options.timezone || "Europe/Kyiv",
+      visibility: callVisibilityCacheKey(options)
     });
     const cached = this.callStatisticsCache.get(cacheKey);
     if (cached && Date.now() - cached.createdAt < this.analyticsCacheMillis) {
@@ -1299,7 +1426,8 @@ class BinotelMonitorService {
       query: options.query || "",
       from: options.from || null,
       to: options.to || null,
-      timezone: options.timezone || "Europe/Kyiv"
+      timezone: options.timezone || "Europe/Kyiv",
+      ...callVisibilityOptions(options)
     });
 
     const integerValue = (value) => Math.trunc(numeric(value));
@@ -1413,16 +1541,60 @@ class BinotelMonitorService {
   }
 
   async calculateManagerRating(options = {}) {
-    if (typeof this.store.managerRating !== "function") {
+    if (typeof this.store.managerRating !== "function" &&
+        typeof this.store.analytics !== "function") {
       return buildManagerRating([], {
         periodDays: options.periodDays || null
       });
     }
 
+    if (typeof this.store.analytics === "function" &&
+        !String(options.query || "").trim()) {
+      const source = await this.analyticsSource(options);
+      const rows = [];
+      for (const item of source.calls || []) {
+        const call = (item && item.call) || item || {};
+        const ai = item && item.ai;
+        if (!ai || ai.status !== "done") {
+          continue;
+        }
+        const summary = ai.summary || {};
+        const callId = call.generalCallId || call.id || call.callId;
+        for (const metric of (summary.customEvaluation && summary.customEvaluation.metrics) || []) {
+          if (metric.countsTowardScore === false ||
+              optionalNumber(metric.score) === null ||
+              optionalNumber(metric.maxScore) === null ||
+              numeric(metric.maxScore) <= 0) {
+            continue;
+          }
+          rows.push({
+            callId,
+            startedAt: call.startedAt,
+            billSec: call.billSec,
+            internalNumber: call.internalNumber,
+            employee: call.employee,
+            pbxNumber: call.pbxNumber,
+            callType: summary.callType,
+            callTypeLabel: summary.callTypeLabel,
+            ...metric
+          });
+        }
+      }
+      const rating = buildManagerRating(rows, {
+        periodDays: options.periodDays || null
+      });
+      return {
+        ...rating,
+        sourceRatedCalls: rating.ratedCalls,
+        sourceScoredMetrics: rating.scoredMetrics
+      };
+    }
+
     const result = await this.store.managerRating({
       limit: this.config.maxStoredCalls || 5000,
       query: options.query || "",
-      since: options.since || null
+      since: options.since || null,
+      ...callVisibilityOptions(options)
     });
 
     return {
@@ -1435,15 +1607,7 @@ class BinotelMonitorService {
   }
 
   async calculateCallTypeAnalytics(options = {}) {
-    await this.ensureSyncBoundaries(await this.store.syncState());
-    const listOptions = {
-      limit: this.config.maxStoredCalls || 5000,
-      query: options.query || "",
-      since: options.since || null
-    };
-    const result = typeof this.store.analytics === "function"
-      ? await this.store.analytics(listOptions)
-      : await this.store.list(listOptions);
+    const result = await this.analyticsSource(options);
     const providerCostsPromise = this.providerCostSnapshots(result.calls, options);
     const categoryMap = new Map();
     const questionMap = new Map();
@@ -1570,7 +1734,12 @@ class BinotelMonitorService {
       }
 
       for (const question of summary.customerQuestions || []) {
-        addCounter(questionMap, question.type, question.label);
+        const rawType = String(question && question.type || "").trim();
+        if (!rawType) {
+          continue;
+        }
+        const type = AiPrompts.normalizeCustomerQuestionType(rawType);
+        addCounter(questionMap, type, AiPrompts.customerQuestionLabel(type));
       }
 
       if (summary.escalation && summary.escalation.needed) {

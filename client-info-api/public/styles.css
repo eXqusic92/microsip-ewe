@@ -370,6 +370,10 @@ a {
   text-decoration: none;
 }
 
+.app-tabs a[hidden] {
+  display: none;
+}
+
 .app-tabs a:hover,
 .app-tabs a.active {
   background: var(--brand);
@@ -1683,6 +1687,12 @@ body[data-theme="dark"] .admin-tabs button.active {
   color: var(--brand-readable);
 }
 
+.admin-role-pill.is-department-head {
+  border-color: var(--state-info-border);
+  background: var(--state-info-bg);
+  color: var(--ink);
+}
+
 .admin-user-actions {
   display: flex;
   justify-content: flex-end;
@@ -2298,6 +2308,137 @@ body[data-theme="dark"] .admin-tabs button.active {
 
 .user-dialog {
   width: min(720px, calc(100% - 28px));
+}
+
+/* This control lives inside .account-dialog-body, whose general form rules
+ * intentionally make text fields full-width. Keep the checkbox list explicit
+ * here so those field styles can never turn it into a stack of giant inputs. */
+.admin-user-binotel-assignment {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 12px;
+}
+
+.admin-user-binotel-assignment[hidden] {
+  display: none;
+}
+
+.admin-user-binotel-assignment > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-user-binotel-assignment > div:first-child > strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.admin-user-binotel-assignment > div:first-child > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.admin-user-binotel-managers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.account-dialog-body .admin-user-binotel-option {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 48px;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.account-dialog-body .admin-user-binotel-option:hover {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--line));
+}
+
+.account-dialog-body .admin-user-binotel-option.is-unavailable {
+  border-style: dashed;
+}
+
+.account-dialog-body .admin-user-binotel-option:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+}
+
+.account-dialog-body .admin-user-binotel-option input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  display: block;
+  box-sizing: border-box;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  flex: 0 0 16px;
+  accent-color: var(--accent);
+}
+
+.account-dialog-body .admin-user-binotel-option input[type="checkbox"]:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.account-dialog-body .admin-user-binotel-option input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.account-dialog-body .admin-user-binotel-option > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  color: var(--ink);
+}
+
+.account-dialog-body .admin-user-binotel-option strong,
+.account-dialog-body .admin-user-binotel-option small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-dialog-body .admin-user-binotel-option strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.account-dialog-body .admin-user-binotel-option small,
+.admin-user-binotel-empty {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.admin-user-binotel-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 4px 2px;
 }
 
 .client-card {
@@ -5843,8 +5984,8 @@ body[data-theme="dark"] .ai-settings-page {
   --ai-field: var(--field);
   --ai-field-soft: var(--panel-soft);
   --ai-button-soft: var(--panel-soft);
-  --ai-control-contrast: var(--brand-ink);
-  --ai-control-text: var(--brand-ink);
+  --ai-control-contrast: var(--panel-soft);
+  --ai-control-text: var(--ink);
   --ai-swatch-border: var(--line-strong);
   --ai-switch-off: var(--line-strong);
   --ai-indigo: var(--brand);
@@ -6786,6 +6927,11 @@ body[data-theme="dark"] .ai-settings-page {
   height: auto;
 }
 
+.ai-terms-dialog {
+  width: min(92vw, 760px);
+  height: min(92vh, 720px);
+}
+
 .ai-soldly-dialog::backdrop {
   background: rgba(17, 24, 39, 0.54);
   backdrop-filter: blur(2px);
@@ -7238,6 +7384,125 @@ body[data-theme="dark"] .ai-settings-page {
   background: var(--ai-button-soft);
 }
 
+.ai-terms-intro,
+.ai-terms-help,
+.ai-terms-preview-caption {
+  margin: 0;
+  color: var(--ai-muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.ai-terms-intro code {
+  border-radius: 5px;
+  background: var(--ai-field-soft);
+  color: var(--ai-label);
+  padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.ai-terms-field {
+  margin-top: 16px;
+}
+
+.ai-terms-dialog .ai-terms-field textarea {
+  min-height: 210px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ai-terms-help {
+  margin-top: 8px;
+}
+
+.ai-terms-preview {
+  margin-top: 20px;
+  border-top: 1px solid var(--ai-line);
+  padding-top: 18px;
+}
+
+.ai-terms-preview-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-terms-preview-heading .section-label {
+  margin: 0 0 3px;
+}
+
+.ai-terms-preview h3 {
+  margin: 0;
+  color: var(--ai-text);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.ai-terms-preview-state {
+  flex: 0 0 auto;
+  max-width: 58%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ai-indigo) 11%, var(--ai-panel));
+  color: var(--ai-indigo);
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-terms-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  margin-top: 12px;
+  border: 1px solid var(--ai-line);
+  border-radius: 10px;
+  background: var(--ai-line);
+}
+
+.ai-terms-preview-item {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  min-height: 82px;
+  background: var(--ai-field);
+  padding: 11px 12px;
+}
+
+.ai-terms-preview-item > span,
+.ai-terms-preview-item small {
+  overflow: hidden;
+  color: var(--ai-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-terms-preview-item strong {
+  overflow: hidden;
+  color: var(--ai-text);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-terms-preview-caption {
+  margin-top: 10px;
+}
+
 @media (max-width: 1100px) {
   .ai-soldly-hero {
     align-items: flex-start;
@@ -7292,6 +7557,19 @@ body[data-theme="dark"] .ai-settings-page {
 
   .ai-settings-page {
     gap: 14px;
+  }
+
+  .ai-terms-dialog {
+    width: min(100vw - 20px, 760px);
+    height: min(94vh, 720px);
+  }
+
+  .ai-terms-dialog .ai-terms-field textarea {
+    min-height: 170px;
+  }
+
+  .ai-terms-preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .ai-soldly-tabs {
@@ -10522,6 +10800,10 @@ body[data-theme="dark"] .booking-action-confirm-button.is-ghost {
   }
 
   .account-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-binotel-managers {
     grid-template-columns: 1fr;
   }
 

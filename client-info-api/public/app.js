@@ -85,6 +85,7 @@ const elements = {
   profileMenuName: document.querySelector("#profile-menu-name"),
   profileMenuRole: document.querySelector("#profile-menu-role"),
   profileAdminOnly: document.querySelectorAll("[data-profile-admin-only]"),
+  teamAnalyticsOnly: document.querySelectorAll("[data-team-analytics-only]"),
   changePasswordButton: document.querySelector("#change-password-button"),
   logoutButton: document.querySelector("#logout-button"),
   changePasswordModal: document.querySelector("#change-password-modal"),
@@ -98,6 +99,7 @@ const elements = {
   changePasswordMessage: document.querySelector("#change-password-message"),
   emptyState: document.querySelector("#empty-state"),
   loadingState: document.querySelector("#loading-state"),
+  loadingMessage: document.querySelector("#loading-message"),
   clientCard: document.querySelector("#client-card"),
   monitorPage: document.querySelector("#calls-monitor-page"),
   callStatsPage: document.querySelector("#call-stats-page"),
@@ -175,6 +177,8 @@ const elements = {
   adminUserRole: document.querySelector("#admin-user-role"),
   adminUserPassword: document.querySelector("#admin-user-password"),
   adminUserPasswordLabel: document.querySelector("#admin-user-password-label"),
+  adminUserBinotelAssignment: document.querySelector("#admin-user-binotel-assignment"),
+  adminUserBinotelManagers: document.querySelector("#admin-user-binotel-managers"),
   adminUserMessage: document.querySelector("#admin-user-message"),
   callDetailPage: document.querySelector("#call-detail-page"),
   monitorStatus: document.querySelector("#monitor-status"),
@@ -269,6 +273,16 @@ const elements = {
   aiTypeCancel: document.querySelector("#ai-type-cancel"),
   aiTypeLabel: document.querySelector("#ai-type-label"),
   aiTypeDescription: document.querySelector("#ai-type-description"),
+  aiTermsModal: document.querySelector("#ai-terms-modal"),
+  aiTermsForm: document.querySelector("#ai-terms-modal-form"),
+  aiTermsClose: document.querySelector("#ai-terms-modal-close"),
+  aiTermsCancel: document.querySelector("#ai-terms-cancel"),
+  aiTermsInput: document.querySelector("#ai-terms-input"),
+  aiTermsPreviewState: document.querySelector("#ai-terms-preview-state"),
+  aiTermsPreviewGrid: document.querySelector("#ai-terms-preview-grid"),
+  aiTermsPreviewCaption: document.querySelector("#ai-terms-preview-caption"),
+  aiTermsFormMessage: document.querySelector("#ai-terms-form-message"),
+  aiTermsSubmit: document.querySelector("#ai-terms-submit"),
   monitorSearchForm: document.querySelector("#monitor-search"),
   monitorQuery: document.querySelector("#monitor-query"),
   monitorCallTypeFilter: document.querySelector("#monitor-call-type-filter"),
@@ -390,6 +404,7 @@ let detailPollTimer = null;
 let monitorPage = 1;
 let monitorPageSize = 10;
 let monitorTotalCalls = 0;
+let monitorListFingerprint = "";
 let currentUiState = "";
 let currentAdminMotionTab = "";
 let currentAiSettingsMotionTab = "";
@@ -430,7 +445,13 @@ const aiSettingsState = {
   pendingMetricDrag: null,
   suppressMetricClickUntil: 0,
   dirty: false,
-  saving: false
+  saving: false,
+  termsPreview: null,
+  termsPreviewError: "",
+  termsPreviewLoading: false,
+  termsPreviewRequestId: 0,
+  termsPreviewTimer: 0,
+  termsSaving: false
 };
 const AI_SCORE_NONE_VALUE = "__none";
 const AI_COLOR_PALETTE = [
@@ -478,6 +499,7 @@ const adminState = {
   users: [],
   loading: false,
   editingUserId: "",
+  binotelManagers: [],
   analysisNumbers: [],
   analysisNumbersLoading: false,
   analysisNumbersSaving: false,
@@ -525,8 +547,28 @@ function isAdminUser(user = authState.user) {
   return Boolean(user && user.role === "admin");
 }
 
+function isDepartmentHead(user = authState.user) {
+  return Boolean(user && user.role === "department_head");
+}
+
+function canEditAiFeedback(user = authState.user) {
+  return isAdminUser(user) || isDepartmentHead(user);
+}
+
+function canViewTeamAnalytics(user = authState.user) {
+  return isAdminUser(user) || isDepartmentHead(user);
+}
+
+function canModifyData(user = authState.user) {
+  return canEditAiFeedback(user);
+}
+
 function userRoleLabel(role) {
-  return role === "admin" ? "Адміністратор" : "Користувач";
+  return {
+    admin: "Адміністратор",
+    department_head: "Керівник відділу",
+    user: "Користувач"
+  }[role] || "Користувач";
 }
 
 function userInitial(user = authState.user) {
@@ -624,6 +666,11 @@ function renderProfileMenu() {
   for (const node of elements.profileAdminOnly || []) {
     node.hidden = !isAdminUser(user);
   }
+  for (const node of elements.teamAnalyticsOnly || []) {
+    node.hidden = !canViewTeamAnalytics(user);
+  }
+  elements.noteForm?.classList.toggle("hidden", !canModifyData(user));
+  elements.telegramCompose?.classList.toggle("hidden", !canModifyData(user));
 }
 
 async function loadAuthSession() {
@@ -1698,7 +1745,12 @@ async function loadAiSettingsPage(showLoading = true) {
 
 async function saveAiSettings(options = {}) {
   if (!aiSettingsState.settings || aiSettingsState.saving) {
-    return;
+    return {
+      ok: false,
+      error: aiSettingsState.saving
+        ? "Налаштування вже зберігаються."
+        : "AI-налаштування ще не завантажені."
+    };
   }
 
   const silent = Boolean(options.silent);
@@ -1724,8 +1776,10 @@ async function saveAiSettings(options = {}) {
     if (!silent) {
       setAiSettingsMessage("AI-налаштування оновлено.", "success");
     }
+    return { ok: true, payload };
   } catch (error) {
     setAiSettingsMessage(error.message, "danger");
+    return { ok: false, error: error.message };
   } finally {
     aiSettingsState.saving = false;
     updateAiSettingsChrome();
@@ -2236,6 +2290,308 @@ function closeAiTypeModal() {
   closeAiDialog(elements.aiTypeModal);
 }
 
+function aiTermsFromText(value) {
+  const terms = [];
+  const seen = new Set();
+
+  for (const line of String(value || "").split(/\r?\n/)) {
+    const term = line.trim().replace(/\s+/g, " ");
+    const key = term.toLocaleLowerCase("uk-UA");
+    if (!term || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    terms.push(term);
+  }
+
+  return terms;
+}
+
+function currentAiTermsDraft() {
+  return aiTermsFromText(elements.aiTermsInput && elements.aiTermsInput.value);
+}
+
+function formatAiTermsBytes(value) {
+  const bytes = Number(value || 0);
+  if (!Number.isFinite(bytes)) {
+    return "—";
+  }
+  if (bytes < 1024) {
+    return `${new Intl.NumberFormat("uk-UA").format(Math.round(bytes))} Б`;
+  }
+  return `${new Intl.NumberFormat("uk-UA", {
+    maximumFractionDigits: 1
+  }).format(bytes / 1024)} КБ`;
+}
+
+function formatAiTermsCostChange(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) {
+    return "—";
+  }
+  if (Math.abs(amount) < 0.0000005) {
+    return "без змін";
+  }
+  return `${amount > 0 ? "+" : "−"}${formatApiUsd(Math.abs(amount))}`;
+}
+
+function createAiTermsPreviewItem(label, value, detail = "") {
+  const item = document.createElement("div");
+  item.className = "ai-terms-preview-item";
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+  const valueElement = document.createElement("strong");
+  valueElement.textContent = value;
+  item.append(labelElement, valueElement);
+
+  if (detail) {
+    const detailElement = document.createElement("small");
+    detailElement.textContent = detail;
+    item.append(detailElement);
+  }
+
+  return item;
+}
+
+function renderAiTermsPreview() {
+  if (
+    !elements.aiTermsPreviewGrid ||
+    !elements.aiTermsPreviewState ||
+    !elements.aiTermsPreviewCaption
+  ) {
+    return;
+  }
+
+  const draftTerms = currentAiTermsDraft();
+  const preview = aiSettingsState.termsPreview;
+  const items = [
+    createAiTermsPreviewItem("Термінів", String(draftTerms.length))
+  ];
+
+  if (aiSettingsState.termsPreviewLoading) {
+    items.push(
+      createAiTermsPreviewItem("Контекст Soniox", "Рахуємо…"),
+      createAiTermsPreviewItem("Вартість", "Рахуємо…")
+    );
+    elements.aiTermsPreviewState.textContent = "Оновлюємо preview…";
+    elements.aiTermsPreviewCaption.textContent =
+      "Зіставляємо чернетку з фактичним Soniox usage за останні 30 днів.";
+  } else if (aiSettingsState.termsPreviewError) {
+    items.push(
+      createAiTermsPreviewItem("Контекст Soniox", "—"),
+      createAiTermsPreviewItem("Вартість", "—")
+    );
+    elements.aiTermsPreviewState.textContent = "Не вдалося прорахувати";
+    elements.aiTermsPreviewCaption.textContent = aiSettingsState.termsPreviewError;
+  } else if (!preview) {
+    items.push(
+      createAiTermsPreviewItem("Контекст Soniox", "—"),
+      createAiTermsPreviewItem("Вартість", "—")
+    );
+    elements.aiTermsPreviewState.textContent = "Очікуємо terms";
+    elements.aiTermsPreviewCaption.textContent =
+      "Preview з’явиться одразу після введення або відкриття списку.";
+  } else {
+    items[0] = createAiTermsPreviewItem(
+      "Термінів",
+      String(preview.termsCount || 0),
+      preview.currentTermsCount === preview.termsCount
+        ? "без змін"
+        : `було ${preview.currentTermsCount || 0}`
+    );
+    items.push(
+      createAiTermsPreviewItem(
+        "Контекст Soniox",
+        formatAiTermsBytes(preview.contextUtf8Bytes),
+        preview.contextEnabled
+          ? `було ${formatAiTermsBytes(preview.currentContextUtf8Bytes)}`
+          : "режим context вимкнений"
+      )
+    );
+
+    if (preview.usageAvailable && preview.estimate) {
+      items.push(
+        createAiTermsPreviewItem(
+          "Зміна / дзвінок",
+          formatAiTermsCostChange(preview.estimate.changeUsdPerCall),
+          `${new Intl.NumberFormat("uk-UA", {
+            maximumFractionDigits: 0
+          }).format(Number(preview.estimate.inputTextTokensPerCall || 0))} вхідних токенів`
+        ),
+        createAiTermsPreviewItem(
+          "Зміна / 30 днів",
+          formatAiTermsCostChange(preview.estimate.changeUsdForPeriod),
+          `${preview.history && preview.history.calls || 0} async-транскрипцій`
+        )
+      );
+
+      if (Number.isFinite(Number(preview.estimate.totalCostUsdForPeriod))) {
+        items.push(
+          createAiTermsPreviewItem(
+            "Усі витрати / 30 днів",
+            formatApiUsd(preview.estimate.totalCostUsdForPeriod),
+            "аудіо й output без змін"
+          )
+        );
+      }
+      elements.aiTermsPreviewState.textContent =
+        `За ${preview.history && preview.history.calls || 0} дзвінків / 30 днів`;
+    } else {
+      items.push(createAiTermsPreviewItem("Персональний прогноз", "Немає даних"));
+      elements.aiTermsPreviewState.textContent = preview.contextEnabled
+        ? "Потрібен Soniox usage"
+        : "Не надсилається";
+    }
+
+    elements.aiTermsPreviewCaption.textContent = preview.message || "";
+  }
+
+  elements.aiTermsPreviewGrid.replaceChildren(...items);
+}
+
+function scheduleAiTermsPreview(delay = 320) {
+  clearTimeout(aiSettingsState.termsPreviewTimer);
+  aiSettingsState.termsPreviewLoading = true;
+  aiSettingsState.termsPreviewError = "";
+  renderAiTermsPreview();
+  aiSettingsState.termsPreviewTimer = setTimeout(() => {
+    void refreshAiTermsPreview();
+  }, delay);
+}
+
+async function refreshAiTermsPreview() {
+  const requestId = ++aiSettingsState.termsPreviewRequestId;
+  const terms = currentAiTermsDraft();
+  aiSettingsState.termsPreviewLoading = true;
+  aiSettingsState.termsPreviewError = "";
+  renderAiTermsPreview();
+
+  try {
+    const response = await apiFetch(
+      "/api/ai-analysis-settings/transcription-terms-preview",
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ terms })
+      }
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || "Не вдалося прорахувати preview Soniox.");
+    }
+
+    if (requestId !== aiSettingsState.termsPreviewRequestId) {
+      return;
+    }
+    aiSettingsState.termsPreview = payload;
+  } catch (error) {
+    if (requestId !== aiSettingsState.termsPreviewRequestId) {
+      return;
+    }
+    aiSettingsState.termsPreview = null;
+    aiSettingsState.termsPreviewError = error.message;
+  } finally {
+    if (requestId === aiSettingsState.termsPreviewRequestId) {
+      aiSettingsState.termsPreviewLoading = false;
+      renderAiTermsPreview();
+    }
+  }
+}
+
+function setAiTermsSaving(saving) {
+  aiSettingsState.termsSaving = saving;
+  if (elements.aiTermsInput) {
+    elements.aiTermsInput.disabled = saving;
+  }
+  if (elements.aiTermsSubmit) {
+    elements.aiTermsSubmit.disabled = saving;
+  }
+  if (elements.aiTermsClose) {
+    elements.aiTermsClose.disabled = saving;
+  }
+  if (elements.aiTermsCancel) {
+    elements.aiTermsCancel.disabled = saving;
+  }
+}
+
+function openAiTermsModal() {
+  if (!aiSettingsState.settings || !elements.aiTermsModal || aiSettingsState.termsSaving) {
+    return;
+  }
+
+  const savedTerms = Array.isArray(aiSettingsState.settings.transcriptionTerms)
+    ? aiSettingsState.settings.transcriptionTerms
+    : [];
+  elements.aiTermsInput.value = savedTerms.join("\n");
+  aiSettingsState.termsPreview = null;
+  aiSettingsState.termsPreviewError = "";
+  setMessage(elements.aiTermsFormMessage, "");
+  showAiDialog(elements.aiTermsModal);
+  elements.aiTermsInput.focus();
+  scheduleAiTermsPreview(0);
+}
+
+function closeAiTermsModal() {
+  if (aiSettingsState.termsSaving) {
+    return;
+  }
+
+  clearTimeout(aiSettingsState.termsPreviewTimer);
+  aiSettingsState.termsPreviewRequestId += 1;
+  aiSettingsState.termsPreview = null;
+  aiSettingsState.termsPreviewError = "";
+  aiSettingsState.termsPreviewLoading = false;
+  setMessage(elements.aiTermsFormMessage, "");
+  closeAiDialog(elements.aiTermsModal);
+}
+
+async function saveAiTermsModal(event) {
+  event.preventDefault();
+  if (!aiSettingsState.settings || aiSettingsState.termsSaving) {
+    return;
+  }
+
+  const terms = currentAiTermsDraft();
+  const oversizedTerm = terms.find((term) => term.length > 160);
+  if (terms.length > 250) {
+    setMessage(elements.aiTermsFormMessage, "Можна вказати до 250 термінів.", "danger");
+    return;
+  }
+  if (oversizedTerm) {
+    setMessage(
+      elements.aiTermsFormMessage,
+      "Один термін не може бути довшим за 160 символів.",
+      "danger"
+    );
+    return;
+  }
+
+  setMessage(elements.aiTermsFormMessage, "");
+  aiSettingsState.settings.transcriptionTerms = terms;
+  markAiSettingsDirty();
+  setAiTermsSaving(true);
+
+  const result = await saveAiSettings({ silent: true });
+  setAiTermsSaving(false);
+  if (!result.ok) {
+    setMessage(
+      elements.aiTermsFormMessage,
+      result.error || "Не вдалося зберегти терміни.",
+      "danger"
+    );
+    return;
+  }
+
+  closeAiTermsModal();
+  setAiSettingsMessage(
+    "Терміни Soniox оновлено. Вони застосуються до наступних транскрипцій.",
+    "success"
+  );
+}
+
 function setProfileMenuOpen(open) {
   if (!elements.profileMenu || !elements.profileMenuPopover || !elements.profileMenuTrigger) {
     return;
@@ -2313,6 +2669,138 @@ function adminUserById(id) {
   return adminState.users.find((user) => user.id === id) || null;
 }
 
+function binotelManagerNumbersForUser(user = {}) {
+  return [...new Set(
+    (Array.isArray(user.binotelManagerNumbers) ? user.binotelManagerNumbers : [])
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+  )];
+}
+
+function binotelManagerLabel(number) {
+  const key = String(number || "").trim();
+  const manager = adminState.binotelManagers.find(
+    (item) => String(item.number || "").trim() === key
+  );
+  return manager && manager.label
+    ? manager.label
+    : key
+      ? `Внутрішній номер ${key}`
+      : "Менеджер не визначений";
+}
+
+function binotelManagerDetails(manager = {}) {
+  const number = String(manager.number || "").trim();
+  const title = binotelManagerLabel(number);
+  return [...new Set([
+    `вн. ${number}`,
+    String(manager.employeeName || "").trim(),
+    String(manager.pbxName || "").trim()
+  ].filter((item) => item && item !== title))].join(" · ");
+}
+
+function binotelManagerCandidates(selectedNumbers = []) {
+  const candidates = new Map();
+  for (const manager of adminState.binotelManagers) {
+    const number = String(manager && manager.number || "").trim();
+    if (number) {
+      candidates.set(number, manager);
+    }
+  }
+
+  for (const number of selectedNumbers) {
+    const key = String(number || "").trim();
+    if (!key || candidates.has(key)) {
+      continue;
+    }
+    candidates.set(key, {
+      number: key,
+      label: `Внутрішній номер ${key}`,
+      unavailable: true
+    });
+  }
+
+  return [...candidates.values()].sort((left, right) => {
+    const leftLabel = binotelManagerLabel(left && left.number);
+    const rightLabel = binotelManagerLabel(right && right.number);
+    return leftLabel.localeCompare(rightLabel, "uk", { sensitivity: "base" }) ||
+      String(left && left.number || "").localeCompare(String(right && right.number || ""));
+  });
+}
+
+function binotelManagerSummary(user = {}) {
+  const numbers = binotelManagerNumbersForUser(user);
+  if (!numbers.length) {
+    return "Не прив’язано";
+  }
+  return numbers.map(binotelManagerLabel).join(", ");
+}
+
+function selectedAdminUserBinotelManagerNumbers() {
+  return [
+    ...(elements.adminUserBinotelManagers?.querySelectorAll(
+      "input[name='admin-user-binotel-manager']:checked"
+    ) || [])
+  ]
+    .map((input) => String(input.value || "").trim())
+    .filter(Boolean);
+}
+
+function renderAdminUserBinotelAssignments(selectedNumbers = [], role = "user") {
+  const section = elements.adminUserBinotelAssignment;
+  const container = elements.adminUserBinotelManagers;
+  if (!section || !container) {
+    return;
+  }
+
+  const isRegularUser = role === "user";
+  section.hidden = !isRegularUser;
+  if (!isRegularUser) {
+    return;
+  }
+
+  const selected = new Set(
+    (Array.isArray(selectedNumbers) ? selectedNumbers : [])
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+  );
+  container.replaceChildren();
+  const managers = binotelManagerCandidates(selected);
+
+  if (!managers.length) {
+    const empty = document.createElement("p");
+    empty.className = "admin-user-binotel-empty";
+    empty.textContent = "Binotel-менеджерів ще не знайдено. Вони з’являться після синхронізації дзвінків.";
+    container.append(empty);
+    return;
+  }
+
+  for (const manager of managers) {
+    const number = String(manager.number || "").trim();
+    if (!number) {
+      continue;
+    }
+    const option = document.createElement("label");
+    option.className = `admin-user-binotel-option${manager.unavailable ? " is-unavailable" : ""}`;
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "admin-user-binotel-manager";
+    input.value = number;
+    input.checked = selected.has(number);
+    const content = document.createElement("span");
+    const label = document.createElement("strong");
+    const detail = document.createElement("small");
+    label.textContent = binotelManagerLabel(number);
+    label.title = label.textContent;
+    detail.textContent = manager.unavailable
+      ? `вн. ${number} · більше не доступний у Binotel`
+      : binotelManagerDetails(manager) || `вн. ${number}`;
+    content.append(label, detail);
+    option.append(input, content);
+    container.append(option);
+  }
+}
+
 function renderAdminUsers() {
   if (!elements.adminUsersList) {
     return;
@@ -2344,6 +2832,7 @@ function renderAdminUsers() {
 
   for (const user of users) {
     const isSelf = authState.user && authState.user.id === user.id;
+    const binotelSummary = user.role === "user" ? binotelManagerSummary(user) : "";
     const row = document.createElement("article");
     row.className = "admin-user-card";
     row.dataset.userId = user.id;
@@ -2351,12 +2840,13 @@ function renderAdminUsers() {
       <div class="admin-user-main">
         <strong>${escapeHtml(user.name || user.username)}</strong>
         <span>${escapeHtml(user.username || "")}${isSelf ? " · ви" : ""}</span>
+        ${user.role === "user" ? `<span title="Binotel: ${escapeHtml(binotelSummary)}">Binotel: ${escapeHtml(binotelSummary)}</span>` : ""}
       </div>
       <div class="admin-user-meta">
         <strong>${escapeHtml(formatDateTime(user.createdAt))}</strong>
         <span>Створено</span>
       </div>
-      <span class="admin-role-pill ${user.role === "admin" ? "is-admin" : ""}">
+      <span class="admin-role-pill ${user.role === "admin" ? "is-admin" : user.role === "department_head" ? "is-department-head" : ""}">
         ${escapeHtml(userRoleLabel(user.role))}
       </span>
       <div class="admin-user-actions">
@@ -2752,11 +3242,33 @@ async function loadAdminUsers() {
   renderAdminUsers();
 
   try {
-    const response = await apiFetch("/api/admin/users");
-    const payload = await readJsonResponse(response, "Не вдалося завантажити користувачів.");
-    adminState.users = Array.isArray(payload.users) ? payload.users : [];
-    setMessage(elements.adminUsersMessage, "", "neutral");
+    const usersResponse = await apiFetch("/api/admin/users");
+    const usersPayload = await readJsonResponse(
+      usersResponse,
+      "Не вдалося завантажити користувачів."
+    );
+    adminState.users = Array.isArray(usersPayload.users) ? usersPayload.users : [];
+
+    try {
+      const managersResponse = await apiFetch("/api/admin/binotel-managers");
+      const managersPayload = await readJsonResponse(
+        managersResponse,
+        "Не вдалося завантажити менеджерів Binotel."
+      );
+      adminState.binotelManagers = Array.isArray(managersPayload.managers)
+        ? managersPayload.managers
+        : [];
+      setMessage(elements.adminUsersMessage, "", "neutral");
+    } catch (error) {
+      adminState.binotelManagers = [];
+      setMessage(
+        elements.adminUsersMessage,
+        "Користувачів завантажено, але список менеджерів Binotel тимчасово недоступний.",
+        "neutral"
+      );
+    }
   } catch (error) {
+    adminState.binotelManagers = [];
     setMessage(elements.adminUsersMessage, error.message || "Не вдалося завантажити користувачів.");
   } finally {
     adminState.loading = false;
@@ -3434,8 +3946,14 @@ function openAdminUserModal(user = null) {
   elements.adminUserId.value = user ? user.id : "";
   elements.adminUserUsername.value = user ? user.username || "" : "";
   elements.adminUserName.value = user ? user.name || "" : "";
-  elements.adminUserRole.value = user && user.role === "admin" ? "admin" : "user";
+  elements.adminUserRole.value = user && ["admin", "department_head"].includes(user.role)
+    ? user.role
+    : "user";
   syncCustomSelect(elements.adminUserRole);
+  renderAdminUserBinotelAssignments(
+    user ? binotelManagerNumbersForUser(user) : [],
+    elements.adminUserRole.value
+  );
   elements.adminUserPassword.value = "";
   elements.adminUserPassword.required = !user;
   elements.adminUserPasswordLabel.textContent = user ? "Новий пароль" : "Пароль";
@@ -3460,7 +3978,10 @@ async function handleAdminUserSubmit(event) {
   const payload = {
     username: elements.adminUserUsername.value,
     name: elements.adminUserName.value,
-    role: elements.adminUserRole.value
+    role: elements.adminUserRole.value,
+    binotelManagerNumbers: elements.adminUserRole.value === "user"
+      ? selectedAdminUserBinotelManagerNumbers()
+      : []
   };
   if (!userId || password) {
     payload.password = password;
@@ -3686,7 +4207,9 @@ function handleAiSettingsClick(event) {
   }
 
   const { aiAction, key, kind, color } = actionButton.dataset;
-  if (aiAction === "create-call-type") {
+  if (aiAction === "open-transcription-terms") {
+    openAiTermsModal();
+  } else if (aiAction === "create-call-type") {
     addAiCallType(kind);
   } else if (aiAction === "toggle-show-inactive") {
     aiSettingsState.showInactive = !aiSettingsState.showInactive;
@@ -4415,6 +4938,16 @@ function routeState(pathname = window.location.pathname) {
   return "card";
 }
 
+const LOADING_MESSAGES = {
+  card: "Завантажуємо картку клієнта…",
+  monitor: "Завантажуємо дзвінки…",
+  callStats: "Завантажуємо статистику дзвінків…",
+  analytics: "Завантажуємо AI-аналітику…",
+  aiSettings: "Завантажуємо AI-налаштування…",
+  admin: "Завантажуємо адмін-панель…",
+  detail: "Завантажуємо деталі дзвінка…"
+};
+
 function syncDetailPanelHeights() {
   const grid = document.querySelector(".call-detail-grid");
   if (!grid) {
@@ -4438,6 +4971,11 @@ function syncDetailPanelHeights() {
 }
 
 function setState(state) {
+  const navState = state === "loading" ? routeState() : state;
+  if (state === "loading" && elements.loadingMessage) {
+    elements.loadingMessage.textContent = LOADING_MESSAGES[navState] || "Завантажуємо дані…";
+  }
+
   elements.emptyState.classList.toggle("hidden", state !== "empty");
   elements.loadingState.classList.toggle("hidden", state !== "loading");
   elements.clientCard.classList.toggle("hidden", state !== "card");
@@ -4459,7 +4997,6 @@ function setState(state) {
     admin: "Адмінка",
     detail: "Деталі дзвінка"
   };
-  const navState = state === "loading" ? routeState() : state;
   const pageTitle = state === "loading" && titles[navState]
     ? titles[navState]
     : titles[state] || "Картка клієнта";
@@ -6255,17 +6792,20 @@ function renderTelegramMessages(messages, accountId = selectedTelegramAccountId)
     }
     const footer = document.createElement("div");
     footer.className = "telegram-bubble-footer";
-    const replyButton = document.createElement("button");
-    replyButton.className = "telegram-reply-button";
-    replyButton.type = "button";
-    replyButton.dataset.telegramReplyId = String(message.id || "");
-    replyButton.setAttribute("aria-label", "Відповісти");
-    replyButton.title = "Відповісти";
-    replyButton.innerHTML = aiIcon("reply");
     const time = document.createElement("time");
     time.dateTime = message.sentAt || "";
     time.textContent = message.sentAt ? formatDateTime(message.sentAt) : "";
-    footer.append(replyButton, time);
+    if (canModifyData()) {
+      const replyButton = document.createElement("button");
+      replyButton.className = "telegram-reply-button";
+      replyButton.type = "button";
+      replyButton.dataset.telegramReplyId = String(message.id || "");
+      replyButton.setAttribute("aria-label", "Відповісти");
+      replyButton.title = "Відповісти";
+      replyButton.innerHTML = aiIcon("reply");
+      footer.append(replyButton);
+    }
+    footer.append(time);
     bubble.append(footer);
     elements.telegramChat.append(bubble);
   }
@@ -6943,7 +7483,7 @@ function renderNotes(notes) {
     item.dataset.noteId = note.id || "";
 
     const isEditing = sameNoteId(editingNoteId, note.id);
-    const editable = isEditableNote(note);
+    const editable = canModifyData() && isEditableNote(note);
 
     if (isEditing) {
       item.classList.add("is-editing");
@@ -7037,6 +7577,9 @@ function appendCurrentNote(note) {
 }
 
 async function saveNoteEdit(noteId, textarea) {
+  if (!canModifyData()) {
+    return;
+  }
   const nextText = String(textarea && textarea.value || "").trim();
   if (!nextText) {
     setNoteFormMessage("Примітка не може бути пустою.");
@@ -7071,6 +7614,9 @@ async function saveNoteEdit(noteId, textarea) {
 }
 
 async function deleteNote(noteId) {
+  if (!canModifyData()) {
+    return;
+  }
   setNoteFormMessage("Видаляємо…", "neutral");
 
   try {
@@ -7339,6 +7885,9 @@ async function reloadCurrentViber() {
 
 async function handleTelegramSend(event) {
   event.preventDefault();
+  if (!canModifyData()) {
+    return;
+  }
   if (!currentCard || !selectedTelegramAccountId) {
     return;
   }
@@ -9457,6 +10006,53 @@ async function loadCallStatsPage(showLoading = true) {
   }
 }
 
+function monitorCallDisplaySnapshot(call = {}) {
+  const ai = call.ai || {};
+  const summary = ai.summary || {};
+  const escalation = summary.escalation || {};
+  const churnRisk = summary.churnRisk || {};
+
+  return {
+    id: callId(call),
+    externalNumber: String(call.externalNumber || ""),
+    type: String(call.type || ""),
+    typeLabel: String(call.typeLabel || ""),
+    disposition: String(call.disposition || ""),
+    dispositionLabel: String(call.dispositionLabel || ""),
+    recordable: call.recordable !== false,
+    startedAt: String(call.startedAt || ""),
+    billSec: Number(call.billSec || 0),
+    employeeName: String(call.employee && call.employee.name || ""),
+    pbxNumberName: String(call.pbxNumber && call.pbxNumber.name || ""),
+    aiStatus: String(ai.status || ""),
+    aiTerminalFailure: Boolean(ai.terminalFailure),
+    callType: String(summary.callType || ""),
+    callTypeLabel: String(summary.callTypeLabel || ""),
+    escalation: {
+      needed: Boolean(escalation.needed),
+      level: String(escalation.level || ""),
+      department: String(escalation.department || ""),
+      reason: String(escalation.reason || "")
+    },
+    churnRisk: {
+      level: String(churnRisk.level || ""),
+      reason: String(churnRisk.reason || "")
+    }
+  };
+}
+
+function monitorCallsFingerprint(payload, calls, total, limit, offset) {
+  return JSON.stringify({
+    total,
+    limit,
+    offset,
+    maxStoredCalls: Number(payload && payload.maxStoredCalls) || 0,
+    historyLimited: Boolean(payload && payload.historyLimited),
+    managerAssignmentMissing: Boolean(payload && payload.managerAssignmentMissing),
+    calls: calls.map(monitorCallDisplaySnapshot)
+  });
+}
+
 function renderMonitorCalls(payload) {
   const calls = Array.isArray(payload && payload.calls) ? payload.calls : [];
   const total = Number(payload && payload.total) || 0;
@@ -9472,25 +10068,42 @@ function renderMonitorCalls(payload) {
   const totalPages = Math.max(1, Math.ceil(total / Math.max(1, limit)));
   if (total > 0 && monitorPage > totalPages) {
     monitorPage = totalPages;
+    monitorListFingerprint = "";
     loadMonitor(false);
     return;
   }
+
+  const fingerprint = monitorCallsFingerprint(payload, calls, total, limit, offset);
+  if (
+    fingerprint === monitorListFingerprint &&
+    elements.monitorList.childElementCount
+  ) {
+    return;
+  }
+  monitorListFingerprint = fingerprint;
+
   elements.monitorList.replaceChildren();
   const maxStoredCalls = Number(payload && payload.maxStoredCalls) || 0;
   const historyLimited = Boolean(payload && payload.historyLimited);
+  const managerAssignmentMissing = Boolean(
+    payload && payload.managerAssignmentMissing
+  );
   const displayedTotal = total || calls.length;
   const countPrefix = historyLimited && maxStoredCalls > 0 && displayedTotal >= maxStoredCalls
     ? `останні ${displayedTotal}`
     : `${displayedTotal}`;
   elements.monitorCountLabel.textContent =
-    `${countPrefix} дзвінків у локальній історії`;
+    managerAssignmentMissing
+      ? "Прив’язка до Binotel ще не налаштована"
+      : `${countPrefix} дзвінків у локальній історії`;
 
   if (!calls.length) {
     const message = document.createElement("p");
     message.className = "no-data";
-    message.textContent = "У локальній історії дзвінків ще немає.";
+    message.textContent = managerAssignmentMissing
+      ? "Адміністратор ще не прив’язав ваш обліковий запис до менеджера Binotel."
+      : "У локальній історії дзвінків ще немає.";
     elements.monitorList.append(message);
-    stageMotionItems(elements.monitorList, ":scope > .no-data", { maxIndex: 0 });
     renderMonitorPagination();
     return;
   }
@@ -9498,7 +10111,6 @@ function renderMonitorCalls(payload) {
   for (const call of calls) {
     appendMonitorCall(elements.monitorList, call);
   }
-  stageMotionItems(elements.monitorList, ":scope > .monitor-call-link", { maxIndex: 8 });
 
   renderMonitorPagination();
 }
@@ -9565,7 +10177,6 @@ function renderMonitorPagination() {
     });
     elements.monitorPageNumbers.append(button);
   }
-  stageMotionItems(elements.monitorPageNumbers, ":scope > .monitor-page-button", { maxIndex: 6 });
 }
 
 function isEscalationProblem(escalation) {
@@ -10034,18 +10645,21 @@ function createQualityMetricElement(metric) {
 
   const actions = document.createElement("div");
   actions.className = "quality-metric-actions";
-  const feedbackButton = document.createElement("button");
-  feedbackButton.className = "quality-feedback-button";
-  feedbackButton.type = "button";
-  feedbackButton.dataset.metricFeedbackAction = "open";
-  feedbackButton.dataset.metricKey = metric.metricKey || "";
-  feedbackButton.setAttribute(
-    "aria-label",
-    feedback ? "Редагувати примітку до метрики" : "Додати примітку до метрики"
-  );
-  feedbackButton.title = feedback ? "Редагувати примітку" : "Додати примітку";
-  feedbackButton.innerHTML = aiIcon("edit");
-  actions.append(score, feedbackButton);
+  actions.append(score);
+  if (canEditAiFeedback()) {
+    const feedbackButton = document.createElement("button");
+    feedbackButton.className = "quality-feedback-button";
+    feedbackButton.type = "button";
+    feedbackButton.dataset.metricFeedbackAction = "open";
+    feedbackButton.dataset.metricKey = metric.metricKey || "";
+    feedbackButton.setAttribute(
+      "aria-label",
+      feedback ? "Редагувати примітку до метрики" : "Додати примітку до метрики"
+    );
+    feedbackButton.title = feedback ? "Редагувати примітку" : "Додати примітку";
+    feedbackButton.innerHTML = aiIcon("edit");
+    actions.append(feedbackButton);
+  }
 
   header.append(titleWrap, actions);
   item.append(header);
@@ -10329,6 +10943,9 @@ function setMetricFeedbackMessage(message, tone = "") {
 }
 
 function openMetricFeedbackModal(metricKey) {
+  if (!canEditAiFeedback()) {
+    return;
+  }
   const metric = currentDetailMetricByKey(metricKey);
   if (!metric || !currentDetailCall) {
     return;
@@ -10383,6 +11000,9 @@ function closeMetricFeedbackModal() {
 
 async function saveMetricFeedback(event) {
   event.preventDefault();
+  if (!canEditAiFeedback()) {
+    return;
+  }
   const callId = metricFeedbackState.callId;
   const metricKey = metricFeedbackState.metricKey;
   const text = String(elements.metricFeedbackText?.value || "").trim();
@@ -10440,6 +11060,9 @@ async function saveMetricFeedback(event) {
 }
 
 async function deleteMetricFeedback(anchor = null) {
+  if (!canEditAiFeedback()) {
+    return;
+  }
   const callId = metricFeedbackState.callId;
   const metricKey = metricFeedbackState.metricKey;
   if (!callId || !metricKey || metricFeedbackState.saving || metricFeedbackState.deleting) {
@@ -10867,6 +11490,14 @@ function updateDetailReanalyzeButton(call, ai) {
     return;
   }
 
+  const canEdit = canEditAiFeedback();
+  elements.detailReanalyzeAi.classList.toggle("hidden", !canEdit);
+  if (!canEdit) {
+    elements.detailReanalyzeAi.disabled = true;
+    elements.detailReanalyzeAi.dataset.loading = "false";
+    return;
+  }
+
   const status = ai && ai.status;
   const isRunning = status === "queued" || status === "processing";
   const canAnalyze = Boolean(call && call.recordable);
@@ -11231,6 +11862,7 @@ async function loadMonitor(showLoading = true, preservePlayback = false) {
   } catch (error) {
     setState("monitor");
     if (!(preservePlayback && isMonitorAudioActive())) {
+      monitorListFingerprint = "";
       elements.monitorList.replaceChildren();
       const message = document.createElement("p");
       message.className = "no-data";
@@ -11431,6 +12063,10 @@ elements.aiMetricModalClose.addEventListener("click", closeAiMetricModal);
 elements.aiMetricCancel.addEventListener("click", closeAiMetricModal);
 elements.aiTypeModalClose.addEventListener("click", closeAiTypeModal);
 elements.aiTypeCancel.addEventListener("click", closeAiTypeModal);
+elements.aiTermsForm.addEventListener("submit", saveAiTermsModal);
+elements.aiTermsInput.addEventListener("input", () => scheduleAiTermsPreview());
+elements.aiTermsClose.addEventListener("click", closeAiTermsModal);
+elements.aiTermsCancel.addEventListener("click", closeAiTermsModal);
 
 elements.aiMetricModal.addEventListener("click", (event) => {
   if (event.target === elements.aiMetricModal) {
@@ -11442,6 +12078,17 @@ elements.aiTypeModal.addEventListener("click", (event) => {
   if (event.target === elements.aiTypeModal) {
     closeAiTypeModal();
   }
+});
+
+elements.aiTermsModal.addEventListener("click", (event) => {
+  if (event.target === elements.aiTermsModal) {
+    closeAiTermsModal();
+  }
+});
+
+elements.aiTermsModal.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeAiTermsModal();
 });
 
 elements.monitorPageSize.addEventListener("change", () => {
@@ -11512,6 +12159,7 @@ document.addEventListener("keydown", (event) => {
     closeManagerRatingModal();
     closeMetricFeedbackModal();
     closeMetricPromptModal();
+    closeAiTermsModal();
   }
 });
 
@@ -11537,6 +12185,12 @@ elements.adminTelegramForm?.addEventListener("submit", handleAdminTelegramSubmit
 elements.adminTelegramList?.addEventListener("click", handleAdminTelegramClick);
 elements.adminTelegramList?.addEventListener("submit", handleAdminTelegramConfirm);
 elements.adminUserForm?.addEventListener("submit", handleAdminUserSubmit);
+elements.adminUserRole?.addEventListener("change", () => {
+  renderAdminUserBinotelAssignments(
+    selectedAdminUserBinotelManagerNumbers(),
+    elements.adminUserRole.value
+  );
+});
 elements.adminUserClose?.addEventListener("click", closeAdminUserModal);
 elements.adminUserCancel?.addEventListener("click", closeAdminUserModal);
 elements.adminUserModal?.addEventListener("click", (event) => {
@@ -11663,6 +12317,9 @@ elements.metricPromptModal?.addEventListener("click", (event) => {
 });
 
 elements.notesList.addEventListener("click", async (event) => {
+  if (!canModifyData()) {
+    return;
+  }
   const button = event.target.closest("[data-note-action]");
   if (!button) {
     return;
@@ -11713,6 +12370,9 @@ elements.notesList.addEventListener("click", async (event) => {
 
 elements.noteForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!canModifyData()) {
+    return;
+  }
   const noteText = elements.noteText.value.trim();
 
   if (!noteText || !currentPhone) {

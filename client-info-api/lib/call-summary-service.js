@@ -37,6 +37,41 @@ function storedTranscriptionProvider(entry) {
   return model.startsWith("soniox:") ? "soniox" : "openai";
 }
 
+async function configuredTranscriptionContextVersion(
+  config,
+  transcriptionClient,
+  contextSnapshot = null
+) {
+  if (configuredTranscriptionProvider(config) !== "soniox") {
+    return "";
+  }
+
+  if (
+    contextSnapshot &&
+    Object.prototype.hasOwnProperty.call(contextSnapshot, "version")
+  ) {
+    return text(contextSnapshot.version);
+  }
+
+  if (
+    transcriptionClient &&
+    typeof transcriptionClient.contextVersion === "function"
+  ) {
+    return text(await transcriptionClient.contextVersion());
+  }
+
+  return text(config && config.soniox && config.soniox.contextVersion);
+}
+
+async function hasCurrentTranscriptionContext(entry, config, transcriptionClient) {
+  const contextVersion = await configuredTranscriptionContextVersion(
+    config,
+    transcriptionClient
+  );
+  return !contextVersion ||
+    text(entry && entry.transcription && entry.transcription.contextVersion) === contextVersion;
+}
+
 function isCurrentAnalysisProfile(entry, analysisProfile) {
   const semanticRevision = text(analysisProfile && analysisProfile.semanticRevision);
   const entrySemanticRevision = text(
@@ -392,6 +427,11 @@ class CallSummaryService {
       };
     }
 
+    const refreshTranscription = !(await hasCurrentTranscriptionContext(
+      existing,
+      this.config,
+      this.transcriptionClient
+    ));
     const entry = await this.store.upsert(callId, {
       status: "queued",
       stage: "queued",
@@ -414,11 +454,13 @@ class CallSummaryService {
         ...(existing && existing.transcription ? existing.transcription : {}),
         provider: configuredTranscriptionProvider(this.config)
       },
-      message: "Повторний AI-аналіз поставлено в чергу.",
+      message: refreshTranscription
+        ? "Повторну транскрипцію та AI-аналіз поставлено в чергу."
+        : "Повторний AI-аналіз поставлено в чергу.",
       error: ""
     });
 
-    this.start(phone, call);
+    this.start(phone, call, { refreshTranscription });
     return publicEntry(entry, call, analysisProfile);
   }
 
@@ -487,14 +529,14 @@ class CallSummaryService {
     };
   }
 
-  start(phone, call) {
+  start(phone, call, options = {}) {
     const callId = String(call.generalCallId);
     if (this.running.has(callId)) {
       return;
     }
 
     this.running.add(callId);
-    this.process(phone, call)
+    this.process(phone, call, options)
       .catch((error) => {
         console.error(`AI call summary failed for ${callId}: ${error.message}`);
       })
@@ -503,7 +545,7 @@ class CallSummaryService {
       });
   }
 
-  async process(phone, call) {
+  async process(phone, call, options = {}) {
     const callId = String(call.generalCallId);
     const existing = await this.store.get(callId);
     const analysisProfile = this.openAiClient &&
@@ -540,12 +582,22 @@ class CallSummaryService {
     });
 
     try {
-      let transcript = storedTranscript(existing, this.config);
+      let transcript = options.refreshTranscription
+        ? null
+        : storedTranscript(existing, this.config);
       let audio = null;
       let preparedAudio = null;
       let clientContext = null;
+      let transcriptionContextSnapshot = null;
 
       if (!transcript) {
+        if (
+          this.transcriptionClient &&
+          typeof this.transcriptionClient.contextSnapshot === "function"
+        ) {
+          transcriptionContextSnapshot =
+            await this.transcriptionClient.contextSnapshot();
+        }
         audio = this.recordingCache
           ? await this.recordingCache.getAudio(callId)
           : await this.fetchRecording(callId);
@@ -555,7 +607,8 @@ class CallSummaryService {
           {
             originalAudio: audio,
             callDurationSec: Number(call.billSec || 0),
-            callId
+            callId,
+            contextSnapshot: transcriptionContextSnapshot
           }
         );
 
@@ -580,6 +633,11 @@ class CallSummaryService {
           transcription: {
             provider:
               transcript.provider || configuredTranscriptionProvider(this.config),
+            contextVersion: await configuredTranscriptionContextVersion(
+              this.config,
+              this.transcriptionClient,
+              transcriptionContextSnapshot
+            ),
             language: transcript.language,
             temperature: transcript.temperature,
             quality: transcript.quality || null

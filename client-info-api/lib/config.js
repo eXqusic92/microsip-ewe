@@ -360,6 +360,8 @@ module.exports = {
       ["none", "minimal", "full"],
       "minimal"
     ),
+    contextVersion:
+      process.env.SONIOX_CONTEXT_VERSION || "20260710-stations-v1",
     languageHints: parseCsv(process.env.SONIOX_LANGUAGE_HINTS, [
       "uk",
       "ru",

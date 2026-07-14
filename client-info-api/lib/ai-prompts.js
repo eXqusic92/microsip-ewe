@@ -76,6 +76,15 @@ const CUSTOMER_QUESTION_LABELS = [
   "Інше"
 ];
 
+const CUSTOMER_QUESTION_LABEL_BY_TYPE = Object.freeze(
+  Object.fromEntries(
+    CUSTOMER_QUESTION_TYPES.map((type, index) => [
+      type,
+      CUSTOMER_QUESTION_LABELS[index]
+    ])
+  )
+);
+
 const OPERATOR_EVALUATION_CRITERIA = [
   {
     key: "greeting",
@@ -252,6 +261,7 @@ const SUMMARY_SCHEMA = {
     },
     customerQuestions: {
       type: "array",
+      maxItems: 1,
       items: {
         type: "object",
         additionalProperties: false,
@@ -414,6 +424,36 @@ function compactSchemaForModel(value) {
 
 function text(value) {
   return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function normalizeCustomerQuestionType(value) {
+  const type = text(value);
+  return Object.prototype.hasOwnProperty.call(CUSTOMER_QUESTION_LABEL_BY_TYPE, type)
+    ? type
+    : "other";
+}
+
+function customerQuestionLabel(type) {
+  return CUSTOMER_QUESTION_LABEL_BY_TYPE[normalizeCustomerQuestionType(type)];
+}
+
+function normalizeCustomerQuestions(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((question) => {
+      const rawType = text(question && question.type);
+      if (!rawType) {
+        return null;
+      }
+
+      const type = normalizeCustomerQuestionType(rawType);
+      return {
+        type,
+        label: customerQuestionLabel(type),
+        evidence: text(question && question.evidence)
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 1);
 }
 
 function finiteNumber(value, fallback = null) {
@@ -630,11 +670,36 @@ function buildSummarySchema(profileOrSettings) {
   return schema;
 }
 
+const TRANSCRIPTION_PRIORITY_TERMS = [
+  "Стрийський автовокзал",
+  "автовокзал на Стрийській"
+];
+
+// This is the compact vocabulary sent with SONIOX_CONTEXT_MODE=minimal.
+// Administrators may override it in AI settings without making the generic
+// Soniox context unnecessarily large.
+const TRANSCRIPTION_DEFAULT_TERMS = [
+  "DUMA",
+  "East West Eurolines",
+  "Іст Вест Євролайнс",
+  "EWE",
+  ...TRANSCRIPTION_PRIORITY_TERMS,
+  "бронювання",
+  "викуп",
+  "перенесення",
+  "повернення",
+  "скасування",
+  "посадка",
+  "автовокзал",
+  "АС"
+];
+
 const DOMAIN_TERMS = [
   "DUMA",
   "East West Eurolines",
   "Іст Вест Євролайнс",
   "EWE",
+  ...TRANSCRIPTION_PRIORITY_TERMS,
   "Львів",
   "Варшава",
   "Краків",
@@ -667,15 +732,26 @@ const DOMAIN_TERMS = [
   "зупинка"
 ];
 
-const TRANSCRIPTION_DOMAIN_PROMPT = `
+function buildTranscriptionDomainPrompt(terms = DOMAIN_TERMS) {
+  const vocabulary = Array.isArray(terms)
+    ? terms.map((term) => String(term || "").trim()).filter(Boolean)
+    : DOMAIN_TERMS;
+  const vocabularyLine = vocabulary.length
+    ? vocabulary.join(", ")
+    : "немає додаткового словника";
+
+  return `
 Це запис телефонної розмови автобусної компанії DUMA / East West Eurolines.
 East West Eurolines - це назва компанії/бренду, не ім'я пасажира і не маршрут.
 Розмова переважно українською, іноді російською або англійською.
 Важливі слова і власні назви, які треба розпізнавати особливо уважно:
-${DOMAIN_TERMS.join(", ")}.
+${vocabularyLine}.
 Типові теми: рейси, бронювання, квитки, дати поїздки, час відправлення, місця,
 маршрути між містами, повернення, скасування, багаж, посадка, зупинки.
 `.trim();
+}
+
+const TRANSCRIPTION_DOMAIN_PROMPT = buildTranscriptionDomainPrompt();
 
 const CLIENT_CONTEXT_PROMPT = `
 Контекст картки клієнта:
@@ -740,6 +816,7 @@ const COMPACT_EVALUATION_GUARDRAILS_PROMPT = `
 - Для вибору варіанту користуйся тільки інструкціями конкретної metric і її option нижче. Загальні guardrails не замінюють Soldly-інструкції.
 - Для документів, дітей, тварин, багажу, митниці та кордону не вигадуй юридичних гарантій; добре, коли оператор говорить обережно або скеровує до офіційного джерела.
 - Якщо запис дуже короткий, ролі спікерів неясні або ASR слабкий, знижуй confidence і став null там, де фактично немає доказів.
+- reason, evidence та improvement пиши лише як самодостатні, завершені фрази. Якщо evidence містить цитату з дзвінка, цитуй тільки повне речення або завершену репліку; ніколи не обривай її посеред фрази. Якщо повна цитата задовга, передай зміст коротким завершеним перефразуванням.
 `.trim();
 
 const CALL_SUMMARY_SYSTEM_PROMPT = `
@@ -810,7 +887,7 @@ ${SALES_SCRIPT_PROMPT}
 - escalation.level: none, low, medium або high. high лише для гострих скарг, ризику втрати клієнта, небезпечної ситуації, грошей або повторної невирішеної проблеми.
 - escalation.department: dispatcher, quality, manager, accounting, technical, driver, other або null.
 - churnRisk.level: low, medium, high або unknown. Став high, якщо клієнт явно злий, погрожує скаргою/відмовою, повторно дзвонить щодо невирішеної проблеми або просить повернення через сервісну проблему.
-- customerQuestions - тільки 1 головне питання клієнта. Якщо питань не було, поверни порожній масив. Обирай type/label із цього списку:
+- customerQuestions - тільки 1 головне питання клієнта. Якщо питань не було, поверни порожній масив. type і label мають бути точною парою з цього списку: не підбирай label окремо й не змінюй його формулювання.
 ${CUSTOMER_QUESTION_TYPES.map((type, index) => `  - ${type} / "${CUSTOMER_QUESTION_LABELS[index]}"`).join("\n")}
 
 Оцінка якості оператора:
@@ -1171,7 +1248,7 @@ ${COMPACT_EVALUATION_GUARDRAILS_PROMPT}
 Заповни лише JSON schema: короткий підсумок, головне питання, наступну дію, ескалацію, ризик, ролі та enabled metrics цього типу. Бекенд сам додасть тип, профіль і технічні дані option.
 
 Для кожної metric обери рівно один optionKey тільки за її описом. Для customEvaluation.metrics повертай тільки metricKey, selectedOptionKey, evidence, improvement, confidence.
-Текст українською: summary до 160 символів; reason/evidence/improvement і customEvaluation.summary до 110 символів; null замість формальних пояснень. Не повторюй тип у summary.
+Текст українською: summary до 160 символів; reason/evidence/improvement і customEvaluation.summary до 110 символів; null замість формальних пояснень. evidence має бути завершеним реченням або завершеною реплікою; якщо повна цитата не вміщується, коротко перефразуй її завершеним реченням, але не обривай цитату посеред фрази. Не повторюй тип у summary.
 
 Метрики:
 ${metrics.length
@@ -1437,6 +1514,7 @@ function enrichCallEvaluation(rawSummary, profileOrSettings, callTypeKey, classi
     ...(rawSummary || {}),
     callType: callType.key,
     callTypeLabel: callType.label,
+    customerQuestions: normalizeCustomerQuestions(rawSummary && rawSummary.customerQuestions),
     callTypeConfidence: finiteNumber(
       classification && classification.confidence,
       finiteNumber(rawSummary && rawSummary.callTypeConfidence, 0.7)
@@ -1501,13 +1579,18 @@ module.exports = {
   CALL_TYPE_LABELS,
   CALL_TYPES,
   CLIENT_CONTEXT_PROMPT,
+  buildTranscriptionDomainPrompt,
+  customerQuestionLabel,
   CUSTOMER_QUESTION_LABELS,
   CUSTOMER_QUESTION_TYPES,
   DOMAIN_TERMS,
   enrichCallEvaluation,
   findAnalysisCallType,
+  normalizeCustomerQuestionType,
   OPERATOR_EVALUATION_CRITERIA,
   SALES_SCRIPT_PROMPT,
   SUMMARY_SCHEMA,
-  TRANSCRIPTION_DOMAIN_PROMPT
+  TRANSCRIPTION_DEFAULT_TERMS,
+  TRANSCRIPTION_DOMAIN_PROMPT,
+  TRANSCRIPTION_PRIORITY_TERMS
 };

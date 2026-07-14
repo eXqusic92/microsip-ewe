@@ -941,6 +941,164 @@ class PostgresAiAnalysisSettingsStore {
     return this.getPublicSettings();
   }
 
+  async updateMetricPrompt(
+    value,
+    target = {},
+    expectedRevision = "",
+    beforeCommit = null
+  ) {
+    await this.load();
+
+    const settings = normalizeAiAnalysisSettings(value);
+    const callTypeKey = text(target.callTypeKey);
+    const metricKey = text(target.metricKey);
+    const callType = (settings.callTypes || []).find(
+      (item) => text(item.key) === callTypeKey
+    );
+    const metric = callType && (callType.metrics || []).find(
+      (item) => text(item.key) === metricKey
+    );
+
+    if (!callType || !metric) {
+      throw appStateRequestError(
+        "Метрику в поточних AI-налаштуваннях не знайдено.",
+        "metric_settings_not_found",
+        404
+      );
+    }
+
+    const revision = settingsRevision(settings);
+    const semanticRevision = settingsSemanticRevision(settings);
+    const scoringRevision = settingsScoringRevision(settings);
+    const optionPatches = (metric.options || []).map((option) => ({
+      option_key: text(option.key),
+      ai_instructions: text(option.aiInstructions),
+      ai_brief: text(option.aiBrief),
+      payload: option
+    }));
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const profile = await client.query(
+        `
+          UPDATE ai_analysis_settings_profiles
+          SET
+            settings_version = $1,
+            schema_version = $2,
+            revision = $3,
+            semantic_revision = $4,
+            scoring_revision = $5,
+            settings_json = $6::jsonb,
+            updated_at = now()
+          WHERE profile_key = 'default'
+            AND ($7 = '' OR revision = $7)
+          RETURNING id
+        `,
+        [
+          integer(settings.version, 1),
+          text(settings.schemaVersion),
+          revision,
+          semanticRevision,
+          scoringRevision,
+          JSON.stringify(settings),
+          text(expectedRevision)
+        ]
+      );
+
+      if (!profile.rows.length) {
+        throw appStateRequestError(
+          "AI-налаштування змінилися в іншому сеансі. Оновіть сторінку й повторіть правку.",
+          "ai_settings_conflict",
+          409
+        );
+      }
+
+      const profileId = profile.rows[0].id;
+      const metricResult = await client.query(
+        `
+          UPDATE ai_analysis_metrics AS metric
+          SET
+            description = $1,
+            ai_instructions = $2,
+            ai_brief = $3,
+            payload = $4::jsonb
+          FROM ai_analysis_call_types AS call_type
+          WHERE metric.call_type_id = call_type.id
+            AND call_type.profile_id = $5
+            AND call_type.call_type_key = $6
+            AND metric.metric_key = $7
+          RETURNING metric.id
+        `,
+        [
+          text(metric.description),
+          text(metric.aiInstructions),
+          text(metric.aiBrief),
+          JSON.stringify(metric),
+          profileId,
+          callTypeKey,
+          metricKey
+        ]
+      );
+
+      if (metricResult.rows.length !== 1) {
+        throw appStateRequestError(
+          "Метрику в поточних AI-налаштуваннях не знайдено.",
+          "metric_settings_not_found",
+          404
+        );
+      }
+
+      if (optionPatches.length) {
+        const optionResult = await client.query(
+          `
+            UPDATE ai_analysis_metric_options AS option
+            SET
+              ai_instructions = patch.ai_instructions,
+              ai_brief = patch.ai_brief,
+              payload = patch.payload
+            FROM jsonb_to_recordset($1::jsonb) AS patch(
+              option_key text,
+              ai_instructions text,
+              ai_brief text,
+              payload jsonb
+            )
+            WHERE option.metric_id = $2
+              AND option.option_key = patch.option_key
+            RETURNING option.option_key
+          `,
+          [JSON.stringify(optionPatches), metricResult.rows[0].id]
+        );
+
+        if (optionResult.rows.length !== optionPatches.length) {
+          throw appStateRequestError(
+            "Варіанти оцінки змінилися в іншому сеансі. Оновіть сторінку й повторіть правку.",
+            "ai_settings_conflict",
+            409
+          );
+        }
+      }
+
+      if (typeof beforeCommit === "function") {
+        await beforeCommit(client, {
+          profileId,
+          metricId: metricResult.rows[0].id,
+          revision
+        });
+      }
+
+      await client.query("COMMIT");
+      this.settings = settings;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    return this.getPublicSettings();
+  }
+
   async reset() {
     await this.load();
     this.settings = createDefaultAiAnalysisSettings();
@@ -2337,62 +2495,77 @@ class PostgresAiMetricFeedbackStore {
       optionItem.aiBrief = optionPrompt.aiBrief;
     }
 
-    const settingsResult = await settingsStore.update(target.settings);
-    const revisionAfter = text(settingsResult && settingsResult.revision) ||
-      settingsRevision(settingsResult && settingsResult.settings);
     const actor = feedbackActor(user);
-    const promptUpdate = {
-      appliedAt: nowIso(),
-      appliedBy: actor,
-      settingsRevisionBefore: revisionBefore,
-      settingsRevisionAfter: revisionAfter,
-      target: target.target,
-      type: "ai_metric_prompt_rewrite",
-      model: proposal.model,
-      usage: proposal.usage,
-      rationale: proposal.rationale,
-      before: currentPrompt,
-      after: {
-        metric: {
-          ...currentPrompt.metric,
-          description: proposal.metric.description,
-          aiInstructions: proposal.metric.aiInstructions,
-          aiBrief: proposal.metric.aiBrief
-        },
-        options: currentPrompt.options.map((optionItem) => {
-          const optionPrompt = optionsByKey.get(optionItem.key);
-          return optionPrompt
-            ? {
-                ...optionItem,
-                aiInstructions: optionPrompt.aiInstructions,
-                aiBrief: optionPrompt.aiBrief
-              }
-            : optionItem;
-        })
-      }
-    };
-    const payload = cloneJson(feedback.payload, {}) || {};
-    payload.promptUpdate = promptUpdate;
-    delete payload.promptUpdateDraft;
+    let promptUpdate = null;
 
-    await this.pool.query(
-      `
-        UPDATE ai_metric_feedback
-        SET
-          updated_by_user_id = $2,
-          updated_by_username = $3,
-          updated_by_name = $4,
-          updated_at = now(),
-          payload = $5::jsonb
-        WHERE id = $1
-      `,
-      [
-        text(feedback.id),
-        text(actor.id),
-        text(actor.username),
-        text(actor.name),
-        JSON.stringify(payload)
-      ]
+    const settingsResult = await settingsStore.updateMetricPrompt(
+      target.settings,
+      target.target,
+      revisionBefore,
+      async (client, update) => {
+        promptUpdate = {
+          appliedAt: nowIso(),
+          appliedBy: actor,
+          settingsRevisionBefore: revisionBefore,
+          settingsRevisionAfter: text(update.revision),
+          target: target.target,
+          type: "ai_metric_prompt_rewrite",
+          model: proposal.model,
+          usage: proposal.usage,
+          rationale: proposal.rationale,
+          before: currentPrompt,
+          after: {
+            metric: {
+              ...currentPrompt.metric,
+              description: proposal.metric.description,
+              aiInstructions: proposal.metric.aiInstructions,
+              aiBrief: proposal.metric.aiBrief
+            },
+            options: currentPrompt.options.map((optionItem) => {
+              const optionPrompt = optionsByKey.get(optionItem.key);
+              return optionPrompt
+                ? {
+                    ...optionItem,
+                    aiInstructions: optionPrompt.aiInstructions,
+                    aiBrief: optionPrompt.aiBrief
+                  }
+                : optionItem;
+            })
+          }
+        };
+        const payload = cloneJson(feedback.payload, {}) || {};
+        payload.promptUpdate = promptUpdate;
+        delete payload.promptUpdateDraft;
+
+        const feedbackResult = await client.query(
+          `
+            UPDATE ai_metric_feedback
+            SET
+              updated_by_user_id = $2,
+              updated_by_username = $3,
+              updated_by_name = $4,
+              updated_at = now(),
+              payload = $5::jsonb
+            WHERE id = $1
+            RETURNING id
+          `,
+          [
+            text(feedback.id),
+            text(actor.id),
+            text(actor.username),
+            text(actor.name),
+            JSON.stringify(payload)
+          ]
+        );
+
+        if (!feedbackResult.rows.length) {
+          throw appStateRequestError(
+            "Правку метрики не знайдено.",
+            "metric_feedback_not_found",
+            404
+          );
+        }
+      }
     );
 
     return {
@@ -2461,7 +2634,21 @@ function monitorAnalyticsRow(row) {
   const callId = text(row && row.call_id);
   const generalCallId = text(row && row.general_call_id, callId);
   const summaryPayload = cloneJson(row && row.summary_payload, {}) || {};
-  const metrics = Array.isArray(row && row.metrics) ? row.metrics : [];
+  const metrics = (Array.isArray(row && row.metrics) ? row.metrics : []).map((metric) => {
+    if (!Array.isArray(metric)) {
+      return metric;
+    }
+    return {
+      metricKey: metric[0],
+      metricLabel: metric[1],
+      selectedOptionKey: metric[2],
+      selectedOptionLabel: metric[3],
+      score: metric[4],
+      maxScore: metric[5],
+      color: metric[6],
+      countsTowardScore: metric[7]
+    };
+  });
   const customEvaluation = {
     ...(summaryPayload.customEvaluation || {})
   };
@@ -2499,21 +2686,22 @@ function monitorAnalyticsRow(row) {
       startedAt: optionalTimestamp(row && row.started_at),
       billSec: integer(row && row.bill_sec, 0),
       disposition: text(row && row.disposition),
-      recordingStatus: text(row && row.recording_status)
+      recordingStatus: text(row && row.recording_status),
+      internalNumber: text(row && row.internal_number),
+      employee: {
+        id: text(row && row.employee_id),
+        name: text(row && row.employee_name),
+        internalNumber: text(row && row.employee_extension)
+      },
+      pbxNumber: {
+        name: text(row && row.pbx_name),
+        number: text(row && row.pbx_number)
+      }
     },
     ai: row && row.ai_status
       ? {
           status: text(row.ai_status),
-          callId: text(row.summary_call_id, generalCallId),
-          generalCallId,
-          callStartedAt: optionalTimestamp(row.call_started_at),
-          updatedAt: optionalTimestamp(row.summary_updated_at),
-          completedAt: optionalTimestamp(row.completed_at),
           summary,
-          error: text(row.summary_error),
-          message: text(row.summary_message),
-          attempts: integer(row.summary_attempts, 0),
-          terminalFailure: Boolean(row.terminal_failure),
           usage,
           models: {
             summary: text(row.summary_model),
@@ -2584,6 +2772,31 @@ function analysisInternalNumberEnabledClause(alias) {
     WHERE analysis_numbers.internal_number = ${prefix}internal_number
       AND analysis_numbers.enabled = false
   )`;
+}
+
+function assignedInternalNumbers(options = {}) {
+  return [...new Set(
+    (Array.isArray(options.assignedInternalNumbers)
+      ? options.assignedInternalNumbers
+      : [])
+      .map((item) => text(item))
+      .filter(Boolean)
+  )];
+}
+
+function appendAssignedInternalNumbersClause(clauses, values, alias, options = {}) {
+  if (options.restrictToAssignedInternalNumbers !== true) {
+    return;
+  }
+
+  const numbers = assignedInternalNumbers(options);
+  if (!numbers.length) {
+    clauses.push("FALSE");
+    return;
+  }
+
+  values.push(numbers);
+  clauses.push(`${alias}.internal_number = ANY($${values.length}::text[])`);
 }
 
 async function upsertBinotelCall(client, call, currentPayload, options = {}) {
@@ -3042,6 +3255,8 @@ class PostgresBinotelMonitorStore {
       clauses.push(analysisInternalNumberEnabledClause("calls"));
     }
 
+    appendAssignedInternalNumbersClause(clauses, values, "calls", options);
+
     if (options.since) {
       values.push(optionalTimestamp(options.since));
       clauses.push(`calls.started_at >= $${values.length}`);
@@ -3117,6 +3332,7 @@ class PostgresBinotelMonitorStore {
     const values = [];
 
     clauses.push(analysisInternalNumberEnabledClause("calls"));
+    appendAssignedInternalNumbersClause(clauses, values, "calls", options);
 
     if (options.since) {
       values.push(optionalTimestamp(options.since));
@@ -3151,6 +3367,32 @@ class PostgresBinotelMonitorStore {
             calls.bill_sec,
             calls.disposition,
             calls.recording_status,
+            calls.internal_number,
+            COALESCE(
+              NULLIF(calls.employee_payload->>'id', ''),
+              NULLIF(calls.employee_payload->>'employeeId', ''),
+              NULLIF(calls.employee_payload->>'userId', '')
+            ) AS employee_id,
+            COALESCE(
+              NULLIF(calls.employee_payload->>'name', ''),
+              NULLIF(calls.employee_payload->>'fullName', ''),
+              NULLIF(calls.employee_payload->>'employeeName', ''),
+              NULLIF(calls.employee_payload->>'title', '')
+            ) AS employee_name,
+            COALESCE(
+              NULLIF(calls.employee_payload->>'internalNumber', ''),
+              NULLIF(calls.employee_payload->>'extension', ''),
+              NULLIF(calls.employee_payload->>'number', ''),
+              NULLIF(calls.internal_number, '')
+            ) AS employee_extension,
+            COALESCE(
+              NULLIF(calls.pbx_number_payload->>'name', ''),
+              NULLIF(calls.pbx_number_payload->>'title', '')
+            ) AS pbx_name,
+            COALESCE(
+              NULLIF(calls.pbx_number_payload->>'number', ''),
+              NULLIF(calls.pbx_number_payload->>'id', '')
+            ) AS pbx_number,
             COUNT(*) OVER ()::int AS total
           FROM binotel_calls calls
           ${whereClause}
@@ -3159,21 +3401,17 @@ class PostgresBinotelMonitorStore {
         )
         SELECT
           filtered_calls.*,
-          summaries.call_id AS summary_call_id,
           summaries.status AS ai_status,
-          summaries.call_started_at,
           summaries.call_duration_sec,
-          summaries.updated_at AS summary_updated_at,
-          summaries.completed_at,
-          summaries.error AS summary_error,
-          summaries.message AS summary_message,
-          summaries.attempts AS summary_attempts,
-          summaries.terminal_failure,
           summaries.call_type AS summary_call_type,
           summaries.call_type_label AS summary_call_type_label,
           summaries.summary_model,
           summaries.transcription_model,
-          summaries.summary_payload,
+          jsonb_strip_nulls(jsonb_build_object(
+            'customerQuestions', summaries.summary_payload->'customerQuestions',
+            'escalation', summaries.summary_payload->'escalation',
+            'churnRisk', summaries.summary_payload->'churnRisk'
+          )) AS summary_payload,
           usage.scope AS usage_scope,
           usage.input_tokens,
           usage.cached_input_tokens,
@@ -3190,19 +3428,15 @@ class PostgresBinotelMonitorStore {
          AND usage.scope = 'summary'
         LEFT JOIN LATERAL (
           SELECT jsonb_agg(
-            jsonb_build_object(
-              'metricKey', metric_key,
-              'metricLabel', metric_label,
-              'metricGroup', metric_group,
-              'selectedOptionKey', selected_option_key,
-              'selectedOptionLabel', selected_option_label,
-              'score', score,
-              'maxScore', max_score,
-              'color', color,
-              'countsTowardScore', counts_toward_score,
-              'evidence', evidence,
-              'improvement', improvement,
-              'confidence', confidence
+            jsonb_build_array(
+              metric_key,
+              metric_label,
+              selected_option_key,
+              selected_option_label,
+              score,
+              max_score,
+              color,
+              counts_toward_score
             )
             ORDER BY metric_key
           ) AS items
@@ -3232,6 +3466,8 @@ class PostgresBinotelMonitorStore {
     const query = text(options.query).toLowerCase();
     const queryDigits = query.replace(/\D/g, "");
     const timezone = text(options.timezone, "Europe/Kyiv") || "Europe/Kyiv";
+
+    appendAssignedInternalNumbersClause(clauses, values, "calls", options);
 
     if (options.from) {
       values.push(optionalTimestamp(options.from));
@@ -3549,6 +3785,7 @@ class PostgresBinotelMonitorStore {
     const values = [];
 
     callClauses.push(analysisInternalNumberEnabledClause("source_calls"));
+    appendAssignedInternalNumbersClause(callClauses, values, "source_calls", options);
 
     if (options.since) {
       values.push(optionalTimestamp(options.since));

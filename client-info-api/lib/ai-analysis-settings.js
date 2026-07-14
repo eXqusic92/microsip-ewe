@@ -1,9 +1,12 @@
 "use strict";
 
 const crypto = require("crypto");
+const { TRANSCRIPTION_DEFAULT_TERMS } = require("./ai-prompts");
 
 const SETTINGS_VERSION = 1;
 const DEFAULT_SCHEMA_VERSION = "20260608-ai-analysis-settings-2";
+const MAX_TRANSCRIPTION_TERMS = 250;
+const MAX_TRANSCRIPTION_TERM_LENGTH = 160;
 const DEFAULT_COLORS = {
   excellent: "#22c55e",
   good: "#84cc16",
@@ -66,6 +69,62 @@ function normalizeColor(value, fallback) {
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function normalizedTranscriptionTerm(value) {
+  return text(value).replace(/\s+/g, " ");
+}
+
+function normalizeTranscriptionTerms(value, fallback = TRANSCRIPTION_DEFAULT_TERMS) {
+  const source = Array.isArray(value) ? value : fallback;
+  const terms = [];
+  const seen = new Set();
+
+  for (const rawTerm of source) {
+    const term = normalizedTranscriptionTerm(rawTerm);
+    if (!term || term.length > MAX_TRANSCRIPTION_TERM_LENGTH) {
+      continue;
+    }
+
+    const normalizedKey = term.toLocaleLowerCase("uk-UA");
+    if (seen.has(normalizedKey)) {
+      continue;
+    }
+
+    seen.add(normalizedKey);
+    terms.push(term);
+    if (terms.length >= MAX_TRANSCRIPTION_TERMS) {
+      break;
+    }
+  }
+
+  return terms;
+}
+
+function validateTranscriptionTerms(value) {
+  if (value === undefined || value === null) {
+    return;
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error("Список термінів має бути масивом.");
+  }
+
+  if (value.length > MAX_TRANSCRIPTION_TERMS) {
+    throw new Error(`Можна вказати до ${MAX_TRANSCRIPTION_TERMS} термінів.`);
+  }
+
+  for (const rawTerm of value) {
+    if (typeof rawTerm !== "string") {
+      throw new Error("Кожен термін має бути текстом.");
+    }
+
+    if (normalizedTranscriptionTerm(rawTerm).length > MAX_TRANSCRIPTION_TERM_LENGTH) {
+      throw new Error(
+        `Один термін не може бути довшим за ${MAX_TRANSCRIPTION_TERM_LENGTH} символів.`
+      );
+    }
+  }
 }
 
 function option(key, label, score, color, aiInstructions, countsTowardScore = score !== null) {
@@ -559,6 +618,7 @@ function createDefaultAiAnalysisSettings() {
     version: SETTINGS_VERSION,
     schemaVersion: DEFAULT_SCHEMA_VERSION,
     updatedAt: new Date().toISOString(),
+    transcriptionTerms: normalizeTranscriptionTerms(),
     callTypes: CALL_TYPES.map((callType, index) => ({
       key: callType.key,
       label: callType.label,
@@ -665,6 +725,9 @@ function normalizeCallType(raw, fallbackKey, fallbackOrder) {
 
 function normalizeAiAnalysisSettings(value) {
   const source = value && value.settings ? value.settings : value;
+  const transcriptionTerms = normalizeTranscriptionTerms(
+    source && source.transcriptionTerms
+  );
   const callTypesRaw = Array.isArray(source && source.callTypes)
     ? source.callTypes
     : [];
@@ -681,13 +744,17 @@ function normalizeAiAnalysisSettings(value) {
   }
 
   if (!callTypes.length) {
-    return createDefaultAiAnalysisSettings();
+    return {
+      ...createDefaultAiAnalysisSettings(),
+      transcriptionTerms
+    };
   }
 
   return {
     version: SETTINGS_VERSION,
     schemaVersion: DEFAULT_SCHEMA_VERSION,
     updatedAt: new Date().toISOString(),
+    transcriptionTerms,
     callTypes
   };
 }
@@ -734,7 +801,8 @@ function semanticValue(value) {
         "color",
         "countsTowardScore",
         "weight",
-        "order"
+        "order",
+        "transcriptionTerms"
       ].includes(key))
       .sort()
       .map((key) => [key, semanticValue(value[key])])
@@ -756,7 +824,8 @@ function scoringValue(value) {
         "updatedAt",
         "description",
         "aiInstructions",
-        "aiBrief"
+        "aiBrief",
+        "transcriptionTerms"
       ].includes(key))
       .sort()
       .map((key) => [key, scoringValue(value[key])])
@@ -796,7 +865,9 @@ module.exports = {
   enabledCallTypes,
   enabledMetrics,
   normalizeAiAnalysisSettings,
+  normalizeTranscriptionTerms,
   settingsRevision,
   settingsSemanticRevision,
-  settingsScoringRevision
+  settingsScoringRevision,
+  validateTranscriptionTerms
 };

@@ -1227,6 +1227,11 @@ function createClientStore(config, appStateDatabase) {
     aiAnalysisSettingsStore.getProfile()
   );
   const transcriptionClient = createTranscriptionClient(config);
+  if (typeof transcriptionClient.setAnalysisSettingsProvider === "function") {
+    transcriptionClient.setAnalysisSettingsProvider(() =>
+      aiAnalysisSettingsStore.getProfile()
+    );
+  }
   const callSummaryStore = appStateDatabase.callSummaryStore;
   const callSummaryService = new CallSummaryService(
     config,

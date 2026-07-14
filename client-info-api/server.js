@@ -6,7 +6,7 @@ const path = require("path");
 const { URL } = require("url");
 
 const config = require("./lib/config");
-const { AuthService } = require("./lib/auth");
+const { AuthService, canEditAiFeedback } = require("./lib/auth");
 const { createAppStateDatabase } = require("./lib/app-state-db");
 const { createClientStore } = require("./lib/client-store");
 const { normalizePhone } = require("./lib/phone");
@@ -14,6 +14,11 @@ const { BinotelMonitorService } = require("./lib/binotel-monitor-service");
 const { RecordingCache } = require("./lib/recording-cache");
 const { TelegramUserService } = require("./lib/telegram-service");
 const { ViberService } = require("./lib/viber-service");
+const {
+  normalizeTranscriptionTerms,
+  validateTranscriptionTerms
+} = require("./lib/ai-analysis-settings");
+const { buildSonioxContext } = require("./lib/soniox-client");
 
 const publicDir = path.join(__dirname, "public");
 const animeBundlePath = path.join(
@@ -56,6 +61,14 @@ const binotelMonitor = new BinotelMonitorService(
   recordingCache
 );
 let shuttingDown = false;
+const SONIOX_TERMS_PREVIEW_PERIOD_DAYS = 30;
+const SONIOX_TERMS_PREVIEW_CACHE_MILLIS = 10 * 60 * 1000;
+const SONIOX_INPUT_TEXT_USD_PER_MILLION_TOKENS = 3.5;
+const sonioxTermsUsagePreviewCache = {
+  loadedAt: 0,
+  pending: null,
+  value: null
+};
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -75,6 +88,229 @@ function sendJson(res, statusCode, data) {
     "X-Content-Type-Options": "nosniff"
   });
   res.end(body);
+}
+
+function finiteNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function roundedPreviewNumber(value, digits = 6) {
+  const parsed = finiteNumber(value);
+  return parsed === null ? null : Number(parsed.toFixed(digits));
+}
+
+function median(values) {
+  const sorted = values
+    .map(finiteNumber)
+    .filter((value) => value !== null)
+    .sort((left, right) => left - right);
+  if (!sorted.length) {
+    return null;
+  }
+
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function sonioxAsyncUsageHistory(usageLogs, startTime, endTime) {
+  const calls = (Array.isArray(usageLogs) ? usageLogs : [])
+    .filter((entry) => String(entry && entry.model || "").startsWith("stt-async"))
+    .map((entry) => {
+      const inputTextTokens = finiteNumber(entry && entry.input_text_tokens);
+      if (inputTextTokens === null) {
+        return null;
+      }
+
+      const inputTextCost = finiteNumber(entry && entry.input_text_cost_usd);
+      return {
+        inputTextTokens,
+        inputTextCostUsd: inputTextCost === null
+          ? inputTextTokens * SONIOX_INPUT_TEXT_USD_PER_MILLION_TOKENS / 1000000
+          : inputTextCost,
+        totalCostUsd: finiteNumber(entry && entry.cost_usd)
+      };
+    })
+    .filter(Boolean);
+
+  if (!calls.length) {
+    return {
+      available: false,
+      reason: "no_async_usage",
+      message: "За останні 30 днів у Soniox ще немає async-транскрипцій для прогнозу.",
+      startTime,
+      endTime
+    };
+  }
+
+  const totalCostValues = calls
+    .map((call) => call.totalCostUsd)
+    .filter((value) => value !== null);
+  return {
+    available: true,
+    source: "soniox_usage_logs",
+    startTime,
+    endTime,
+    calls: calls.length,
+    medianInputTextTokens: median(calls.map((call) => call.inputTextTokens)),
+    medianInputTextCostUsd: median(calls.map((call) => call.inputTextCostUsd)),
+    totalInputTextCostUsd: calls.reduce(
+      (total, call) => total + call.inputTextCostUsd,
+      0
+    ),
+    totalCostUsd: totalCostValues.length
+      ? totalCostValues.reduce((total, cost) => total + cost, 0)
+      : null
+  };
+}
+
+async function loadSonioxTermsUsageHistory() {
+  const now = Date.now();
+  if (
+    sonioxTermsUsagePreviewCache.value &&
+    now - sonioxTermsUsagePreviewCache.loadedAt < SONIOX_TERMS_PREVIEW_CACHE_MILLIS
+  ) {
+    return sonioxTermsUsagePreviewCache.value;
+  }
+
+  if (sonioxTermsUsagePreviewCache.pending) {
+    return sonioxTermsUsagePreviewCache.pending;
+  }
+
+  sonioxTermsUsagePreviewCache.pending = (async () => {
+    const transcriptionClient = store.callSummaryService &&
+      store.callSummaryService.transcriptionClient;
+    if (
+      !transcriptionClient ||
+      !transcriptionClient.enabled ||
+      typeof transcriptionClient.listUsageLogs !== "function"
+    ) {
+      return {
+        available: false,
+        reason: "soniox_not_configured",
+        message: "Потрібне активне підключення Soniox, щоб побудувати персональний прогноз."
+      };
+    }
+
+    const end = new Date();
+    const start = new Date(
+      end.getTime() - SONIOX_TERMS_PREVIEW_PERIOD_DAYS * 24 * 60 * 60 * 1000
+    );
+
+    try {
+      const response = await transcriptionClient.listUsageLogs({
+        startTime: start.toISOString(),
+        endTime: end.toISOString()
+      });
+      return sonioxAsyncUsageHistory(
+        response.usageLogs,
+        response.startTime,
+        response.endTime
+      );
+    } catch (error) {
+      console.warn(`Soniox terms preview usage unavailable: ${error.message}`);
+      return {
+        available: false,
+        reason: "usage_unavailable",
+        message: "Soniox usage зараз недоступний, тому персональний прогноз не побудовано."
+      };
+    }
+  })()
+    .then((value) => {
+      sonioxTermsUsagePreviewCache.value = value;
+      sonioxTermsUsagePreviewCache.loadedAt = Date.now();
+      return value;
+    })
+    .finally(() => {
+      sonioxTermsUsagePreviewCache.pending = null;
+    });
+
+  return sonioxTermsUsagePreviewCache.pending;
+}
+
+function contextUtf8Bytes(context) {
+  return context ? Buffer.byteLength(JSON.stringify(context), "utf8") : 0;
+}
+
+async function buildSonioxTermsPreview(candidateTerms) {
+  const profile = await store.getAiAnalysisSettings();
+  const currentSettings = profile && profile.settings ? profile.settings : profile;
+  const currentTerms = normalizeTranscriptionTerms(
+    currentSettings && currentSettings.transcriptionTerms
+  );
+  const terms = normalizeTranscriptionTerms(candidateTerms, currentTerms);
+  const contextMode = config.soniox && config.soniox.contextMode || "minimal";
+  const currentContext = buildSonioxContext(contextMode, currentTerms);
+  const candidateContext = buildSonioxContext(contextMode, terms);
+  const currentContextUtf8Bytes = contextUtf8Bytes(currentContext);
+  const contextBytes = contextUtf8Bytes(candidateContext);
+  const base = {
+    ok: true,
+    contextEnabled: Boolean(candidateContext),
+    contextMode,
+    currentContextUtf8Bytes,
+    contextUtf8Bytes: contextBytes,
+    currentTermsCount: currentTerms.length,
+    termsCount: terms.length,
+    terms
+  };
+
+  if (!candidateContext) {
+    return {
+      ...base,
+      usageAvailable: false,
+      message: "SONIOX_CONTEXT_MODE=none: цей список зараз не надсилається до Soniox."
+    };
+  }
+
+  const history = await loadSonioxTermsUsageHistory();
+  if (!history.available || !currentContextUtf8Bytes) {
+    return {
+      ...base,
+      usageAvailable: false,
+      history,
+      message: history.message || "Немає достатньо Soniox usage для прогнозу."
+    };
+  }
+
+  const byteRatio = contextBytes / currentContextUtf8Bytes;
+  const currentInputTextCostUsd = history.medianInputTextCostUsd;
+  const estimatedInputTextCostUsd = currentInputTextCostUsd * byteRatio;
+  const changeUsdPerCall = estimatedInputTextCostUsd - currentInputTextCostUsd;
+  const changeUsdForPeriod = changeUsdPerCall * history.calls;
+  const estimatedTotalCostUsd = history.totalCostUsd === null
+    ? null
+    : history.totalCostUsd + changeUsdForPeriod;
+
+  return {
+    ...base,
+    usageAvailable: true,
+    history: {
+      source: history.source,
+      startTime: history.startTime,
+      endTime: history.endTime,
+      calls: history.calls,
+      totalCostUsd: roundedPreviewNumber(history.totalCostUsd),
+      totalInputTextCostUsd: roundedPreviewNumber(history.totalInputTextCostUsd)
+    },
+    estimate: {
+      inputTextTokensPerCall: roundedPreviewNumber(
+        history.medianInputTextTokens * byteRatio,
+        2
+      ),
+      inputTextCostUsdPerCall: roundedPreviewNumber(estimatedInputTextCostUsd),
+      changeUsdPerCall: roundedPreviewNumber(changeUsdPerCall),
+      changeUsdForPeriod: roundedPreviewNumber(changeUsdForPeriod),
+      totalCostUsdForPeriod: roundedPreviewNumber(estimatedTotalCostUsd)
+    },
+    message:
+      "Оцінка за медіанним Soniox input usage за останні 30 днів. Точна сума з’явиться в usage після нової транскрипції."
+  };
 }
 
 function sendDiskFile(res, filePath, cacheControl = "no-store") {
@@ -329,6 +565,48 @@ function safeLoginTarget(value) {
   return target;
 }
 
+function callVisibilityForAuth(auth) {
+  const ordinaryUser = Boolean(
+    auth && auth.user && auth.user.role === "user"
+  );
+  return {
+    restrictToAssignedInternalNumbers: ordinaryUser,
+    assignedInternalNumbers: ordinaryUser
+      ? auth.user.binotelManagerNumbers || []
+      : []
+  };
+}
+
+function sendAiFeedbackForbidden(res) {
+  sendJson(res, 403, {
+    ok: false,
+    error: "ai_feedback_editor_required",
+    message: "AI-правки доступні лише керівнику відділу та адміністратору."
+  });
+}
+
+function sendReadOnlyUserForbidden(res) {
+  sendJson(res, 403, {
+    ok: false,
+    error: "read_only_user",
+    message: "Звичайний користувач має доступ лише для перегляду."
+  });
+}
+
+function canViewTeamAnalytics(user) {
+  return Boolean(
+    user && ["admin", "department_head"].includes(user.role)
+  );
+}
+
+function sendTeamAnalyticsForbidden(res) {
+  sendJson(res, 403, {
+    ok: false,
+    error: "team_analytics_required",
+    message: "Статистика та AI-аналітика доступні лише керівнику відділу й адміністратору."
+  });
+}
+
 async function requirePageAuth(req, res, requestUrl) {
   const auth = await authService.getRequestAuth(req);
   if (!auth) {
@@ -344,6 +622,18 @@ async function requirePageAdmin(req, res, requestUrl) {
     return null;
   }
   if ((auth.user && auth.user.role) !== "admin") {
+    redirect(res, "/client-card");
+    return null;
+  }
+  return auth;
+}
+
+async function requirePageTeamAnalytics(req, res, requestUrl) {
+  const auth = await requirePageAuth(req, res, requestUrl);
+  if (!auth) {
+    return null;
+  }
+  if (!canViewTeamAnalytics(auth.user)) {
     redirect(res, "/client-card");
     return null;
   }
@@ -440,7 +730,7 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/call-stats") {
-    if (!(await requirePageAuth(req, res, requestUrl))) {
+    if (!(await requirePageTeamAnalytics(req, res, requestUrl))) {
       return;
     }
     sendFile(res, "index.html");
@@ -448,7 +738,7 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/call-analytics") {
-    if (!(await requirePageAuth(req, res, requestUrl))) {
+    if (!(await requirePageTeamAnalytics(req, res, requestUrl))) {
       return;
     }
     sendFile(res, "index.html");
@@ -456,7 +746,7 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/ai-settings") {
-    if (!(await requirePageAuth(req, res, requestUrl))) {
+    if (!(await requirePageAdmin(req, res, requestUrl))) {
       return;
     }
     sendFile(res, "index.html");
@@ -514,6 +804,34 @@ async function handleRequest(req, res) {
       readJsonBody,
       decodeURIComponent(requestUrl.pathname.split("/").pop() || "")
     );
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/admin/binotel-managers") {
+    const auth = await authService.requireAdmin(req, res);
+    if (!auth) {
+      return;
+    }
+
+    if (req.method !== "GET") {
+      res.writeHead(405, { Allow: "GET" });
+      res.end("Method not allowed");
+      return;
+    }
+
+    const result = await binotelMonitorStore.analysisInternalNumbers();
+    sendJson(res, 200, {
+      ok: true,
+      managers: result.numbers
+        .filter((item) => item.enabled !== false)
+        .filter((item) => item.employeeName || item.customLabel)
+        .map((item) => ({
+          number: item.number,
+          label: item.label,
+          employeeName: item.employeeName,
+          pbxName: item.pbxName
+        }))
+    });
     return;
   }
 
@@ -674,14 +992,24 @@ async function handleRequest(req, res) {
     return;
   }
 
+  let requestAuth = null;
   if (
     requestUrl.pathname.startsWith("/api/") ||
     requestUrl.pathname === "/client"
   ) {
-    const auth = await authService.requireAuth(req, res);
-    if (!auth) {
+    requestAuth = await authService.requireAuth(req, res);
+    if (!requestAuth) {
       return;
     }
+  }
+
+  if (
+    requestAuth &&
+    requestAuth.user.role === "user" &&
+    !["GET", "HEAD", "OPTIONS"].includes(req.method)
+  ) {
+    sendReadOnlyUserForbidden(res);
+    return;
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/api/client-card") {
@@ -850,10 +1178,47 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (
+    req.method === "POST" &&
+    requestUrl.pathname === "/api/ai-analysis-settings/transcription-terms-preview"
+  ) {
+    if (!requestAuth || requestAuth.user.role !== "admin") {
+      sendJson(res, 403, { ok: false, error: "admin_required" });
+      return;
+    }
+    try {
+      const payload = await readJsonBody(req, 256 * 1024);
+      const hasTerms = payload &&
+        typeof payload === "object" &&
+        !Array.isArray(payload) &&
+        Object.prototype.hasOwnProperty.call(payload, "terms");
+      const terms = hasTerms ? payload.terms : undefined;
+      validateTranscriptionTerms(terms);
+      sendJson(res, 200, await buildSonioxTermsPreview(terms));
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : 422;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: error.message
+      });
+    }
+    return;
+  }
+
   if (req.method === "PUT" && requestUrl.pathname === "/api/ai-analysis-settings") {
+    if (!requestAuth || requestAuth.user.role !== "admin") {
+      sendJson(res, 403, { ok: false, error: "admin_required" });
+      return;
+    }
     try {
       const payload = await readJsonBody(req, 1024 * 1024);
-      sendJson(res, 200, await store.updateAiAnalysisSettings(payload.settings || payload));
+      const settings = payload && payload.settings ? payload.settings : payload;
+      validateTranscriptionTerms(settings && settings.transcriptionTerms);
+      sendJson(res, 200, await store.updateAiAnalysisSettings(settings));
     } catch (error) {
       const statusCode = ["invalid_json", "request_body_too_large"].includes(
         error.message
@@ -869,6 +1234,10 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "POST" && requestUrl.pathname === "/api/ai-analysis-settings/reset") {
+    if (!requestAuth || requestAuth.user.role !== "admin") {
+      sendJson(res, 403, { ok: false, error: "admin_required" });
+      return;
+    }
     sendJson(res, 200, await store.resetAiAnalysisSettings());
     return;
   }
@@ -884,13 +1253,23 @@ async function handleRequest(req, res) {
     const query = requestUrl.searchParams.get("q") || "";
     const callType = requestUrl.searchParams.get("callType") || "";
     const problem = requestUrl.searchParams.get("problem") || "";
-    sendJson(res, 200, await binotelMonitor.listCalls({
+    const visibility = callVisibilityForAuth(requestAuth);
+    const result = await binotelMonitor.listCalls({
       limit,
       offset,
       query,
       callType,
-      problem
-    }));
+      problem,
+      ...visibility
+    });
+    sendJson(res, 200, {
+      ...result,
+      restrictedToOwnCalls: visibility.restrictToAssignedInternalNumbers,
+      managerAssignmentMissing: Boolean(
+        visibility.restrictToAssignedInternalNumbers &&
+        !visibility.assignedInternalNumbers.length
+      )
+    });
     return;
   }
 
@@ -931,12 +1310,14 @@ async function handleRequest(req, res) {
   }
 
   if (requestUrl.pathname === "/api/ai-metric-feedback") {
-    const auth = await authService.requireAuth(req, res);
-    if (!auth) {
-      return;
-    }
+    const auth = requestAuth;
 
     try {
+      if (["POST", "DELETE"].includes(req.method) && !canEditAiFeedback(auth.user)) {
+        sendAiFeedbackForbidden(res);
+        return;
+      }
+
       if (req.method === "POST") {
         const payload = await readJsonBody(req, 64 * 1024);
         const feedback = await appStateDatabase.aiMetricFeedbackStore.save(
@@ -1123,6 +1504,10 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "POST" && requestUrl.pathname === "/api/binotel-monitor/call/reanalyze") {
+    if (!requestAuth || !canEditAiFeedback(requestAuth.user)) {
+      sendAiFeedbackForbidden(res);
+      return;
+    }
     try {
       const payload = await readJsonBody(req);
       const callId = String(
@@ -1162,6 +1547,10 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/api/binotel-monitor/analytics") {
+    if (!canViewTeamAnalytics(requestAuth && requestAuth.user)) {
+      sendTeamAnalyticsForbidden(res);
+      return;
+    }
     const query = requestUrl.searchParams.get("q") || "";
     const requestedPeriod = requestUrl.searchParams.get("period") || "30";
     const utcNow = new Date();
@@ -1183,16 +1572,19 @@ async function handleRequest(req, res) {
         ? new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString()
         : null;
 
+    const visibility = callVisibilityForAuth(requestAuth);
     const [analytics, managerRating] = await Promise.all([
       binotelMonitor.callTypeAnalytics({
         query,
         since,
-        periodDays
+        periodDays,
+        ...visibility
       }),
       binotelMonitor.managerRating({
         query,
         since,
-        periodDays
+        periodDays,
+        ...visibility
       })
     ]);
 
@@ -1204,6 +1596,10 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/api/binotel-monitor/call-statistics") {
+    if (!canViewTeamAnalytics(requestAuth && requestAuth.user)) {
+      sendTeamAnalyticsForbidden(res);
+      return;
+    }
     const query = requestUrl.searchParams.get("q") || "";
     const period = callStatsPeriod(requestUrl.searchParams);
 
@@ -1218,13 +1614,15 @@ async function handleRequest(req, res) {
       return;
     }
 
+    const visibility = callVisibilityForAuth(requestAuth);
     sendJson(
       res,
       200,
       await binotelMonitor.callStatistics({
         query,
         ...period,
-        timezone: "Europe/Kyiv"
+        timezone: "Europe/Kyiv",
+        ...visibility
       })
     );
     return;

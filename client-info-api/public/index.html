@@ -32,8 +32,8 @@
         <nav class="app-tabs" aria-label="Основна навігація">
           <a href="/client-card" data-view-link="client-card">Картка</a>
           <a href="/calls-monitor" data-view-link="calls-monitor">Дзвінки</a>
-          <a href="/call-stats" data-view-link="call-stats">Статистика</a>
-          <a href="/call-analytics" data-view-link="call-analytics">AI-аналітика</a>
+          <a href="/call-stats" data-view-link="call-stats" data-team-analytics-only hidden>Статистика</a>
+          <a href="/call-analytics" data-view-link="call-analytics" data-team-analytics-only hidden>AI-аналітика</a>
         </nav>
       </div>
 
@@ -92,26 +92,28 @@
                 <small id="profile-menu-role">Користувач</small>
               </span>
             </div>
-            <div class="profile-menu-divider"></div>
-            <a class="profile-menu-item" href="/ai-settings" role="menuitem" data-view-link="ai-settings">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 20h9"></path>
-                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-              </svg>
-              <span>AI-налаштування</span>
-            </a>
-            <div class="profile-menu-divider" data-profile-admin-only hidden></div>
-            <a class="profile-menu-item" href="/admin" role="menuitem" data-view-link="admin" data-profile-admin-only hidden>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M3 21h18"></path>
-                <path d="M5 21V7l8-4v18"></path>
-                <path d="M19 21V11l-6-4"></path>
-                <path d="M9 9v.01"></path>
-                <path d="M9 13v.01"></path>
-                <path d="M9 17v.01"></path>
-              </svg>
-              <span>Адмінка</span>
-            </a>
+            <div class="profile-menu-admin-group" data-profile-admin-only hidden>
+              <div class="profile-menu-divider"></div>
+              <a class="profile-menu-item" href="/ai-settings" role="menuitem" data-view-link="ai-settings">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                </svg>
+                <span>AI-налаштування</span>
+              </a>
+              <div class="profile-menu-divider"></div>
+              <a class="profile-menu-item" href="/admin" role="menuitem" data-view-link="admin">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 21h18"></path>
+                  <path d="M5 21V7l8-4v18"></path>
+                  <path d="M19 21V11l-6-4"></path>
+                  <path d="M9 9v.01"></path>
+                  <path d="M9 13v.01"></path>
+                  <path d="M9 17v.01"></path>
+                </svg>
+                <span>Адмінка</span>
+              </a>
+            </div>
             <div class="profile-menu-divider"></div>
             <button class="profile-menu-item" id="change-password-button" type="button" role="menuitem">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -147,7 +149,7 @@
 
       <div class="loading-state hidden" id="loading-state" aria-live="polite">
         <span class="spinner" aria-hidden="true"></span>
-        Завантажуємо історію клієнта…
+        <span id="loading-message">Завантажуємо картку клієнта…</span>
       </div>
 
       <section class="client-card hidden" id="client-card" aria-live="polite">
@@ -742,6 +744,12 @@
                 <h1>Правила оцінювання дзвінків</h1>
               </div>
             </div>
+            <div class="ai-hero-actions">
+              <button class="ai-white-button" type="button" data-ai-action="open-transcription-terms">
+                <span class="ai-js-icon" data-icon="settings"></span>
+                Терміни Soniox
+              </button>
+            </div>
           </div>
 
           <div class="ai-soldly-hero hidden" id="ai-settings-detail-hero">
@@ -901,6 +909,49 @@
               <button class="ai-dialog-submit" type="submit">
                 <span class="ai-js-icon" data-icon="check"></span>
                 Оновити
+              </button>
+            </footer>
+          </form>
+        </dialog>
+
+        <dialog class="ai-soldly-dialog ai-terms-dialog" id="ai-terms-modal" aria-labelledby="ai-terms-modal-title">
+          <form id="ai-terms-modal-form">
+            <header class="ai-dialog-head">
+              <h2 id="ai-terms-modal-title">Терміни для транскрипції</h2>
+              <button type="button" id="ai-terms-modal-close" aria-label="Закрити">
+                <span class="ai-js-icon" data-icon="x"></span>
+              </button>
+            </header>
+            <div class="ai-dialog-body">
+              <p class="ai-terms-intro">
+                Soniox отримає цей список у полі <code>terms</code> для всіх наступних транскрипцій.
+              </p>
+              <label class="ai-dialog-field ai-terms-field">
+                <span>Терміни та фрази</span>
+                <textarea id="ai-terms-input" rows="10" placeholder="Один термін або фраза в рядку" aria-describedby="ai-terms-help"></textarea>
+              </label>
+              <p class="ai-terms-help" id="ai-terms-help">
+                Один рядок — один термін. Повтори та зайві пробіли система прибере; можна залишити список порожнім.
+              </p>
+
+              <section class="ai-terms-preview" aria-labelledby="ai-terms-preview-title" aria-live="polite">
+                <div class="ai-terms-preview-heading">
+                  <div>
+                    <p class="section-label">Preview</p>
+                    <h3 id="ai-terms-preview-title">Оцінка вартості</h3>
+                  </div>
+                  <span class="ai-terms-preview-state" id="ai-terms-preview-state">Рахуємо…</span>
+                </div>
+                <div class="ai-terms-preview-grid" id="ai-terms-preview-grid"></div>
+                <p class="ai-terms-preview-caption" id="ai-terms-preview-caption"></p>
+              </section>
+              <p class="form-message" id="ai-terms-form-message" aria-live="polite"></p>
+            </div>
+            <footer class="ai-dialog-footer">
+              <button class="ai-dialog-cancel" id="ai-terms-cancel" type="button">Скасувати</button>
+              <button class="ai-dialog-submit" id="ai-terms-submit" type="submit">
+                <span class="ai-js-icon" data-icon="check"></span>
+                Зберегти терміни
               </button>
             </footer>
           </form>
@@ -1168,6 +1219,7 @@
               <span>Роль</span>
               <select id="admin-user-role">
                 <option value="user">Користувач</option>
+                <option value="department_head">Керівник відділу</option>
                 <option value="admin">Адміністратор</option>
               </select>
             </label>
@@ -1176,6 +1228,13 @@
               <input id="admin-user-password" type="password" autocomplete="new-password">
             </label>
           </div>
+          <section class="admin-user-binotel-assignment" id="admin-user-binotel-assignment" hidden>
+            <div>
+              <strong>Менеджери Binotel</strong>
+              <span>Оберіть внутрішній номер менеджера. Якщо у нього їх кілька — відзначте всі.</span>
+            </div>
+            <div class="admin-user-binotel-managers" id="admin-user-binotel-managers"></div>
+          </section>
           <p class="form-message" id="admin-user-message" aria-live="polite"></p>
         </div>
         <footer class="account-dialog-footer">

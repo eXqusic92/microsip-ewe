@@ -2,6 +2,9 @@
 
 const crypto = require("crypto");
 
+const USER_ROLES = new Set(["admin", "department_head", "user"]);
+const AI_FEEDBACK_EDITOR_ROLES = new Set(["admin", "department_head"]);
+
 function text(value, fallback = "") {
   return value === null || value === undefined ? fallback : String(value).trim();
 }
@@ -12,6 +15,24 @@ function nowIso() {
 
 function normalizeUsername(value) {
   return text(value).toLowerCase();
+}
+
+function normalizeUserRole(value, fallback = "user") {
+  const role = text(value || fallback).toLowerCase();
+  return USER_ROLES.has(role) ? role : fallback;
+}
+
+function canEditAiFeedback(user) {
+  return AI_FEEDBACK_EDITOR_ROLES.has(normalizeUserRole(user && user.role));
+}
+
+function normalizeBinotelManagerNumbers(value) {
+  const values = Array.isArray(value) ? value : [];
+  return [...new Set(
+    values
+      .map((item) => text(item))
+      .filter((item) => item && item.length <= 80)
+  )];
 }
 
 function isValidUsername(value) {
@@ -33,7 +54,8 @@ function safeUser(user) {
     id: user.id,
     username: user.username,
     name: user.name || user.username,
-    role: user.role || "user",
+    role: normalizeUserRole(user.role),
+    binotelManagerNumbers: normalizeBinotelManagerNumbers(user.binotelManagerNumbers),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };
@@ -98,8 +120,11 @@ function mapUser(row) {
     id: row.id,
     username: row.username,
     name: row.name,
-    role: row.role || "user",
+    role: normalizeUserRole(row.role),
     password: row.password_hash,
+    binotelManagerNumbers: normalizeBinotelManagerNumbers(
+      row.binotel_manager_numbers
+    ),
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null
   };
@@ -129,6 +154,8 @@ class AuthService {
     this.pool = pool;
     this.sendJson = sendJson;
     this.readyPromise = null;
+    this.userRolesSchemaPromise = null;
+    this.binotelManagerAssignmentsSchemaPromise = null;
   }
 
   get cookieName() {
@@ -174,6 +201,8 @@ class AuthService {
   }
 
   async prepare() {
+    await this.ensureUserRolesSchema();
+    await this.ensureBinotelManagerAssignmentsSchema();
     await this.cleanupExpiredSessions();
     const count = await this.userCount();
     if (count > 0) {
@@ -211,6 +240,61 @@ class AuthService {
     return Number(result.rows[0] && result.rows[0].count) || 0;
   }
 
+  async ensureUserRolesSchema() {
+    if (!this.userRolesSchemaPromise) {
+      this.userRolesSchemaPromise = this.pool.query(
+        `
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1
+              FROM pg_constraint
+              WHERE conrelid = 'users'::regclass
+                AND conname = 'users_role_check'
+                AND position('department_head' in pg_get_constraintdef(oid)) > 0
+            ) THEN
+              ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+              ALTER TABLE users
+                ADD CONSTRAINT users_role_check
+                CHECK (role IN ('admin', 'department_head', 'user'));
+            END IF;
+          END
+          $$;
+        `
+      ).catch((error) => {
+        this.userRolesSchemaPromise = null;
+        throw error;
+      });
+    }
+
+    return this.userRolesSchemaPromise;
+  }
+
+  async ensureBinotelManagerAssignmentsSchema() {
+    if (!this.binotelManagerAssignmentsSchemaPromise) {
+      this.binotelManagerAssignmentsSchemaPromise = this.pool.query(
+        `
+          CREATE TABLE IF NOT EXISTS user_binotel_manager_assignments (
+            user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+            internal_number text NOT NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now(),
+            CONSTRAINT user_binotel_manager_assignments_pk PRIMARY KEY (user_id, internal_number),
+            CONSTRAINT user_binotel_manager_assignments_manager_uniq UNIQUE (internal_number)
+          );
+
+          CREATE INDEX IF NOT EXISTS user_binotel_manager_assignments_user_idx
+            ON user_binotel_manager_assignments (user_id, internal_number);
+        `
+      ).catch((error) => {
+        this.binotelManagerAssignmentsSchemaPromise = null;
+        throw error;
+      });
+    }
+
+    return this.binotelManagerAssignmentsSchemaPromise;
+  }
+
   async createUser({ username, password, name, role = "user" }) {
     const current = nowIso();
     const normalizedUsername = normalizeUsername(username);
@@ -228,7 +312,7 @@ class AuthService {
         crypto.randomUUID(),
         normalizedUsername,
         text(name, normalizedUsername) || normalizedUsername,
-        role === "admin" ? "admin" : "user",
+        normalizeUserRole(role),
         passwordHash,
         current
       ]
@@ -237,14 +321,55 @@ class AuthService {
   }
 
   async listUsers() {
+    await this.ensureBinotelManagerAssignmentsSchema();
     const result = await this.pool.query(
       `
-        SELECT id, username, name, role, created_at, updated_at
+        SELECT
+          users.id,
+          users.username,
+          users.name,
+          users.role,
+          users.created_at,
+          users.updated_at,
+          COALESCE(
+            array_agg(assignments.internal_number ORDER BY assignments.internal_number)
+              FILTER (WHERE assignments.internal_number IS NOT NULL),
+            ARRAY[]::text[]
+          ) AS binotel_manager_numbers
         FROM users
-        ORDER BY created_at ASC, username ASC
+        LEFT JOIN user_binotel_manager_assignments assignments
+          ON assignments.user_id = users.id
+        GROUP BY users.id, users.username, users.name, users.role, users.created_at, users.updated_at
+        ORDER BY users.created_at ASC, users.username ASC
       `
     );
     return result.rows.map(mapUser);
+  }
+
+  async replaceBinotelManagerAssignments(client, userId, numbers) {
+    const assignments = normalizeBinotelManagerNumbers(numbers);
+    await client.query(
+      "DELETE FROM user_binotel_manager_assignments WHERE user_id = $1",
+      [text(userId)]
+    );
+
+    if (!assignments.length) {
+      return;
+    }
+
+    await client.query(
+      `
+        INSERT INTO user_binotel_manager_assignments (
+          user_id,
+          internal_number,
+          created_at,
+          updated_at
+        )
+        SELECT $1, manager.internal_number, now(), now()
+        FROM unnest($2::text[]) AS manager(internal_number)
+      `,
+      [text(userId), assignments]
+    );
   }
 
   validateUserPayload(payload = {}, { requirePassword = false } = {}) {
@@ -257,7 +382,7 @@ class AuthService {
     }
 
     const role = text(payload.role || "user").toLowerCase();
-    if (!["admin", "user"].includes(role)) {
+    if (!USER_ROLES.has(role)) {
       throw requestError("Некоректна роль користувача.", "invalid_role");
     }
 
@@ -270,7 +395,12 @@ class AuthService {
       username,
       name: text(payload.name, username) || username,
       role,
-      password
+      password,
+      binotelManagerNumbers: role === "user"
+        ? normalizeBinotelManagerNumbers(
+            payload.binotelManagerNumbers || payload.binotelManagers
+          )
+        : []
     };
   }
 
@@ -291,12 +421,16 @@ class AuthService {
   }
 
   async createManagedUser(payload) {
+    await this.ensureUserRolesSchema();
+    await this.ensureBinotelManagerAssignmentsSchema();
     const user = this.validateUserPayload(payload, { requirePassword: true });
     const current = nowIso();
     const passwordHash = hashPassword(user.password, this.pbkdf2Iterations);
+    const client = await this.pool.connect();
 
     try {
-      const result = await this.pool.query(
+      await client.query("BEGIN");
+      const result = await client.query(
         `
           INSERT INTO users (
             id, username, name, role, password_hash, permissions, created_at, updated_at
@@ -313,16 +447,36 @@ class AuthService {
           current
         ]
       );
-      return mapUser(result.rows[0]);
+      const managedUser = mapUser(result.rows[0]);
+      await this.replaceBinotelManagerAssignments(
+        client,
+        managedUser.id,
+        user.binotelManagerNumbers
+      );
+      await client.query("COMMIT");
+      managedUser.binotelManagerNumbers = user.binotelManagerNumbers;
+      return managedUser;
     } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
       if (error && error.code === "23505") {
+        if (error.constraint === "user_binotel_manager_assignments_manager_uniq") {
+          throw requestError(
+            "Цей менеджер Binotel уже прив’язаний до іншого користувача.",
+            "binotel_manager_already_assigned",
+            409
+          );
+        }
         throw requestError("Користувач з таким логіном вже існує.", "username_taken", 409);
       }
       throw error;
+    } finally {
+      client.release();
     }
   }
 
   async updateManagedUser(userId, payload) {
+    await this.ensureUserRolesSchema();
+    await this.ensureBinotelManagerAssignmentsSchema();
     const user = this.validateUserPayload(payload, { requirePassword: false });
     const client = await this.pool.connect();
 
@@ -365,11 +519,25 @@ class AuthService {
         `,
         [existing.id, user.username, user.name, user.role, passwordHash]
       );
+      await this.replaceBinotelManagerAssignments(
+        client,
+        existing.id,
+        user.binotelManagerNumbers
+      );
       await client.query("COMMIT");
-      return mapUser(result.rows[0]);
+      const managedUser = mapUser(result.rows[0]);
+      managedUser.binotelManagerNumbers = user.binotelManagerNumbers;
+      return managedUser;
     } catch (error) {
       await client.query("ROLLBACK").catch(() => {});
       if (error && error.code === "23505") {
+        if (error.constraint === "user_binotel_manager_assignments_manager_uniq") {
+          throw requestError(
+            "Цей менеджер Binotel уже прив’язаний до іншого користувача.",
+            "binotel_manager_already_assigned",
+            409
+          );
+        }
         throw requestError("Користувач з таким логіном вже існує.", "username_taken", 409);
       }
       throw error;
@@ -414,11 +582,25 @@ class AuthService {
   }
 
   async readUserByUsername(username) {
+    await this.ensureBinotelManagerAssignmentsSchema();
     const result = await this.pool.query(
       `
-        SELECT id, username, name, role, password_hash, created_at, updated_at
+        SELECT
+          users.id,
+          users.username,
+          users.name,
+          users.role,
+          users.password_hash,
+          users.created_at,
+          users.updated_at,
+          ARRAY(
+            SELECT assignments.internal_number
+            FROM user_binotel_manager_assignments assignments
+            WHERE assignments.user_id = users.id
+            ORDER BY assignments.internal_number
+          ) AS binotel_manager_numbers
         FROM users
-        WHERE username = $1
+        WHERE users.username = $1
         LIMIT 1
       `,
       [normalizeUsername(username)]
@@ -427,11 +609,25 @@ class AuthService {
   }
 
   async readUserById(userId) {
+    await this.ensureBinotelManagerAssignmentsSchema();
     const result = await this.pool.query(
       `
-        SELECT id, username, name, role, password_hash, created_at, updated_at
+        SELECT
+          users.id,
+          users.username,
+          users.name,
+          users.role,
+          users.password_hash,
+          users.created_at,
+          users.updated_at,
+          ARRAY(
+            SELECT assignments.internal_number
+            FROM user_binotel_manager_assignments assignments
+            WHERE assignments.user_id = users.id
+            ORDER BY assignments.internal_number
+          ) AS binotel_manager_numbers
         FROM users
-        WHERE id = $1
+        WHERE users.id = $1
         LIMIT 1
       `,
       [text(userId)]
@@ -865,8 +1061,10 @@ class AuthService {
 
 module.exports = {
   AuthService,
+  canEditAiFeedback,
   hashPassword,
   isValidUsername,
+  normalizeUserRole,
   normalizeUsername,
   parseSeedAdmins,
   safeUser,

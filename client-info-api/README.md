@@ -61,7 +61,8 @@ metadata.
 
 Apply the app-state SQL files from `db/` with `psql` or another PostgreSQL
 client before starting the server. Existing databases created before auth need
-`db/002_auth.sql`. Then verify the code:
+`db/002_auth.sql`; databases created before the department-head role need
+`db/003_department_head_role.sql`. Then verify the code:
 
 ```bash
 npm run check
@@ -250,6 +251,7 @@ SONIOX_API_KEY=...
 SONIOX_BASE_URL=https://api.soniox.com/v1
 SONIOX_MODEL=stt-async-v5
 SONIOX_CONTEXT_MODE=minimal
+SONIOX_CONTEXT_VERSION=20260710-stations-v1
 SONIOX_LANGUAGE_HINTS=uk,ru,en
 SONIOX_LANGUAGE_HINTS_STRICT=false
 SONIOX_ENABLE_SPEAKER_DIARIZATION=true
@@ -306,6 +308,9 @@ Accuracy notes:
   only a short domain hint and the most important brand/booking terms. Use
   `full` to restore the older long `context.text` + full terms payload, or
   `none` to omit Soniox context completely.
+- `SONIOX_CONTEXT_VERSION` identifies the vocabulary used for transcription.
+  Bump it after changing Soniox terms so a manual reanalysis retranscribes old
+  audio once instead of reusing a transcript produced with the previous context.
 - `TRANSCRIPTION_AUDIO_PREPROCESSING=true` runs FFmpeg before Soniox:
   mono 16 kHz WAV, voice-band filters, and loudness normalization. If FFmpeg
   fails, the original Binotel audio is used.

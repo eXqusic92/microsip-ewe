@@ -1,22 +1,14 @@
 "use strict";
 
-const { DOMAIN_TERMS, TRANSCRIPTION_DOMAIN_PROMPT } = require("./ai-prompts");
+const crypto = require("crypto");
+
+const {
+  DOMAIN_TERMS,
+  TRANSCRIPTION_DOMAIN_PROMPT,
+  TRANSCRIPTION_DEFAULT_TERMS
+} = require("./ai-prompts");
 
 const DEFAULT_SONIOX_ASYNC_MODEL = "stt-async-v5";
-const MINIMAL_DOMAIN_TERMS = [
-  "DUMA",
-  "East West Eurolines",
-  "Іст Вест Євролайнс",
-  "EWE",
-  "бронювання",
-  "викуп",
-  "перенесення",
-  "повернення",
-  "скасування",
-  "посадка",
-  "автовокзал",
-  "АС"
-];
 
 function text(value) {
   return value === null || value === undefined ? "" : String(value).trim();
@@ -102,7 +94,25 @@ function sonioxErrorMessage(data, fallback) {
   return requestId ? `${base} (request_id: ${requestId})` : base;
 }
 
-function sonioxContext(mode) {
+function normalizeContextTerms(value, fallback) {
+  const source = Array.isArray(value) ? value : fallback;
+  const terms = [];
+  const seen = new Set();
+
+  for (const rawTerm of source) {
+    const term = text(rawTerm).replace(/\s+/g, " ");
+    const key = term.toLocaleLowerCase("uk-UA");
+    if (!term || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    terms.push(term);
+  }
+
+  return terms;
+}
+
+function buildSonioxContext(mode, configuredTerms) {
   const contextMode = text(mode || "minimal").toLowerCase();
 
   if (contextMode === "none") {
@@ -134,7 +144,7 @@ function sonioxContext(mode) {
         }
       ],
       text: TRANSCRIPTION_DOMAIN_PROMPT,
-      terms: DOMAIN_TERMS
+      terms: normalizeContextTerms(configuredTerms, DOMAIN_TERMS)
     };
   }
 
@@ -146,8 +156,21 @@ function sonioxContext(mode) {
           "Phone calls of bus company DUMA / East West Eurolines: tickets, routes, booking, baggage, boarding, returns and schedule changes."
       }
     ],
-    terms: MINIMAL_DOMAIN_TERMS
+    terms: normalizeContextTerms(configuredTerms, TRANSCRIPTION_DEFAULT_TERMS)
   };
+}
+
+function sonioxContextVersion(context, baseVersion) {
+  if (!context) {
+    return "";
+  }
+
+  const contextHash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(context))
+    .digest("hex")
+    .slice(0, 16);
+  return `${text(baseVersion) || "soniox-context"}:${contextHash}`;
 }
 
 function formatTimestamp(value) {
@@ -301,10 +324,46 @@ class SonioxClient {
   constructor(config) {
     this.config = config.soniox || {};
     this.provider = "soniox";
+    this.analysisSettingsProvider = null;
   }
 
   get enabled() {
     return Boolean(this.config.enabled && this.config.apiKey);
+  }
+
+  setAnalysisSettingsProvider(provider) {
+    this.analysisSettingsProvider = typeof provider === "function" ? provider : null;
+  }
+
+  async configuredTerms() {
+    if (!this.analysisSettingsProvider) {
+      return null;
+    }
+
+    const profile = await this.analysisSettingsProvider();
+    const settings = profile && profile.settings ? profile.settings : profile;
+    return Array.isArray(settings && settings.transcriptionTerms)
+      ? settings.transcriptionTerms
+      : null;
+  }
+
+  async context() {
+    return buildSonioxContext(
+      this.config.contextMode,
+      await this.configuredTerms()
+    );
+  }
+
+  async contextSnapshot() {
+    const context = await this.context();
+    return {
+      context,
+      version: sonioxContextVersion(context, this.config.contextVersion)
+    };
+  }
+
+  async contextVersion() {
+    return (await this.contextSnapshot()).version;
   }
 
   async request(path, options = {}) {
@@ -534,7 +593,10 @@ class SonioxClient {
         enable_language_identification:
           this.config.enableLanguageIdentification !== false
       };
-      const context = sonioxContext(this.config.contextMode);
+      const context = options.contextSnapshot &&
+        Object.prototype.hasOwnProperty.call(options.contextSnapshot, "context")
+        ? options.contextSnapshot.context
+        : await this.context();
 
       if (context) {
         body.context = context;
@@ -594,5 +656,7 @@ class SonioxClient {
 }
 
 module.exports = {
-  SonioxClient
+  buildSonioxContext,
+  SonioxClient,
+  sonioxContextVersion
 };
