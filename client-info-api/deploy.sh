@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY="${DEPLOY_REPOSITORY:-https://github.com/eXqusic92/microsip-ewe.git}"
+REPOSITORY="${DEPLOY_REPOSITORY:-git@github-client-info:eXqusic92/client-info.git}"
 BRANCH="${DEPLOY_BRANCH:-main}"
-TARGET="${DEPLOY_PATH:-/home/ewetech/ewe_crm}"
-SERVICE="${DEPLOY_SERVICE:-ewe-crm.service}"
-APP="$TARGET/client-info-api"
+TARGET="${DEPLOY_PATH:-/root/client-info}"
+SERVICE="${DEPLOY_SERVICE:-client-info.service}"
 
 if [[ ! -d "$TARGET/.git" ]]; then
   git clone --branch "$BRANCH" --single-branch "$REPOSITORY" "$TARGET"
@@ -13,10 +12,11 @@ else
   git -C "$TARGET" pull --ff-only origin "$BRANCH"
 fi
 
-cd "$APP"
+cd "$TARGET"
 npm ci --omit=dev
+npm run check
 
-sudo install -m 0644 "$APP/deploy/ewe-crm.service" "/etc/systemd/system/$SERVICE"
+sudo install -m 0644 "$TARGET/deploy/client-info.service" "/etc/systemd/system/$SERVICE"
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE"
 sudo systemctl restart "$SERVICE"

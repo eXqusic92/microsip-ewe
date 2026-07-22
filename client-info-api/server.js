@@ -395,6 +395,15 @@ function callStatsPeriod(searchParams) {
     };
   }
 
+  if (period === "month") {
+    const currentDate = kyivDateKey(now);
+    return {
+      periodKey: period,
+      from: parseKyivDateBoundary(`${currentDate.slice(0, 7)}-01`),
+      to: null
+    };
+  }
+
   const days = [7, 30, 90, 180].includes(Number(period)) ? Number(period) : 30;
   return {
     periodKey: String(days),
@@ -577,11 +586,91 @@ function callVisibilityForAuth(auth) {
   };
 }
 
+function isOrdinaryUser(user) {
+  return Boolean(user && user.role === "user");
+}
+
+function callMatchesVisibility(call, visibility) {
+  if (!visibility || visibility.restrictToAssignedInternalNumbers !== true) {
+    return true;
+  }
+
+  const assigned = new Set(
+    (visibility.assignedInternalNumbers || [])
+      .map((number) => String(number || "").trim())
+      .filter(Boolean)
+  );
+  return assigned.has(String(call && call.internalNumber || "").trim());
+}
+
+async function restrictClientCallsForAuth(payload, auth) {
+  const visibility = callVisibilityForAuth(auth);
+  if (!visibility.restrictToAssignedInternalNumbers) {
+    return payload;
+  }
+
+  const calls = (Array.isArray(payload && payload.calls) ? payload.calls : [])
+    .filter((call) => callMatchesVisibility(call, visibility));
+  const latestCall = calls[0] || null;
+  const latestCallId = String(
+    latestCall && (latestCall.generalCallId || latestCall.id || latestCall.callId) || ""
+  ).trim();
+
+  return {
+    ...(payload || {}),
+    calls,
+    latestCallSummary: latestCallId
+      ? await store.getCallSummaryByCallId(latestCallId)
+      : null,
+    restrictedToOwnCalls: true,
+    managerAssignmentMissing: !visibility.assignedInternalNumbers.length
+  };
+}
+
+function periodDays(period) {
+  const from = period && period.from ? new Date(period.from).getTime() : 0;
+  const to = period && period.to ? new Date(period.to).getTime() : Date.now();
+  return from && Number.isFinite(from) && Number.isFinite(to) && to > from
+    ? Math.max(1, Math.ceil((to - from) / (24 * 60 * 60 * 1000)))
+    : null;
+}
+
+function operatorRatingPayload(rating) {
+  const source = rating || {};
+  return {
+    ratedCalls: Number(source.ratedCalls || 0),
+    scoredMetrics: Number(source.scoredMetrics || 0),
+    averageScore: source.averageScore ?? null,
+    averageMaxScore: source.averageMaxScore ?? null,
+    averagePercent: source.averagePercent ?? null,
+    totalPercent: source.totalPercent ?? null,
+    metrics: Array.isArray(source.metrics) ? source.metrics : [],
+    daily: Array.isArray(source.daily) ? source.daily : []
+  };
+}
+
+function teamBenchmarkPayload(rating) {
+  const source = rating || {};
+  return {
+    ratedCalls: Number(source.ratedCalls || 0),
+    scoredMetrics: Number(source.scoredMetrics || 0),
+    averagePercent: source.averagePercent ?? null
+  };
+}
+
 function sendAiFeedbackForbidden(res) {
   sendJson(res, 403, {
     ok: false,
     error: "ai_feedback_editor_required",
     message: "AI-правки доступні лише керівнику відділу та адміністратору."
+  });
+}
+
+function sendManagerStatisticsForbidden(res) {
+  sendJson(res, 403, {
+    ok: false,
+    error: "manager_statistics_editor_required",
+    message: "Виключати дзвінки зі статистики може лише керівник відділу або адміністратор."
   });
 }
 
@@ -604,6 +693,14 @@ function sendTeamAnalyticsForbidden(res) {
     ok: false,
     error: "team_analytics_required",
     message: "Статистика та AI-аналітика доступні лише керівнику відділу й адміністратору."
+  });
+}
+
+function sendMyWorkForbidden(res) {
+  sendJson(res, 403, {
+    ok: false,
+    error: "ordinary_user_required",
+    message: "Розділ «Моя робота» доступний лише звичайному користувачу."
   });
 }
 
@@ -635,6 +732,18 @@ async function requirePageTeamAnalytics(req, res, requestUrl) {
   }
   if (!canViewTeamAnalytics(auth.user)) {
     redirect(res, "/client-card");
+    return null;
+  }
+  return auth;
+}
+
+async function requirePageOrdinaryUser(req, res, requestUrl) {
+  const auth = await requirePageAuth(req, res, requestUrl);
+  if (!auth) {
+    return null;
+  }
+  if (!isOrdinaryUser(auth.user)) {
+    redirect(res, "/calls-monitor");
     return null;
   }
   return auth;
@@ -722,7 +831,20 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/calls-monitor") {
-    if (!(await requirePageAuth(req, res, requestUrl))) {
+    const auth = await requirePageAuth(req, res, requestUrl);
+    if (!auth) {
+      return;
+    }
+    if (isOrdinaryUser(auth.user)) {
+      redirect(res, "/my-work");
+      return;
+    }
+    sendFile(res, "index.html");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/my-work") {
+    if (!(await requirePageOrdinaryUser(req, res, requestUrl))) {
       return;
     }
     sendFile(res, "index.html");
@@ -774,6 +896,14 @@ async function handleRequest(req, res) {
       return;
     }
     sendFile(res, "app.js");
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/page-lifecycle.js") {
+    if (!(await requirePageAuth(req, res, requestUrl))) {
+      return;
+    }
+    sendFile(res, "page-lifecycle.js");
     return;
   }
 
@@ -1012,6 +1142,63 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/api/my-work/summary") {
+    if (!isOrdinaryUser(requestAuth && requestAuth.user)) {
+      sendMyWorkForbidden(res);
+      return;
+    }
+
+    const period = callStatsPeriod(requestUrl.searchParams);
+    if (
+      requestUrl.searchParams.get("period") === "custom" &&
+      (!period.from ||
+        !period.to ||
+        new Date(period.to).getTime() <= new Date(period.from).getTime())
+    ) {
+      sendJson(res, 400, {
+        ok: false,
+        error: "Некоректний період розділу «Моя робота»."
+      });
+      return;
+    }
+
+    const visibility = callVisibilityForAuth(requestAuth);
+    const analyticsOptions = {
+      since: period.from,
+      to: period.to,
+      periodDays: periodDays(period)
+    };
+    const [statistics, ownRating, teamRating] = await Promise.all([
+      binotelMonitor.callStatistics({
+        ...analyticsOptions,
+        from: period.from,
+        periodKey: period.periodKey,
+        timezone: "Europe/Kyiv",
+        ...visibility
+      }),
+      binotelMonitor.managerRating({
+        ...analyticsOptions,
+        ...visibility
+      }),
+      binotelMonitor.managerRating(analyticsOptions)
+    ]);
+
+    sendJson(res, 200, {
+      ok: true,
+      period: {
+        key: period.periodKey,
+        from: period.from,
+        to: period.to,
+        timezone: "Europe/Kyiv"
+      },
+      statistics,
+      rating: operatorRatingPayload(ownRating),
+      teamBenchmark: teamBenchmarkPayload(teamRating),
+      managerAssignmentMissing: !visibility.assignedInternalNumbers.length
+    });
+    return;
+  }
+
   if (req.method === "GET" && requestUrl.pathname === "/api/client-card") {
     const phone = normalizePhone(requestUrl.searchParams.get("phone"));
 
@@ -1026,11 +1213,20 @@ async function handleRequest(req, res) {
     const fast = ["1", "true", "yes"].includes(
       String(requestUrl.searchParams.get("fast") || "").toLowerCase()
     );
-    sendJson(
-      res,
-      200,
-      fast ? await store.getClientCardBase(phone) : await store.getClientCard(phone)
-    );
+    const card = fast
+      ? await store.getClientCardBase(phone)
+      : await store.getClientCard(phone);
+    if (!fast && isOrdinaryUser(requestAuth && requestAuth.user)) {
+      const restrictedCalls = await restrictClientCallsForAuth({
+        calls: card.calls,
+        latestCallSummary: card.latestCallSummary
+      }, requestAuth);
+      card.calls = restrictedCalls.calls;
+      card.latestCallSummary = restrictedCalls.latestCallSummary;
+      card.restrictedToOwnCalls = true;
+      card.managerAssignmentMissing = restrictedCalls.managerAssignmentMissing;
+    }
+    sendJson(res, 200, card);
     return;
   }
 
@@ -1044,7 +1240,11 @@ async function handleRequest(req, res) {
       return;
     }
 
-    sendJson(res, 200, await store.getClientCardCalls(phone));
+    sendJson(
+      res,
+      200,
+      await restrictClientCallsForAuth(await store.getClientCardCalls(phone), requestAuth)
+    );
     return;
   }
 
@@ -1155,6 +1355,16 @@ async function handleRequest(req, res) {
   if (req.method === "GET" && requestUrl.pathname === "/api/call-summary") {
     const callId = String(requestUrl.searchParams.get("callId") || "").trim();
     if (callId) {
+      if (
+        isOrdinaryUser(requestAuth && requestAuth.user) &&
+        !(await binotelMonitor.visibleCall(callId, callVisibilityForAuth(requestAuth)))
+      ) {
+        sendJson(res, 404, {
+          status: "not_available",
+          error: "call was not found in your call history"
+        });
+        return;
+      }
       sendJson(res, 200, await store.getCallSummaryByCallId(callId));
       return;
     }
@@ -1166,6 +1376,22 @@ async function handleRequest(req, res) {
         status: "failed",
         error: "phone or callId query parameter is required"
       });
+      return;
+    }
+
+    if (isOrdinaryUser(requestAuth && requestAuth.user)) {
+      const restricted = await restrictClientCallsForAuth(
+        await store.getClientCardCalls(phone),
+        requestAuth
+      );
+      sendJson(
+        res,
+        200,
+        restricted.latestCallSummary || {
+          status: "not_available",
+          message: "Для ваших дзвінків із цим клієнтом немає AI-підсумку."
+        }
+      );
       return;
     }
 
@@ -1247,12 +1473,68 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/api/binotel-monitor/operators") {
+    if (!canViewTeamAnalytics(requestAuth && requestAuth.user)) {
+      sendTeamAnalyticsForbidden(res);
+      return;
+    }
+    const result = await binotelMonitorStore.analysisInternalNumbers();
+    sendJson(res, 200, {
+      ok: true,
+      operators: result.numbers
+        .filter((item) => item.enabled !== false)
+        .map((item) => ({
+          number: item.number,
+          label: item.label,
+          employeeName: item.employeeName,
+          pbxName: item.pbxName
+        }))
+    });
+    return;
+  }
+
   if (req.method === "GET" && requestUrl.pathname === "/api/binotel-monitor/calls") {
     const limit = Number(requestUrl.searchParams.get("limit") || 100);
     const offset = Number(requestUrl.searchParams.get("offset") || 0);
     const query = requestUrl.searchParams.get("q") || "";
     const callType = requestUrl.searchParams.get("callType") || "";
     const problem = requestUrl.searchParams.get("problem") || "";
+    const requestedPeriod = requestUrl.searchParams.get("period");
+    const rawFrom = requestUrl.searchParams.get("from");
+    const rawTo = requestUrl.searchParams.get("to");
+    const customFrom = parseKyivDateBoundary(rawFrom);
+    const customTo = parseKyivDateBoundary(rawTo, true);
+    const period = requestedPeriod
+      ? callStatsPeriod(requestUrl.searchParams)
+      : rawFrom || rawTo
+        ? {
+            periodKey: "custom",
+            from: customFrom,
+            to: customTo
+          }
+        : null;
+    const selectedInternalNumbers = [...new Set(
+      requestUrl.searchParams
+        .getAll("operator")
+        .flatMap((value) => String(value || "").split(","))
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )].slice(0, 200);
+    if (
+      (requestedPeriod === "custom" && (!customFrom || !customTo)) ||
+      (rawFrom && !customFrom) ||
+      (rawTo && !customTo) ||
+      (period &&
+        period.from &&
+        period.to &&
+        new Date(period.to).getTime() <= new Date(period.from).getTime())
+    ) {
+      sendJson(res, 400, {
+        ok: false,
+        error: "Некоректний період списку дзвінків."
+      });
+      return;
+    }
     const visibility = callVisibilityForAuth(requestAuth);
     const result = await binotelMonitor.listCalls({
       limit,
@@ -1260,10 +1542,21 @@ async function handleRequest(req, res) {
       query,
       callType,
       problem,
+      since: period && period.from,
+      to: period && period.to,
+      selectedInternalNumbers,
       ...visibility
     });
     sendJson(res, 200, {
       ...result,
+      period: period
+        ? {
+            key: period.periodKey,
+            from: period.from,
+            to: period.to,
+            timezone: "Europe/Kyiv"
+          }
+        : null,
       restrictedToOwnCalls: visibility.restrictToAssignedInternalNumbers,
       managerAssignmentMissing: Boolean(
         visibility.restrictToAssignedInternalNumbers &&
@@ -1283,7 +1576,10 @@ async function handleRequest(req, res) {
       return;
     }
 
-    const call = await binotelMonitor.callDetails(callId);
+    const call = await binotelMonitor.callDetails(
+      callId,
+      callVisibilityForAuth(requestAuth)
+    );
     if (!call) {
       sendJson(res, 404, {
         ok: false,
@@ -1306,6 +1602,71 @@ async function handleRequest(req, res) {
     }
 
     sendJson(res, 200, call);
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/binotel-monitor/call/manager-statistics") {
+    if (req.method !== "PUT") {
+      res.writeHead(405, { Allow: "PUT" });
+      res.end("Method not allowed");
+      return;
+    }
+    if (!requestAuth || !canViewTeamAnalytics(requestAuth.user)) {
+      sendManagerStatisticsForbidden(res);
+      return;
+    }
+
+    try {
+      const payload = await readJsonBody(req, 16 * 1024);
+      const callId = String(payload.callId || "").trim();
+      if (!callId) {
+        sendJson(res, 400, {
+          ok: false,
+          error: "call_id_required",
+          message: "callId is required"
+        });
+        return;
+      }
+      if (typeof payload.excluded !== "boolean") {
+        sendJson(res, 400, {
+          ok: false,
+          error: "excluded_boolean_required",
+          message: "Поле excluded має бути true або false."
+        });
+        return;
+      }
+
+      const managerStatistics = await binotelMonitor.setManagerStatisticsExcluded(
+        callId,
+        payload.excluded,
+        requestAuth.user,
+        callVisibilityForAuth(requestAuth)
+      );
+      if (!managerStatistics) {
+        sendJson(res, 404, {
+          ok: false,
+          error: "call_not_found",
+          message: "Дзвінок не знайдено."
+        });
+        return;
+      }
+
+      sendJson(res, 200, {
+        ok: true,
+        managerStatistics
+      });
+    } catch (error) {
+      const statusCode = ["invalid_json", "request_body_too_large"].includes(
+        error.message
+      )
+        ? 400
+        : Number(error.statusCode) || 500;
+      sendJson(res, statusCode, {
+        ok: false,
+        error: error.publicError || error.message || "manager_statistics_update_failed",
+        message: error.message || "Не вдалося оновити статистику менеджера."
+      });
+    }
     return;
   }
 
@@ -1338,6 +1699,16 @@ async function handleRequest(req, res) {
           sendJson(res, 400, {
             ok: false,
             error: "callId query parameter is required"
+          });
+          return;
+        }
+        if (
+          isOrdinaryUser(auth.user) &&
+          !(await binotelMonitor.visibleCall(callId, callVisibilityForAuth(auth)))
+        ) {
+          sendJson(res, 404, {
+            ok: false,
+            error: "call was not found in your call history"
           });
           return;
         }
@@ -1448,13 +1819,15 @@ async function handleRequest(req, res) {
       const feedbackId = decodeURIComponent(metricFeedbackPromptMatch[1] || "");
       if (req.method === "GET") {
         const preview = await appStateDatabase.aiMetricFeedbackStore.promptUpdatePreview(feedbackId);
+        const publicPreview = { ...preview };
+        delete publicPreview.callContext;
         const regenerate = ["1", "true", "yes"].includes(
           String(requestUrl.searchParams.get("regenerate") || "").trim().toLowerCase()
         );
         if (!regenerate && preview.promptUpdateDraft && preview.promptUpdateDraft.proposal) {
           sendJson(res, 200, {
             ok: true,
-            ...preview,
+            ...publicPreview,
             proposal: preview.promptUpdateDraft.proposal
           });
           return;
@@ -1524,7 +1897,10 @@ async function handleRequest(req, res) {
         return;
       }
 
-      const ai = await binotelMonitor.reanalyzeCall(callId);
+      const ai = await binotelMonitor.reanalyzeCall(
+        callId,
+        callVisibilityForAuth(requestAuth)
+      );
       if (!ai) {
         sendJson(res, 404, {
           ok: false,
@@ -1553,43 +1929,46 @@ async function handleRequest(req, res) {
     }
     const query = requestUrl.searchParams.get("q") || "";
     const requestedPeriod = requestUrl.searchParams.get("period") || "30";
-    const utcNow = new Date();
-    const utcTodayStart = new Date(Date.UTC(
-      utcNow.getUTCFullYear(),
-      utcNow.getUTCMonth(),
-      utcNow.getUTCDate()
-    )).toISOString();
+    const period = callStatsPeriod(requestUrl.searchParams);
+    if (
+      requestedPeriod === "custom" &&
+      (!period.from || !period.to || new Date(period.to).getTime() <= new Date(period.from).getTime())
+    ) {
+      sendJson(res, 400, {
+        ok: false,
+        error: "Некоректний власний період AI-аналітики."
+      });
+      return;
+    }
     const periodDays = requestedPeriod === "all"
       ? null
       : requestedPeriod === "today"
         ? 1
-        : [7, 30].includes(Number(requestedPeriod))
+        : [7, 30, 90, 180].includes(Number(requestedPeriod))
           ? Number(requestedPeriod)
-          : 30;
-    const since = requestedPeriod === "today"
-      ? utcTodayStart
-      : periodDays
-        ? new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString()
-        : null;
+          : null;
 
     const visibility = callVisibilityForAuth(requestAuth);
+    const analyticsOptions = {
+      query,
+      since: period.from,
+      to: period.to,
+      periodDays,
+      ...visibility
+    };
     const [analytics, managerRating] = await Promise.all([
-      binotelMonitor.callTypeAnalytics({
-        query,
-        since,
-        periodDays,
-        ...visibility
-      }),
-      binotelMonitor.managerRating({
-        query,
-        since,
-        periodDays,
-        ...visibility
-      })
+      binotelMonitor.callTypeAnalytics(analyticsOptions),
+      binotelMonitor.managerRating(analyticsOptions)
     ]);
 
     sendJson(res, 200, {
       ...analytics,
+      period: {
+        key: period.periodKey,
+        from: period.from,
+        to: period.to,
+        timezone: "Europe/Kyiv"
+      },
       managerRating
     });
     return;
@@ -1640,7 +2019,10 @@ async function handleRequest(req, res) {
     }
 
     try {
-      const call = await binotelMonitor.visibleCall(callId);
+      const call = await binotelMonitor.visibleCall(
+        callId,
+        callVisibilityForAuth(requestAuth)
+      );
       if (!call) {
         sendJson(res, 404, {
           ok: false,

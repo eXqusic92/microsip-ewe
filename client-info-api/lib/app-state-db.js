@@ -1898,7 +1898,13 @@ function normalizePromptRewriteProposal(proposal = {}, metric = {}) {
   return normalized;
 }
 
-function metricPromptDraftSourceHash(feedback = {}, target = {}, currentPrompt = {}, revision = "") {
+function metricPromptDraftSourceHash(
+  feedback = {},
+  target = {},
+  currentPrompt = {},
+  revision = "",
+  callContext = null
+) {
   return crypto
     .createHash("sha256")
     .update(JSON.stringify({
@@ -1906,7 +1912,8 @@ function metricPromptDraftSourceHash(feedback = {}, target = {}, currentPrompt =
       feedbackText: text(feedback.text || feedback.feedbackText),
       target,
       settingsRevision: text(revision),
-      currentPrompt
+      currentPrompt,
+      callContext
     }))
     .digest("hex");
 }
@@ -2341,6 +2348,188 @@ class PostgresAiMetricFeedbackStore {
     return this.getById(result.rows[0] && result.rows[0].id);
   }
 
+  async promptRewriteCallContext(callId) {
+    const normalizedCallId = text(callId);
+    const [summaryResult, segmentsResult, speakersResult, metricsResult] = await Promise.all([
+      this.pool.query(
+        `
+          SELECT
+            summaries.call_id AS summary_call_id,
+            summaries.general_call_id AS summary_general_call_id,
+            summaries.phone AS summary_phone,
+            summaries.phone_digits AS summary_phone_digits,
+            summaries.call_started_at,
+            summaries.call_duration_sec,
+            summaries.status AS summary_status,
+            summaries.stage AS summary_stage,
+            summaries.message AS summary_message,
+            summaries.error AS summary_error,
+            summaries.summary_text,
+            summaries.summary_model,
+            summaries.transcription_model,
+            summaries.transcription_provider,
+            summaries.summary_version,
+            summaries.call_type,
+            summaries.call_type_label,
+            summaries.call_type_confidence,
+            summaries.custom_overall_score,
+            summaries.confidence AS summary_confidence,
+            summaries.analysis_schema_version,
+            summaries.analysis_revision,
+            summaries.analysis_semantic_revision,
+            summaries.analysis_scoring_revision,
+            summaries.summary_payload,
+            summaries.transcript_payload,
+            summaries.transcription_payload,
+            summaries.models_payload,
+            summaries.client_context_payload,
+            calls.call_id AS source_call_id,
+            calls.started_at AS source_started_at,
+            calls.external_number,
+            calls.internal_number,
+            calls.internal_additional_data,
+            calls.bill_sec,
+            calls.disposition,
+            calls.disposition_label,
+            calls.employee_payload,
+            calls.pbx_number_payload
+          FROM call_summaries summaries
+          LEFT JOIN LATERAL (
+            SELECT source_calls.*
+            FROM binotel_calls source_calls
+            WHERE source_calls.general_call_id = summaries.call_id
+               OR source_calls.call_id = summaries.call_id
+            ORDER BY source_calls.started_at DESC NULLS LAST, source_calls.call_id DESC
+            LIMIT 1
+          ) calls ON true
+          WHERE summaries.call_id = $1
+          LIMIT 1
+        `,
+        [normalizedCallId]
+      ),
+      this.pool.query(
+        `
+          SELECT
+            segment_index,
+            speaker,
+            started_sec,
+            ended_sec,
+            text,
+            payload
+          FROM call_summary_transcript_segments
+          WHERE call_id = $1
+          ORDER BY segment_index
+        `,
+        [normalizedCallId]
+      ),
+      this.pool.query(
+        `
+          SELECT speaker, role, evidence, payload
+          FROM call_summary_speakers
+          WHERE call_id = $1
+          ORDER BY id
+        `,
+        [normalizedCallId]
+      ),
+      this.pool.query(
+        `
+          SELECT
+            metric_key,
+            metric_label,
+            metric_group,
+            selected_option_key,
+            selected_option_label,
+            score,
+            max_score,
+            color,
+            counts_toward_score,
+            evidence,
+            improvement,
+            confidence,
+            payload AS metric_payload
+          FROM call_summary_metric_results
+          WHERE call_id = $1
+          ORDER BY id
+        `,
+        [normalizedCallId]
+      )
+    ]);
+    const row = summaryResult.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    const transcriptSegments = segmentsResult.rows.map((segment) => ({
+      ...(cloneJson(segment.payload, {}) || {}),
+      index: integer(segment.segment_index, 0),
+      speaker: text(segment.speaker),
+      start: optionalNumber(segment.started_sec),
+      end: optionalNumber(segment.ended_sec),
+      text: text(segment.text)
+    }));
+    const transcript = cloneJson(row.transcript_payload, {}) || {};
+    if (transcriptSegments.length) {
+      transcript.segments = transcriptSegments;
+    }
+    const analysisResult = cloneJson(row.summary_payload, {}) || {};
+    if (!text(analysisResult.summary) && text(row.summary_text)) {
+      analysisResult.summary = text(row.summary_text);
+    }
+
+    return {
+      call: {
+        callId: text(row.summary_call_id),
+        generalCallId: text(row.summary_general_call_id),
+        sourceCallId: text(row.source_call_id),
+        phone: text(row.summary_phone),
+        phoneDigits: text(row.summary_phone_digits),
+        externalNumber: text(row.external_number),
+        internalNumber: text(row.internal_number),
+        internalAdditionalData: text(row.internal_additional_data),
+        operatorName: feedbackOperatorName(row),
+        startedAt:
+          optionalTimestamp(row.call_started_at) ||
+          optionalTimestamp(row.source_started_at),
+        durationSec: integer(row.call_duration_sec || row.bill_sec, 0),
+        disposition: text(row.disposition),
+        dispositionLabel: text(row.disposition_label),
+        status: text(row.summary_status),
+        stage: text(row.summary_stage),
+        message: text(row.summary_message),
+        error: text(row.summary_error),
+        callType: text(row.call_type),
+        callTypeLabel: text(row.call_type_label),
+        callTypeConfidence: optionalNumber(row.call_type_confidence),
+        customOverallScore: optionalNumber(row.custom_overall_score),
+        confidence: optionalNumber(row.summary_confidence),
+        analysis: {
+          schemaVersion: text(row.analysis_schema_version),
+          revision: text(row.analysis_revision),
+          semanticRevision: text(row.analysis_semantic_revision),
+          scoringRevision: text(row.analysis_scoring_revision)
+        }
+      },
+      transcript,
+      speakers: speakersResult.rows.map((speaker) => ({
+        ...(cloneJson(speaker.payload, {}) || {}),
+        speaker: text(speaker.speaker),
+        role: text(speaker.role, "unknown"),
+        evidence: text(speaker.evidence)
+      })),
+      analysisResult,
+      metricResults: metricsResult.rows.map(feedbackMetricSnapshot),
+      clientContext: cloneJson(row.client_context_payload, {}) || {},
+      transcription: cloneJson(row.transcription_payload, {}) || {},
+      models: {
+        ...(cloneJson(row.models_payload, {}) || {}),
+        summary: text(row.summary_model),
+        transcription: text(row.transcription_model),
+        transcriptionProvider: text(row.transcription_provider),
+        summaryVersion: text(row.summary_version)
+      }
+    };
+  }
+
   async promptUpdatePreview(id) {
     await this.ensureSchema();
     const settingsStore = this.requireAiAnalysisSettingsStore();
@@ -2361,11 +2550,20 @@ class PostgresAiMetricFeedbackStore {
 
     const currentPrompt = metricPromptBundle(target.metric);
     const revision = settingsRevision(target.settings);
+    const callContext = await this.promptRewriteCallContext(feedback.callId);
+    if (!callContext) {
+      throw appStateRequestError(
+        "Контекст дзвінка для цієї правки не знайдено.",
+        "metric_feedback_call_context_not_found",
+        404
+      );
+    }
     const draftSourceHash = metricPromptDraftSourceHash(
       feedback,
       target.target,
       currentPrompt,
-      revision
+      revision,
+      callContext
     );
     const promptUpdateDraft = metricPromptDraftFromPayload(
       feedback.promptUpdateDraft,
@@ -2376,6 +2574,7 @@ class PostgresAiMetricFeedbackStore {
       feedback,
       target: target.target,
       currentPrompt,
+      callContext,
       settingsRevision: revision,
       draftSourceHash,
       promptUpdate: feedback.promptUpdate || null,
@@ -2408,6 +2607,14 @@ class PostgresAiMetricFeedbackStore {
 
     const currentPrompt = metricPromptBundle(target.metric);
     const revision = settingsRevision(target.settings);
+    const callContext = await this.promptRewriteCallContext(feedback.callId);
+    if (!callContext) {
+      throw appStateRequestError(
+        "Контекст дзвінка для цієї правки не знайдено.",
+        "metric_feedback_call_context_not_found",
+        404
+      );
+    }
     const proposal = normalizePromptRewriteProposal(proposalInput, target.metric);
     const actor = feedbackActor(user);
     const draft = {
@@ -2419,7 +2626,8 @@ class PostgresAiMetricFeedbackStore {
         feedback,
         target.target,
         currentPrompt,
-        revision
+        revision,
+        callContext
       ),
       target: target.target,
       proposal
@@ -2701,6 +2909,7 @@ function monitorAnalyticsRow(row) {
     ai: row && row.ai_status
       ? {
           status: text(row.ai_status),
+          managerStatisticsExcluded: Boolean(row.manager_statistics_excluded),
           summary,
           usage,
           models: {
@@ -2792,6 +3001,22 @@ function appendAssignedInternalNumbersClause(clauses, values, alias, options = {
   const numbers = assignedInternalNumbers(options);
   if (!numbers.length) {
     clauses.push("FALSE");
+    return;
+  }
+
+  values.push(numbers);
+  clauses.push(`${alias}.internal_number = ANY($${values.length}::text[])`);
+}
+
+function appendSelectedInternalNumbersClause(clauses, values, alias, options = {}) {
+  const numbers = [...new Set(
+    (Array.isArray(options.selectedInternalNumbers)
+      ? options.selectedInternalNumbers
+      : [])
+      .map((item) => text(item))
+      .filter(Boolean)
+  )];
+  if (!numbers.length) {
     return;
   }
 
@@ -2915,6 +3140,7 @@ class PostgresBinotelMonitorStore {
     this.pool = pool;
     this.maxCalls = options.maxCalls === undefined ? 2000 : Number(options.maxCalls);
     this.analysisInternalNumbersSchemaPromise = null;
+    this.managerStatisticsExclusionsSchemaPromise = null;
   }
 
   async ensureAnalysisInternalNumbersSchema() {
@@ -2943,6 +3169,135 @@ class PostgresBinotelMonitorStore {
     }
 
     return this.analysisInternalNumbersSchemaPromise;
+  }
+
+  async ensureManagerStatisticsExclusionsSchema() {
+    if (!this.managerStatisticsExclusionsSchemaPromise) {
+      this.managerStatisticsExclusionsSchemaPromise = this.pool.query(
+        `
+          CREATE TABLE IF NOT EXISTS call_manager_statistics_exclusions (
+            call_id text PRIMARY KEY REFERENCES call_summaries(call_id) ON DELETE CASCADE,
+            excluded boolean NOT NULL DEFAULT true,
+            changed_by_user_id text NOT NULL DEFAULT '',
+            changed_by_username text NOT NULL DEFAULT '',
+            changed_by_name text NOT NULL DEFAULT '',
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+          );
+
+          CREATE INDEX IF NOT EXISTS call_manager_statistics_exclusions_active_idx
+            ON call_manager_statistics_exclusions (call_id)
+            WHERE excluded = true;
+        `
+      ).catch((error) => {
+        this.managerStatisticsExclusionsSchemaPromise = null;
+        throw error;
+      });
+    }
+
+    return this.managerStatisticsExclusionsSchemaPromise;
+  }
+
+  async managerStatisticsExclusion(callId) {
+    await this.ensureManagerStatisticsExclusionsSchema();
+    const normalizedCallId = text(callId);
+    if (!normalizedCallId) {
+      return {
+        excluded: false,
+        updatedAt: null,
+        updatedBy: null
+      };
+    }
+
+    const result = await this.pool.query(
+      `
+        SELECT
+          excluded,
+          changed_by_user_id,
+          changed_by_username,
+          changed_by_name,
+          updated_at
+        FROM call_manager_statistics_exclusions
+        WHERE call_id = $1
+        LIMIT 1
+      `,
+      [normalizedCallId]
+    );
+    const row = result.rows[0];
+    return {
+      excluded: Boolean(row && row.excluded),
+      updatedAt: optionalTimestamp(row && row.updated_at),
+      updatedBy: row
+        ? {
+            id: text(row.changed_by_user_id),
+            username: text(row.changed_by_username),
+            name: text(row.changed_by_name)
+          }
+        : null
+    };
+  }
+
+  async setManagerStatisticsExcluded(callId, excluded, user = {}) {
+    await this.ensureManagerStatisticsExclusionsSchema();
+    const normalizedCallId = text(callId);
+    if (!normalizedCallId) {
+      throw appStateRequestError("callId is required", "call_id_required");
+    }
+
+    const actor = feedbackActor(user);
+    const result = await this.pool.query(
+      `
+        INSERT INTO call_manager_statistics_exclusions (
+          call_id,
+          excluded,
+          changed_by_user_id,
+          changed_by_username,
+          changed_by_name,
+          created_at,
+          updated_at
+        )
+        SELECT $1, $2, $3, $4, $5, now(), now()
+        FROM call_summaries
+        WHERE call_id = $1
+        ON CONFLICT (call_id) DO UPDATE SET
+          excluded = EXCLUDED.excluded,
+          changed_by_user_id = EXCLUDED.changed_by_user_id,
+          changed_by_username = EXCLUDED.changed_by_username,
+          changed_by_name = EXCLUDED.changed_by_name,
+          updated_at = now()
+        RETURNING
+          excluded,
+          changed_by_user_id,
+          changed_by_username,
+          changed_by_name,
+          updated_at
+      `,
+      [
+        normalizedCallId,
+        Boolean(excluded),
+        actor.id,
+        actor.username,
+        actor.name
+      ]
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw appStateRequestError(
+        "AI-оцінку цього дзвінка не знайдено.",
+        "call_summary_not_found",
+        404
+      );
+    }
+
+    return {
+      excluded: Boolean(row.excluded),
+      updatedAt: optionalTimestamp(row.updated_at),
+      updatedBy: {
+        id: text(row.changed_by_user_id),
+        username: text(row.changed_by_username),
+        name: text(row.changed_by_name)
+      }
+    };
   }
 
   async analysisInternalNumbers() {
@@ -3256,10 +3611,16 @@ class PostgresBinotelMonitorStore {
     }
 
     appendAssignedInternalNumbersClause(clauses, values, "calls", options);
+    appendSelectedInternalNumbersClause(clauses, values, "calls", options);
 
     if (options.since) {
       values.push(optionalTimestamp(options.since));
       clauses.push(`calls.started_at >= $${values.length}`);
+    }
+
+    if (options.to) {
+      values.push(optionalTimestamp(options.to));
+      clauses.push(`calls.started_at < $${values.length}`);
     }
 
     if (query) {
@@ -3322,6 +3683,7 @@ class PostgresBinotelMonitorStore {
 
   async analytics(options = {}) {
     await this.ensureAnalysisInternalNumbersSchema();
+    await this.ensureManagerStatisticsExclusionsSchema();
     const limit = Math.max(
       1,
       Math.min(Number(options.limit || 100), this.maxCalls || 5000, 5000)
@@ -3407,6 +3769,7 @@ class PostgresBinotelMonitorStore {
           summaries.call_type_label AS summary_call_type_label,
           summaries.summary_model,
           summaries.transcription_model,
+          COALESCE(manager_statistics.excluded, false) AS manager_statistics_excluded,
           jsonb_strip_nulls(jsonb_build_object(
             'customerQuestions', summaries.summary_payload->'customerQuestions',
             'escalation', summaries.summary_payload->'escalation',
@@ -3423,6 +3786,8 @@ class PostgresBinotelMonitorStore {
         FROM filtered_calls
         LEFT JOIN call_summaries summaries
           ON summaries.call_id = filtered_calls.general_call_id
+        LEFT JOIN call_manager_statistics_exclusions manager_statistics
+          ON manager_statistics.call_id = summaries.call_id
         LEFT JOIN call_summary_usage usage
           ON usage.call_id = summaries.call_id
          AND usage.scope = 'summary'
@@ -3768,6 +4133,7 @@ class PostgresBinotelMonitorStore {
 
   async managerRating(options = {}) {
     await this.ensureAnalysisInternalNumbersSchema();
+    await this.ensureManagerStatisticsExclusionsSchema();
     const limit = Math.max(
       1,
       Math.min(Number(options.limit || 5000), this.maxCalls || 5000, 5000)
@@ -3780,7 +4146,13 @@ class PostgresBinotelMonitorStore {
       "metrics.counts_toward_score = true",
       "metrics.score IS NOT NULL",
       "metrics.max_score IS NOT NULL",
-      "metrics.max_score > 0"
+      "metrics.max_score > 0",
+      `NOT EXISTS (
+        SELECT 1
+        FROM call_manager_statistics_exclusions manager_statistics
+        WHERE manager_statistics.call_id = summaries.call_id
+          AND manager_statistics.excluded = true
+      )`
     ];
     const values = [];
 
@@ -3790,6 +4162,11 @@ class PostgresBinotelMonitorStore {
     if (options.since) {
       values.push(optionalTimestamp(options.since));
       callClauses.push(`source_calls.started_at >= $${values.length}`);
+    }
+
+    if (options.to) {
+      values.push(optionalTimestamp(options.to));
+      callClauses.push(`source_calls.started_at < $${values.length}`);
     }
 
     if (query) {

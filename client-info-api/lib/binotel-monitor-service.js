@@ -92,6 +92,15 @@ function callVisibilityCacheKey(options = {}) {
     : "all";
 }
 
+function isCallVisibleForOptions(call, options = {}) {
+  const visibility = callVisibilityOptions(options);
+  if (!visibility.restrictToAssignedInternalNumbers) {
+    return true;
+  }
+
+  return visibility.assignedInternalNumbers.includes(internalNumber(call));
+}
+
 function numeric(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -315,9 +324,46 @@ function metricRatingList(map) {
     });
 }
 
+function addDailyRating(map, row, score, maxScore, percent) {
+  const startedAt = row && row.startedAt ? new Date(row.startedAt) : null;
+  if (!startedAt || !Number.isFinite(startedAt.getTime())) {
+    return;
+  }
+
+  const dayKey = startedAt.toISOString().slice(0, 10);
+  const current = map.get(dayKey) || {
+    dayKey,
+    calls: new Set(),
+    scoredMetricCount: 0,
+    scoreSum: 0,
+    maxScoreSum: 0,
+    normalizedScoreSum: 0
+  };
+  const callId = String(row.callId || "").trim();
+  if (callId) {
+    current.calls.add(callId);
+  }
+  current.scoredMetricCount += 1;
+  current.scoreSum += score;
+  current.maxScoreSum += maxScore;
+  current.normalizedScoreSum += percent;
+  map.set(dayKey, current);
+}
+
+function dailyRatingList(map) {
+  return [...map.values()]
+    .map((day) => ({
+      dayKey: day.dayKey,
+      ratedCallCount: day.calls.size,
+      ...metricAveragePayload(day)
+    }))
+    .sort((a, b) => a.dayKey.localeCompare(b.dayKey));
+}
+
 function buildManagerRating(rows, options = {}) {
   const managers = new Map();
   const globalMetrics = new Map();
+  const globalDaily = new Map();
   let scoredMetrics = 0;
   let scoreSum = 0;
   let maxScoreSum = 0;
@@ -341,6 +387,7 @@ function buildManagerRating(rows, options = {}) {
       maxScoreSum: 0,
       normalizedScoreSum: 0,
       metrics: new Map(),
+      daily: new Map(),
       lastCallAt: null
     };
     const callId = String(row && row.callId || "").trim();
@@ -371,6 +418,7 @@ function buildManagerRating(rows, options = {}) {
     current.maxScoreSum += maxScore;
     current.normalizedScoreSum += percent;
     addMetricRating(current.metrics, row, score, maxScore, percent);
+    addDailyRating(current.daily, row, score, maxScore, percent);
     managers.set(identity.key, current);
 
     scoredMetrics += 1;
@@ -378,6 +426,7 @@ function buildManagerRating(rows, options = {}) {
     maxScoreSum += maxScore;
     normalizedScoreSum += percent;
     addMetricRating(globalMetrics, row, score, maxScore, percent);
+    addDailyRating(globalDaily, row, score, maxScore, percent);
   }
 
   const managerRows = [...managers.values()]
@@ -393,7 +442,8 @@ function buildManagerRating(rows, options = {}) {
       ...metricAveragePayload(manager),
       callTypes: [...manager.callTypes.values()]
         .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type)),
-      metrics: metricRatingList(manager.metrics)
+      metrics: metricRatingList(manager.metrics),
+      daily: dailyRatingList(manager.daily)
     }))
     .sort((a, b) => {
       const aPercent = Number.isFinite(Number(a.averagePercent)) ? Number(a.averagePercent) : -1;
@@ -424,7 +474,8 @@ function buildManagerRating(rows, options = {}) {
     }),
     topManager: managerRows[0] || null,
     managers: managerRows,
-    metrics: metricRatingList(globalMetrics)
+    metrics: metricRatingList(globalMetrics),
+    daily: dailyRatingList(globalDaily)
   };
 }
 
@@ -617,7 +668,11 @@ class BinotelMonitorService {
   }
 
   providerCostWindow(items, options = {}) {
-    const end = new Date();
+    const now = new Date();
+    const configuredEnd = options.to ? new Date(options.to) : null;
+    const end = configuredEnd && Number.isFinite(configuredEnd.getTime()) && configuredEnd < now
+      ? configuredEnd
+      : now;
     const configuredStart = options.since ? new Date(options.since) : null;
     const callStarts = (Array.isArray(items) ? items : [])
       .map((item) => (item && item.call) || item)
@@ -731,6 +786,7 @@ class BinotelMonitorService {
 
     const cacheKey = JSON.stringify({
       startHour: window.startTime.slice(0, 13),
+      endHour: window.endTime.slice(0, 13),
       sonioxStartHour: window.sonioxStartTime.slice(0, 13),
       sonioxCoverageComplete: window.sonioxCoverageComplete
     });
@@ -1143,12 +1199,15 @@ class BinotelMonitorService {
     );
   }
 
-  async visibleCall(callId) {
+  async visibleCall(callId, options = {}) {
     const call = await this.store.getCall(callId);
     if (!call) {
       return null;
     }
     if (this.isInternalNumberDisabled(call, await this.disabledAnalysisInternalNumbers())) {
+      return null;
+    }
+    if (!isCallVisibleForOptions(call, options)) {
       return null;
     }
     return call;
@@ -1166,6 +1225,7 @@ class BinotelMonitorService {
     return JSON.stringify({
       query: options.query || "",
       since: periodDays ? null : options.since || null,
+      to: options.to || null,
       periodDays,
       visibility: callVisibilityCacheKey(options)
     });
@@ -1189,6 +1249,7 @@ class BinotelMonitorService {
         limit: this.config.maxStoredCalls || 5000,
         query: options.query || "",
         since: options.since || null,
+        to: options.to || null,
         ...callVisibilityOptions(options)
       };
       return typeof this.store.analytics === "function"
@@ -1250,9 +1311,9 @@ class BinotelMonitorService {
     };
   }
 
-  async callDetails(callId) {
+  async callDetails(callId, options = {}) {
     await this.ensureSyncBoundaries(await this.store.syncState());
-    const call = await this.visibleCall(callId);
+    const call = await this.visibleCall(callId, options);
     if (!call) {
       return null;
     }
@@ -1263,9 +1324,18 @@ class BinotelMonitorService {
     const recordingCached =
       Boolean(recordable && id && this.recordingCache) &&
       await this.recordingCache.hasFresh(id);
-    const ai = id && this.callSummaryService
-      ? await this.callSummaryService.details(id)
-      : null;
+    const [ai, managerStatistics] = await Promise.all([
+      id && this.callSummaryService
+        ? this.callSummaryService.details(id)
+        : null,
+      id && this.store && typeof this.store.managerStatisticsExclusion === "function"
+        ? this.store.managerStatisticsExclusion(id)
+        : {
+            excluded: false,
+            updatedAt: null,
+            updatedBy: null
+          }
+    ]);
 
     return {
       ...call,
@@ -1275,13 +1345,37 @@ class BinotelMonitorService {
       recordingUrl: recordable && id
         ? `/api/binotel-monitor/recording?callId=${encodeURIComponent(id)}`
         : "",
+      managerStatistics,
       ai
     };
   }
 
-  async reanalyzeCall(callId) {
+  async setManagerStatisticsExcluded(callId, excluded, user, options = {}) {
     await this.ensureSyncBoundaries(await this.store.syncState());
-    const call = await this.visibleCall(callId);
+    const call = await this.visibleCall(callId, options);
+    if (!call) {
+      return null;
+    }
+    if (!this.store || typeof this.store.setManagerStatisticsExcluded !== "function") {
+      throw new Error("Manager statistics exclusions are not available");
+    }
+
+    const id = call.generalCallId || call.id || call.callId;
+    const managerStatistics = await this.store.setManagerStatisticsExcluded(
+      id,
+      excluded,
+      user
+    );
+    this.clearAnalyticsCache();
+    return {
+      callId: id,
+      ...managerStatistics
+    };
+  }
+
+  async reanalyzeCall(callId, options = {}) {
+    await this.ensureSyncBoundaries(await this.store.syncState());
+    const call = await this.visibleCall(callId, options);
     if (!call) {
       return null;
     }
@@ -1555,7 +1649,7 @@ class BinotelMonitorService {
       for (const item of source.calls || []) {
         const call = (item && item.call) || item || {};
         const ai = item && item.ai;
-        if (!ai || ai.status !== "done") {
+        if (!ai || ai.status !== "done" || ai.managerStatisticsExcluded) {
           continue;
         }
         const summary = ai.summary || {};
@@ -1594,6 +1688,7 @@ class BinotelMonitorService {
       limit: this.config.maxStoredCalls || 5000,
       query: options.query || "",
       since: options.since || null,
+      to: options.to || null,
       ...callVisibilityOptions(options)
     });
 

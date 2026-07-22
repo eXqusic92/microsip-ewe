@@ -1,5 +1,5 @@
 ---
-target: client-info-api/public
+target: public
 total_score: 24
 p0_count: 0
 p1_count: 3
@@ -56,7 +56,7 @@ This is a serious operator tool with a real understanding of its workflow. The b
 
 **Fix**: Rebuild AI settings with the same admin/card tokens used elsewhere: DUMA panels, standard primary/secondary buttons, restrained accents, no purple gradient hero, and no decorative AI-product badge. Frame the screen as quality rules configuration.
 
-**Suggested command**: `$impeccable quieter client-info-api/public/index.html AI settings`
+**Suggested command**: `$impeccable quieter public/index.html AI settings`
 
 **[P1] Navigation mixes live-call work with configuration**
 
@@ -64,7 +64,7 @@ This is a serious operator tool with a real understanding of its workflow. The b
 
 **Fix**: Split operational tabs from settings/admin. Keep `Картка`, `Дзвінки`, and `Статистика` primary. Move `AI-налаштування` and admin/configuration under profile or a compact settings affordance. Preserve `AI-аналітика` only if operators use it operationally; otherwise group it with reporting.
 
-**Suggested command**: `$impeccable layout client-info-api/public header navigation`
+**Suggested command**: `$impeccable layout public header navigation`
 
 **[P1] High-stakes actions lack one consistent reassurance model**
 
@@ -72,7 +72,7 @@ This is a serious operator tool with a real understanding of its workflow. The b
 
 **Fix**: Use one DUMA confirmation popover/dialog for destructive and costly actions. Include consequence, exact target, cancel, confirm, loading, success, and recovery states. Apply it to AI reset/delete, metric delete, user delete, Telegram delete, and reanalyze.
 
-**Suggested command**: `$impeccable harden client-info-api/public high-stakes confirmations`
+**Suggested command**: `$impeccable harden public high-stakes confirmations`
 
 **[P2] Visual hierarchy is too uniformly card + label + shadow**
 
@@ -80,7 +80,7 @@ This is a serious operator tool with a real understanding of its workflow. The b
 
 **Fix**: Reserve accent labels for major regions only. Convert repeated data blocks to tighter list/table treatments where possible. Reduce decorative gradients in light theme. Keep side accent borders only where the side color encodes a necessary status.
 
-**Suggested command**: `$impeccable layout client-info-api/public client card and call detail`
+**Suggested command**: `$impeccable layout public client card and call detail`
 
 **[P2] Accessibility is partial, not complete**
 
@@ -88,7 +88,7 @@ This is a serious operator tool with a real understanding of its workflow. The b
 
 **Fix**: Prefer native selects unless custom behavior is essential. Add `aria-current` to active nav. Verify menu keyboard conventions, dialog focus return, tooltip/help text accessibility, and focus order across modals.
 
-**Suggested command**: `$impeccable audit client-info-api/public accessibility`
+**Suggested command**: `$impeccable audit public accessibility`
 
 ## Persona Red Flags
 

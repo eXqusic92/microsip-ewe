@@ -312,9 +312,12 @@ function metricPromptRewriteSystemPrompt() {
 Твоя задача: обережно оновити інструкції однієї метрики якості та всі prompt-описи її варіантів оцінки на основі:
 - поточних налаштувань метрики;
 - поточного результату AI для конкретного дзвінка;
+- повного контексту дзвінка: транскриптів, сегментів, ролей спікерів, AI-аналізу, інших метрик і клієнтського контексту;
 - правки менеджера, який пояснив, що в оцінці було неточно.
 
 Правила:
+- Спочатку віднови по callContext, що реально відбулося в дзвінку і чому попередня оцінка могла бути хибною. Транскрипт і його сегменти є первинним джерелом; попередній AI-аналіз — лише результат, який може містити помилку.
+- Зістав правку менеджера з конкретними репліками, ролями спікерів, evidence, improvement, сусідніми метриками та клієнтським контекстом. Якщо джерела суперечать одне одному, не вигадуй фактів — сформулюй обережне загальне правило.
 - Поточний prompt є базою. Переписуй як консервативне злиття: збережи старі критерії та додай/уточни тільки те, що випливає з правки менеджера.
 - Не втрачай конкретні деталі зі старого prompt: числа, відсотки, бонуси, кешбек, знижки, дедлайни, назви сервісів, списки переваг, способи оплати, етапи закриття та інші перевірювані умови.
 - Не замінюй конкретику загальними словами. Наприклад, якщо старий prompt містить бонуси, кешбек, Wi-Fi, розетки чи дедлайн для скріна, ці деталі мають залишитись явно.
@@ -326,9 +329,11 @@ function metricPromptRewriteSystemPrompt() {
 - Не змінюй ключі, назви, score, кольори, порядок або countsTowardScore варіантів оцінки.
 - Поверни новий description та aiInstructions для метрики.
 - Для КОЖНОГО варіанта оцінки поверни новий aiInstructions.
-- aiInstructions мають бути достатньо інформативними, але без води. Компактність не є причиною видаляти конкретні критерії.
+- Результат має бути token-efficient: description — одне коротке речення; кожен aiInstructions — найкоротша самодостатня інструкція, зазвичай 1–4 короткі речення або компактні правила через крапку з комою.
+- Пиши операційно: "став цей option, якщо..."; "не зараховуй, коли..."; "за нечіткого доказу...". Не додавай вступів, пояснень очевидного, переказу дзвінка чи дублювання однакових правил у metric та options.
+- Компактність не є причиною видаляти конкретні критерії. Якщо старий prompt багатий на умови, стискай формулювання, а не зміст.
 - Уточнюй межі між сусідніми оцінками: коли ставити цей option, а коли інший.
-- У rationale коротко напиши, які деталі старого prompt збережено і що саме змінилось через правку менеджера.
+- У rationale максимум двома короткими реченнями напиши, які деталі старого prompt збережено і що саме змінилось через правку менеджера.
 - Пиши українською.
 `.trim();
 }
@@ -948,7 +953,7 @@ class OpenAiClient {
     };
   }
 
-  async rewriteMetricPrompt({ feedback, target, currentPrompt }) {
+  async rewriteMetricPrompt({ feedback, target, currentPrompt, callContext }) {
     if (!this.enabled) {
       throw new Error("OPENAI_API_KEY не налаштований");
     }
@@ -960,7 +965,8 @@ class OpenAiClient {
     const model = this.promptRewriteModel();
     const preservationHints = collectPromptPreservationHints(currentPrompt);
     const buildUserPayload = (missingMarkers = []) => ({
-      task: "Rewrite metric prompt settings. Return only the JSON schema output.",
+      task:
+        "Diagnose the manager correction using the full call context, then rewrite the metric prompt as short reusable rules. Return only the JSON schema output.",
       target,
       currentPrompt,
       preservationHints,
@@ -971,7 +977,14 @@ class OpenAiClient {
       managerFeedback: {
         text: feedback && (feedback.text || feedback.feedbackText),
         createdBy: feedback && feedback.createdBy,
-        updatedAt: feedback && feedback.updatedAt
+        updatedBy: feedback && feedback.updatedBy,
+        updatedAt: feedback && feedback.updatedAt,
+        history:
+          feedback &&
+          feedback.payload &&
+          Array.isArray(feedback.payload.history)
+            ? feedback.payload.history
+            : []
       },
       evaluatedExample: {
         selectedOptionKey: feedback && feedback.metric && feedback.metric.selectedOptionKey,
@@ -981,6 +994,20 @@ class OpenAiClient {
         evidence: feedback && feedback.metric && feedback.metric.evidence,
         improvement: feedback && feedback.metric && feedback.metric.improvement,
         callType: feedback && feedback.call && (feedback.call.typeLabel || feedback.call.type)
+      },
+      evaluatedMetric: feedback && feedback.metric,
+      callContext: callContext || null,
+      outputRequirements: {
+        purpose:
+          "Create short reusable instructions for future calls after diagnosing this example in full context.",
+        metricDescription: "One short sentence.",
+        metricInstructions:
+          "Usually 1-4 short sentences or compact semicolon-separated decision rules.",
+        optionInstructions:
+          "For every option, state the shortest clear boundary for selecting it versus adjacent options.",
+        rationale: "At most two short sentences.",
+        forbidden:
+          "Do not copy call IDs, dates, phone numbers, names, transcript quotes, or other one-off details into the saved prompt."
       }
     });
     const requestRewrite = async (missingMarkers = []) => {
@@ -1005,7 +1032,7 @@ class OpenAiClient {
             }
           ],
           text: {
-            verbosity: "medium",
+            verbosity: "low",
             format: {
               type: "json_schema",
               name: "metric_prompt_rewrite",

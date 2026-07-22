@@ -1,0 +1,23 @@
+[Unit]
+Description=DUMA Client Info API
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/client-info
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /root/client-info/server.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

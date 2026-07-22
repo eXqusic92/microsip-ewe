@@ -21,9 +21,10 @@
     </script>
     <title>Картка клієнта | DUMA</title>
     <link rel="icon" href="/duma-logo.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/styles.css?v=20260707-call-filters">
+    <link rel="stylesheet" href="/styles.css?v=20260722-manager-statistics-exclusion">
   </head>
-  <body>
+  <body data-ui-state="empty">
+    <a class="skip-link" href="#main-content">Перейти до основного вмісту</a>
     <header class="app-header">
       <div class="brand-lockup">
         <a class="brand" href="/client-card" aria-label="DUMA">
@@ -31,7 +32,8 @@
         </a>
         <nav class="app-tabs" aria-label="Основна навігація">
           <a href="/client-card" data-view-link="client-card">Картка</a>
-          <a href="/calls-monitor" data-view-link="calls-monitor">Дзвінки</a>
+          <a href="/my-work" data-view-link="my-work" data-my-work-only hidden>Моя робота</a>
+          <a href="/calls-monitor" data-view-link="calls-monitor" data-team-analytics-only hidden>Дзвінки</a>
           <a href="/call-stats" data-view-link="call-stats" data-team-analytics-only hidden>Статистика</a>
           <a href="/call-analytics" data-view-link="call-analytics" data-team-analytics-only hidden>AI-аналітика</a>
         </nav>
@@ -136,7 +138,7 @@
       </div>
     </header>
 
-    <main class="page-shell">
+    <main class="page-shell" id="main-content">
       <section class="empty-state" id="empty-state">
         <div class="empty-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
@@ -167,6 +169,17 @@
           </div>
         </div>
 
+        <section class="upcoming-section" id="upcoming-section">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Актуальна поїздка</p>
+              <h2>Найближчий рейс</h2>
+            </div>
+            <span class="status" id="upcoming-status"></span>
+          </div>
+          <div class="upcoming-trip" id="upcoming-trip"></div>
+        </section>
+
         <div class="profile-grid">
           <section class="profile-block">
             <h2>Пов’язані пасажири</h2>
@@ -183,17 +196,6 @@
             </div>
           </section>
         </div>
-
-        <section class="upcoming-section" id="upcoming-section">
-          <div class="section-heading">
-            <div>
-              <p class="section-label">Актуальна поїздка</p>
-              <h2>Найближчий рейс</h2>
-            </div>
-            <span class="status" id="upcoming-status"></span>
-          </div>
-          <div class="upcoming-trip" id="upcoming-trip"></div>
-        </section>
 
         <div class="content-grid">
           <div class="client-main-stack">
@@ -373,6 +375,150 @@
         </div>
       </section>
 
+      <section class="my-work-page hidden" id="my-work-page" aria-live="polite">
+        <header class="my-work-header">
+          <div>
+            <h1>Моя робота</h1>
+            <p>Ваші дзвінки, записи та оцінки якості в одному робочому просторі.</p>
+          </div>
+          <form class="my-work-period-filter" id="my-work-period-filter" data-custom="false">
+            <label>
+              <span>Період</span>
+              <select id="my-work-period">
+                <option value="7">Останні 7 днів</option>
+                <option value="30" selected>Останні 30 днів</option>
+                <option value="month">Цей місяць</option>
+                <option value="custom">Власний діапазон</option>
+              </select>
+            </label>
+            <label class="my-work-custom-date">
+              <span>Від</span>
+              <input id="my-work-from" type="date" disabled>
+            </label>
+            <label class="my-work-custom-date">
+              <span>До</span>
+              <input id="my-work-to" type="date" disabled>
+            </label>
+            <button class="primary-button" id="my-work-period-apply" type="submit" disabled>Застосувати</button>
+            <p class="form-message my-work-period-message" id="my-work-period-message" aria-live="polite"></p>
+          </form>
+        </header>
+
+        <div class="my-work-tabs" role="tablist" aria-label="Розділи моєї роботи">
+          <button
+            class="active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="my-work-calls-panel"
+            data-my-work-tab="calls"
+          >Мої дзвінки</button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="my-work-ratings-panel"
+            data-my-work-tab="ratings"
+          >Мої оцінки</button>
+        </div>
+
+        <div class="my-work-summary" aria-label="Показники за вибраний період">
+          <div>
+            <span>Дзвінки</span>
+            <strong id="my-work-total-calls">0</strong>
+            <small id="my-work-total-caption">завантаження</small>
+          </div>
+          <div>
+            <span>Відповіді</span>
+            <strong id="my-work-answer-rate">0%</strong>
+            <small id="my-work-answer-caption">завантаження</small>
+          </div>
+          <div>
+            <span>Середня розмова</span>
+            <strong id="my-work-average-duration">–</strong>
+            <small id="my-work-duration-caption">завантаження</small>
+          </div>
+          <div>
+            <span>Середня оцінка</span>
+            <strong id="my-work-average-rating">–</strong>
+            <small id="my-work-rating-caption">завантаження</small>
+          </div>
+        </div>
+
+        <section
+          class="my-work-panel"
+          id="my-work-calls-panel"
+          role="tabpanel"
+          data-my-work-panel="calls"
+        >
+          <div class="section-heading">
+            <div>
+              <h2>Мої дзвінки</h2>
+              <p>Останні контакти за вибраний період</p>
+            </div>
+            <span class="muted" id="my-work-calls-count"></span>
+          </div>
+          <form class="my-work-call-toolbar" id="my-work-call-search" role="search">
+            <label class="sr-only" for="my-work-query">Пошук у власних дзвінках</label>
+            <input id="my-work-query" name="q" placeholder="Номер клієнта або Binotel ID">
+            <button class="secondary-button" type="submit">Знайти</button>
+            <button class="primary-button" id="my-work-refresh" type="button">Оновити</button>
+          </form>
+          <div class="monitor-list my-work-call-list" id="my-work-call-list"></div>
+          <nav class="my-work-pagination" id="my-work-pagination" aria-label="Пагінація моїх дзвінків">
+            <button class="secondary-button" id="my-work-prev-page" type="button">Назад</button>
+            <span class="muted" id="my-work-page-info"></span>
+            <button class="secondary-button" id="my-work-next-page" type="button">Вперед</button>
+          </nav>
+        </section>
+
+        <section
+          class="my-work-panel hidden"
+          id="my-work-ratings-panel"
+          role="tabpanel"
+          data-my-work-panel="ratings"
+        >
+          <div class="my-work-rating-overview">
+            <div>
+              <span>Ваша оцінка</span>
+              <strong id="my-work-own-score">–</strong>
+              <small id="my-work-own-score-caption">Ще немає оцінених дзвінків</small>
+            </div>
+            <div>
+              <span>Середнє відділу</span>
+              <strong id="my-work-team-score">–</strong>
+              <small id="my-work-team-score-caption">Анонімний орієнтир</small>
+            </div>
+            <div>
+              <span>Оцінено дзвінків</span>
+              <strong id="my-work-rated-calls">0</strong>
+              <small id="my-work-rated-caption">за вибраний період</small>
+            </div>
+          </div>
+
+          <div class="my-work-rating-grid">
+            <section class="my-work-rating-section">
+              <div class="section-heading">
+                <div>
+                  <h2>Оцінки за метриками</h2>
+                  <p>Сильні сторони та точки для покращення</p>
+                </div>
+              </div>
+              <div class="my-work-metric-list" id="my-work-metric-list"></div>
+            </section>
+            <section class="my-work-rating-section">
+              <div class="section-heading">
+                <div>
+                  <h2>Динаміка</h2>
+                  <p>Зміна середньої оцінки по днях</p>
+                </div>
+              </div>
+              <div class="my-work-rating-trend" id="my-work-rating-trend"></div>
+            </section>
+          </div>
+        </section>
+      </section>
+
       <section class="monitor-page hidden" id="calls-monitor-page" aria-live="polite">
         <div class="monitor-hero">
           <div>
@@ -405,34 +551,90 @@
           </div>
 
           <form class="monitor-toolbar" id="monitor-search" role="search">
-            <label class="sr-only" for="monitor-query">Пошук у дзвінках</label>
-            <input id="monitor-query" name="q" placeholder="Номер, оператор або Binotel ID">
-            <label class="monitor-filter-select">
-              <span>AI-тип</span>
-              <select id="monitor-call-type-filter">
-                <option value="">Усі типи</option>
-                <option value="__none">Без типу</option>
-              </select>
-            </label>
-            <label class="monitor-filter-select">
-              <span>Проблеми</span>
-              <select id="monitor-problem-filter">
-                <option value="">Усі дзвінки</option>
-                <option value="escalation">Ескалація</option>
-                <option value="churnRisk">Ризик втрати</option>
-              </select>
-            </label>
-            <label class="monitor-page-size">
-              <span>На сторінці</span>
-              <select id="monitor-page-size">
-                <option value="10" selected>10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-            </label>
-            <button class="secondary-button" type="submit">Фільтрувати</button>
-            <button class="primary-button" id="monitor-refresh" type="button">Оновити</button>
+            <div class="monitor-toolbar-primary">
+              <label class="sr-only" for="monitor-query">Пошук у дзвінках</label>
+              <input id="monitor-query" name="q" placeholder="Номер, оператор або Binotel ID">
+
+              <fieldset class="monitor-date-filter">
+                <legend class="sr-only">Період дзвінків</legend>
+                <span class="monitor-control-label">Період</span>
+                <label class="monitor-date-field">
+                  <span>Від</span>
+                  <input id="monitor-from" type="date" aria-label="Дата від">
+                </label>
+                <span class="monitor-date-separator" aria-hidden="true">→</span>
+                <label class="monitor-date-field">
+                  <span>До</span>
+                  <input id="monitor-to" type="date" aria-label="Дата до">
+                </label>
+                <button class="monitor-date-reset" id="monitor-date-reset" type="button" aria-label="Скинути період" title="Скинути період" hidden>×</button>
+              </fieldset>
+
+              <div class="monitor-operator-filter" id="monitor-operator-filter">
+                <span class="monitor-control-label">Оператори</span>
+                <button
+                  class="monitor-operator-trigger"
+                  id="monitor-operator-trigger"
+                  type="button"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                  aria-controls="monitor-operator-popover"
+                >
+                  <span id="monitor-operator-summary">Усі оператори</span>
+                </button>
+                <div
+                  class="monitor-operator-popover"
+                  id="monitor-operator-popover"
+                  role="dialog"
+                  aria-label="Фільтр за операторами"
+                  hidden
+                >
+                  <div class="monitor-operator-head">
+                    <strong>Оператори</strong>
+                    <button id="monitor-operator-close" type="button" aria-label="Закрити">×</button>
+                  </div>
+                  <label class="monitor-operator-search">
+                    <span class="sr-only">Пошук оператора</span>
+                    <input id="monitor-operator-search" type="search" placeholder="Знайти оператора">
+                  </label>
+                  <div class="monitor-operator-options" id="monitor-operator-options" role="group" aria-label="Оберіть операторів"></div>
+                  <div class="monitor-operator-actions">
+                    <button class="secondary-button" id="monitor-operator-clear" type="button">Скинути</button>
+                    <button class="primary-button" id="monitor-operator-done" type="button">Готово</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="monitor-toolbar-secondary">
+              <label class="monitor-filter-select">
+                <span>AI-тип</span>
+                <select id="monitor-call-type-filter">
+                  <option value="">Усі типи</option>
+                  <option value="__none">Без типу</option>
+                </select>
+              </label>
+              <label class="monitor-filter-select">
+                <span>Проблеми</span>
+                <select id="monitor-problem-filter">
+                  <option value="">Усі дзвінки</option>
+                  <option value="escalation">Ескалація</option>
+                  <option value="churnRisk">Ризик втрати</option>
+                </select>
+              </label>
+              <label class="monitor-page-size">
+                <span>На сторінці</span>
+                <select id="monitor-page-size">
+                  <option value="10" selected>10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </label>
+              <button class="secondary-button" type="submit">Фільтрувати</button>
+              <button class="primary-button" id="monitor-refresh" type="button">Оновити</button>
+            </div>
+            <p class="monitor-filter-message" id="monitor-filter-message" role="status" hidden></p>
           </form>
 
           <div class="monitor-list" id="monitor-list"></div>
@@ -649,15 +851,41 @@
             <p class="section-label">AI-аналітика</p>
             <h1>AI-аналітика дзвінків</h1>
           </div>
-          <label class="monitor-period analytics-period">
-            <span>Період аналізу</span>
-            <select id="monitor-analytics-period">
-              <option value="today">Сьогодні (UTC)</option>
-              <option value="7">7 днів</option>
-              <option value="30" selected>30 днів</option>
-              <option value="all">Весь час</option>
-            </select>
-          </label>
+          <form
+            class="call-stats-filter analytics-period-filter"
+            id="analytics-period-filter"
+            data-custom="false"
+            aria-label="Період AI-аналітики"
+            novalidate
+          >
+            <label class="analytics-period-select">
+              <span>Період аналізу</span>
+              <select id="monitor-analytics-period">
+                <option value="today">Сьогодні</option>
+                <option value="7">7 днів</option>
+                <option value="30" selected>30 днів</option>
+                <option value="all">Весь час</option>
+                <option value="custom">Власний період</option>
+              </select>
+            </label>
+            <label class="analytics-period-date">
+              <span>Від</span>
+              <input id="analytics-period-from" type="date" required>
+            </label>
+            <label class="analytics-period-date">
+              <span>До</span>
+              <input id="analytics-period-to" type="date" required>
+            </label>
+            <button class="primary-button" id="analytics-period-apply" type="submit">
+              Застосувати
+            </button>
+            <p
+              class="analytics-period-message"
+              id="analytics-period-message"
+              role="status"
+              aria-live="polite"
+            ></p>
+          </form>
         </div>
 
         <section class="monitor-panel monitor-analytics">
@@ -704,6 +932,69 @@
             </div>
           </div>
 
+          <section class="manager-performance" aria-labelledby="manager-performance-title">
+            <header class="manager-performance-header">
+              <div>
+                <p class="section-label">Оцінки менеджерів</p>
+                <h2 id="manager-performance-title">Аналітика ефективності</h2>
+                <p>Порівняння загальної якості та окремих AI-метрик за вибраний період.</p>
+              </div>
+              <label class="monitor-period manager-metric-group">
+                <span>Група метрик</span>
+                <select id="manager-rating-group">
+                  <option value="core">Ключові метрики</option>
+                  <option value="all">Усі метрики</option>
+                </select>
+              </label>
+            </header>
+            <div class="manager-rating-summary" id="manager-rating-summary" aria-live="polite"></div>
+            <div class="manager-rating-table" id="manager-rating-table" aria-live="polite"></div>
+            <p class="no-data hidden" id="manager-rating-empty">
+              За вибраний період ще немає оцінених метрик по менеджерах.
+            </p>
+
+            <div class="manager-rating-insights">
+              <section class="manager-rating-trend-panel" aria-labelledby="manager-rating-trend-title">
+                <div class="manager-rating-panel-head">
+                  <div class="manager-rating-panel-title">
+                    <span class="manager-rating-trend-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <path d="M4 17 9 12l4 3 7-8" />
+                        <path d="M15 7h5v5" />
+                      </svg>
+                    </span>
+                    <div>
+                      <h3 id="manager-rating-trend-title">Динаміка менеджерів</h3>
+                      <p>Щоденна загальна оцінка та зміна до попереднього результату.</p>
+                    </div>
+                  </div>
+                  <div class="manager-rating-trend-controls" aria-label="Параметри динаміки">
+                    <span id="manager-rating-range">Період без даних</span>
+                    <span>Загальна оцінка</span>
+                    <span>Крок: 1 день</span>
+                  </div>
+                </div>
+                <div class="manager-rating-trend" id="manager-rating-trend" aria-live="polite"></div>
+              </section>
+              <section class="manager-rating-company-panel" aria-labelledby="manager-rating-company-title">
+                <div class="manager-rating-panel-head">
+                  <div>
+                    <h3 id="manager-rating-company-title">Середня оцінка компанії</h3>
+                    <p>Зведений результат усіх оцінених менеджерів.</p>
+                  </div>
+                </div>
+                <div class="manager-rating-company" id="manager-rating-company" aria-live="polite"></div>
+              </section>
+            </div>
+          </section>
+
+          <div class="analytics-subsection analytics-calls-heading">
+            <div>
+              <p class="section-label">Тематика дзвінків</p>
+              <h2>Структура звернень</h2>
+            </div>
+          </div>
+
           <div class="call-type-overview hidden" id="call-type-overview" aria-hidden="true"></div>
           <div class="call-type-chart" id="call-type-chart" aria-live="polite"></div>
           <p class="no-data hidden" id="call-type-empty">
@@ -721,17 +1012,6 @@
             За вибраний період AI ще не виділив типові питання клієнтів.
           </p>
 
-          <div class="analytics-subsection manager-rating-heading">
-            <div>
-              <p class="section-label">Рейтинг менеджерів</p>
-              <h2>Хто найкраще справляється з дзвінками</h2>
-            </div>
-            <div class="manager-rating-summary" id="manager-rating-summary" aria-live="polite"></div>
-          </div>
-          <div class="manager-rating-table" id="manager-rating-table" aria-live="polite"></div>
-          <p class="no-data hidden" id="manager-rating-empty">
-            За вибраний період ще немає оцінених метрик по менеджерах.
-          </p>
         </section>
       </section>
 
@@ -931,7 +1211,7 @@
                 <textarea id="ai-terms-input" rows="10" placeholder="Один термін або фраза в рядку" aria-describedby="ai-terms-help"></textarea>
               </label>
               <p class="ai-terms-help" id="ai-terms-help">
-                Один рядок — один термін. Повтори та зайві пробіли система прибере; можна залишити список порожнім.
+                Один рядок: один термін. Повтори та зайві пробіли система прибере; можна залишити список порожнім.
               </p>
 
               <section class="ai-terms-preview" aria-labelledby="ai-terms-preview-title" aria-live="polite">
@@ -1044,9 +1324,9 @@
       </section>
 
       <section class="call-detail-page hidden" id="call-detail-page" aria-live="polite">
-        <a class="detail-back-link" href="/calls-monitor">
+        <a class="detail-back-link" id="detail-back-link" href="/calls-monitor">
           <span aria-hidden="true">←</span>
-          До списку дзвінків
+          <span id="detail-back-label">До списку дзвінків</span>
         </a>
 
         <div class="call-detail-hero">
@@ -1128,8 +1408,19 @@
                 <p class="section-label">Оцінка дзвінка</p>
                 <h2>Ваші метрики</h2>
               </div>
-              <strong class="quality-score" id="detail-quality-score">Н/д</strong>
+              <div class="call-quality-heading-actions">
+                <button
+                  class="secondary-action detail-manager-statistics-toggle hidden"
+                  id="detail-manager-statistics-toggle"
+                  type="button"
+                  aria-pressed="false"
+                >
+                  Не враховувати у статистиці
+                </button>
+                <strong class="quality-score" id="detail-quality-score">Н/д</strong>
+              </div>
             </div>
+            <p class="manager-statistics-status hidden" id="detail-manager-statistics-status" aria-live="polite"></p>
             <p class="quality-summary" id="detail-quality-summary">Оцінка зʼявиться після AI-аналізу дзвінка.</p>
             <div class="quality-context" id="detail-quality-context"></div>
             <div class="quality-criteria" id="detail-quality-criteria"></div>
@@ -1231,7 +1522,7 @@
           <section class="admin-user-binotel-assignment" id="admin-user-binotel-assignment" hidden>
             <div>
               <strong>Менеджери Binotel</strong>
-              <span>Оберіть внутрішній номер менеджера. Якщо у нього їх кілька — відзначте всі.</span>
+              <span>Оберіть внутрішній номер менеджера. Якщо у нього їх кілька, відзначте всі.</span>
             </div>
             <div class="admin-user-binotel-managers" id="admin-user-binotel-managers"></div>
           </section>
@@ -1423,20 +1714,23 @@
             <span class="call-direction-icon" data-field="direction-icon" aria-hidden="true"></span>
             <strong data-field="phone"></strong>
           </div>
-          <span data-field="type"></span>
+          <span class="monitor-call-type" data-field="type"></span>
           <div class="monitor-call-alerts" data-field="alerts" hidden></div>
         </div>
-        <div class="monitor-call-fact">
+        <div class="monitor-call-fact monitor-call-time">
           <span>Дата і час</span>
           <strong data-field="time"></strong>
         </div>
-        <div class="monitor-call-fact">
+        <div class="monitor-call-fact monitor-call-operator">
           <span>Хто прийняв</span>
           <strong data-field="operator"></strong>
         </div>
-        <div class="monitor-call-fact">
+        <div class="monitor-call-fact monitor-call-duration">
           <span>Тривалість</span>
           <strong data-field="duration"></strong>
+        </div>
+        <div class="monitor-call-score-cell" data-field="score-cell" hidden>
+          <strong class="monitor-call-score" data-field="score"></strong>
         </div>
         <svg class="monitor-call-arrow" viewBox="0 0 24 24" aria-hidden="true">
           <path d="m9 18 6-6-6-6"></path>
@@ -1444,8 +1738,8 @@
       </a>
     </template>
 
-    <script src="/vendor/anime.umd.min.js" defer></script>
     <script src="/vendor/chart.umd.min.js" defer></script>
-    <script src="/app.js?v=20260707-call-filters" defer></script>
+    <script src="/page-lifecycle.js?v=20260716-monitor-return" defer></script>
+    <script src="/app.js?v=20260722-manager-statistics-exclusion" defer></script>
   </body>
 </html>

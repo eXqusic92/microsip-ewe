@@ -5,8 +5,8 @@
 Головне: база `viber.db` не відкривається звичайним `sqlite3` і не є звичайним SQLCipher. У нашому випадку вона відкривається як SQLite SEE через власний Qt SQLite driver, який лежить всередині Viber Desktop. Читання робиться через маленький C++ reader:
 
 ```bash
-client-info-api/tools/viber-reader.cpp
-client-info-api/bin/viber-reader
+tools/viber-reader.cpp
+bin/viber-reader
 ```
 
 Reader не створює розшифровану копію бази на диску. Він відкриває оригінальний `viber.db`, виконує `PRAGMA hexkey='<hex-key>'`, читає потрібні рядки і повертає JSON.
@@ -118,7 +118,7 @@ VIBER_MESSAGE_LIMIT=50
 З репозиторію:
 
 ```bash
-cd /Users/exqusic/microsip-ewe/client-info-api
+cd /Users/exqusic/client-info
 ./tools/viber-macos-read.sh 380981234567
 ```
 
@@ -135,7 +135,7 @@ node viber-export-html.js 380981234567 --out viber-chat.html
 Якщо скрипт запускається не з репозиторію, можна явно вказати шлях:
 
 ```bash
-DUMA_CLIENT_INFO_ROOT=/Users/exqusic/microsip-ewe/client-info-api \
+DUMA_CLIENT_INFO_ROOT=/Users/exqusic/client-info \
 ./viber-macos-read.sh 380981234567
 ```
 
@@ -152,7 +152,7 @@ QT_HEADERS="/opt/homebrew/Cellar/qtbase/6.11.1/lib"
 Приклад прямого запуску reader-а:
 
 ```bash
-cd /Users/exqusic/microsip-ewe/client-info-api
+cd /Users/exqusic/client-info
 bin/viber-reader \
   "/Users/<user>/Library/Application Support/ViberPC/<account-phone>/viber.db" \
   "<hex-key>" \
@@ -172,7 +172,7 @@ bin/viber-reader "$VIBER_DB_PATH" "$VIBER_DB_KEY" "$VIBER_PLUGIN_PATH" "__sample
 Якщо треба перебілдити вручну:
 
 ```bash
-cd /Users/exqusic/microsip-ewe/client-info-api
+cd /Users/exqusic/client-info
 mkdir -p bin
 xcrun clang++ -std=c++17 -DQT_NO_VERSION_TAGGING \
   -F/opt/homebrew/Cellar/qtbase/6.11.1/lib \
@@ -296,7 +296,7 @@ VIBER_MESSAGE_LIMIT=50
 ```bash
 sudo apt update
 sudo apt install -y build-essential qt6-base-dev pkg-config
-cd /path/to/client-info-api
+cd /path/to/client-info
 mkdir -p bin
 g++ -std=c++17 -DQT_NO_VERSION_TAGGING \
   tools/viber-reader.cpp \
@@ -357,7 +357,7 @@ VIBER_DB_KEY=...
 4. Перезапустити server:
 
 ```bash
-cd /Users/exqusic/microsip-ewe/client-info-api
+cd /Users/exqusic/client-info
 rtk npm start
 ```
 

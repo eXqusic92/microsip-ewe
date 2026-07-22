@@ -5,7 +5,7 @@ Internal customer card opened from an incoming MicroSIP call.
 ## Local run
 
 ```powershell
-cd C:\Users\pavlo\microsip-ewe\client-info-api
+cd C:\Users\pavlo\client-info
 npm install
 npm start
 ```
@@ -62,7 +62,9 @@ metadata.
 Apply the app-state SQL files from `db/` with `psql` or another PostgreSQL
 client before starting the server. Existing databases created before auth need
 `db/002_auth.sql`; databases created before the department-head role need
-`db/003_department_head_role.sql`. Then verify the code:
+`db/003_department_head_role.sql`; databases created before per-call manager
+statistics exclusions need `db/004_call_manager_statistics_exclusions.sql`.
+Then verify the code:
 
 ```bash
 npm run check

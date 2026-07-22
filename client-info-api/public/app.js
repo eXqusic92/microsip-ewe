@@ -1,9 +1,10 @@
 "use strict";
 
 const THEME_KEY = "ewe-ticket-theme";
-const RECENT_ORDERS_PREVIEW_LIMIT = 2;
+const THEME_MEDIA_QUERY = "(prefers-color-scheme: dark)";
+const RECENT_ORDERS_PREVIEW_LIMIT = 3;
 const DETAIL_TICKETS_PREVIEW_LIMIT = 3;
-const CALLS_PREVIEW_LIMIT = 7;
+const CALLS_PREVIEW_LIMIT = 3;
 const MONITOR_POLL_MS = 10000;
 const CALL_TYPE_LABELS = {
   warm_lead_followup: "Тепла заявка",
@@ -86,6 +87,7 @@ const elements = {
   profileMenuRole: document.querySelector("#profile-menu-role"),
   profileAdminOnly: document.querySelectorAll("[data-profile-admin-only]"),
   teamAnalyticsOnly: document.querySelectorAll("[data-team-analytics-only]"),
+  myWorkOnly: document.querySelectorAll("[data-my-work-only]"),
   changePasswordButton: document.querySelector("#change-password-button"),
   logoutButton: document.querySelector("#logout-button"),
   changePasswordModal: document.querySelector("#change-password-modal"),
@@ -101,6 +103,40 @@ const elements = {
   loadingState: document.querySelector("#loading-state"),
   loadingMessage: document.querySelector("#loading-message"),
   clientCard: document.querySelector("#client-card"),
+  myWorkPage: document.querySelector("#my-work-page"),
+  myWorkPeriodFilter: document.querySelector("#my-work-period-filter"),
+  myWorkPeriod: document.querySelector("#my-work-period"),
+  myWorkFrom: document.querySelector("#my-work-from"),
+  myWorkTo: document.querySelector("#my-work-to"),
+  myWorkPeriodApply: document.querySelector("#my-work-period-apply"),
+  myWorkPeriodMessage: document.querySelector("#my-work-period-message"),
+  myWorkTabButtons: document.querySelectorAll("[data-my-work-tab]"),
+  myWorkPanels: document.querySelectorAll("[data-my-work-panel]"),
+  myWorkTotalCalls: document.querySelector("#my-work-total-calls"),
+  myWorkTotalCaption: document.querySelector("#my-work-total-caption"),
+  myWorkAnswerRate: document.querySelector("#my-work-answer-rate"),
+  myWorkAnswerCaption: document.querySelector("#my-work-answer-caption"),
+  myWorkAverageDuration: document.querySelector("#my-work-average-duration"),
+  myWorkDurationCaption: document.querySelector("#my-work-duration-caption"),
+  myWorkAverageRating: document.querySelector("#my-work-average-rating"),
+  myWorkRatingCaption: document.querySelector("#my-work-rating-caption"),
+  myWorkCallsCount: document.querySelector("#my-work-calls-count"),
+  myWorkCallSearch: document.querySelector("#my-work-call-search"),
+  myWorkQuery: document.querySelector("#my-work-query"),
+  myWorkRefresh: document.querySelector("#my-work-refresh"),
+  myWorkCallList: document.querySelector("#my-work-call-list"),
+  myWorkPagination: document.querySelector("#my-work-pagination"),
+  myWorkPrevPage: document.querySelector("#my-work-prev-page"),
+  myWorkNextPage: document.querySelector("#my-work-next-page"),
+  myWorkPageInfo: document.querySelector("#my-work-page-info"),
+  myWorkOwnScore: document.querySelector("#my-work-own-score"),
+  myWorkOwnScoreCaption: document.querySelector("#my-work-own-score-caption"),
+  myWorkTeamScore: document.querySelector("#my-work-team-score"),
+  myWorkTeamScoreCaption: document.querySelector("#my-work-team-score-caption"),
+  myWorkRatedCalls: document.querySelector("#my-work-rated-calls"),
+  myWorkRatedCaption: document.querySelector("#my-work-rated-caption"),
+  myWorkMetricList: document.querySelector("#my-work-metric-list"),
+  myWorkRatingTrend: document.querySelector("#my-work-rating-trend"),
   monitorPage: document.querySelector("#calls-monitor-page"),
   callStatsPage: document.querySelector("#call-stats-page"),
   callStatsFilter: document.querySelector("#call-stats-filter"),
@@ -185,7 +221,12 @@ const elements = {
   monitorUpdated: document.querySelector("#monitor-updated"),
   monitorNextSync: document.querySelector("#monitor-next-sync"),
   monitorCountLabel: document.querySelector("#monitor-count-label"),
+  analyticsPeriodFilter: document.querySelector("#analytics-period-filter"),
   monitorAnalyticsPeriod: document.querySelector("#monitor-analytics-period"),
+  analyticsPeriodFrom: document.querySelector("#analytics-period-from"),
+  analyticsPeriodTo: document.querySelector("#analytics-period-to"),
+  analyticsPeriodApply: document.querySelector("#analytics-period-apply"),
+  analyticsPeriodMessage: document.querySelector("#analytics-period-message"),
   analyticsAnalyzed: document.querySelector("#analytics-analyzed"),
   analyticsAnalyzedCaption: document.querySelector("#analytics-analyzed-caption"),
   analyticsTopType: document.querySelector("#analytics-top-type"),
@@ -210,6 +251,10 @@ const elements = {
   managerRatingSummary: document.querySelector("#manager-rating-summary"),
   managerRatingTable: document.querySelector("#manager-rating-table"),
   managerRatingEmpty: document.querySelector("#manager-rating-empty"),
+  managerRatingGroup: document.querySelector("#manager-rating-group"),
+  managerRatingTrend: document.querySelector("#manager-rating-trend"),
+  managerRatingRange: document.querySelector("#manager-rating-range"),
+  managerRatingCompany: document.querySelector("#manager-rating-company"),
   managerRatingModal: document.querySelector("#manager-rating-modal"),
   managerRatingModalClose: document.querySelector("#manager-rating-modal-close"),
   managerRatingModalTitle: document.querySelector("#manager-rating-modal-title"),
@@ -285,6 +330,19 @@ const elements = {
   aiTermsSubmit: document.querySelector("#ai-terms-submit"),
   monitorSearchForm: document.querySelector("#monitor-search"),
   monitorQuery: document.querySelector("#monitor-query"),
+  monitorFrom: document.querySelector("#monitor-from"),
+  monitorTo: document.querySelector("#monitor-to"),
+  monitorDateReset: document.querySelector("#monitor-date-reset"),
+  monitorFilterMessage: document.querySelector("#monitor-filter-message"),
+  monitorOperatorFilter: document.querySelector("#monitor-operator-filter"),
+  monitorOperatorTrigger: document.querySelector("#monitor-operator-trigger"),
+  monitorOperatorSummary: document.querySelector("#monitor-operator-summary"),
+  monitorOperatorPopover: document.querySelector("#monitor-operator-popover"),
+  monitorOperatorClose: document.querySelector("#monitor-operator-close"),
+  monitorOperatorSearch: document.querySelector("#monitor-operator-search"),
+  monitorOperatorOptions: document.querySelector("#monitor-operator-options"),
+  monitorOperatorClear: document.querySelector("#monitor-operator-clear"),
+  monitorOperatorDone: document.querySelector("#monitor-operator-done"),
   monitorCallTypeFilter: document.querySelector("#monitor-call-type-filter"),
   monitorProblemFilter: document.querySelector("#monitor-problem-filter"),
   monitorPageSize: document.querySelector("#monitor-page-size"),
@@ -304,11 +362,15 @@ const elements = {
   detailDirection: document.querySelector("#detail-direction"),
   detailDuration: document.querySelector("#detail-duration"),
   detailBinotelId: document.querySelector("#detail-binotel-id"),
+  detailBackLink: document.querySelector("#detail-back-link"),
+  detailBackLabel: document.querySelector("#detail-back-label"),
   detailTicketCount: document.querySelector("#detail-ticket-count"),
   detailTicketList: document.querySelector("#detail-ticket-list"),
   detailSummary: document.querySelector("#detail-summary"),
   detailAnalysisList: document.querySelector("#detail-analysis-list"),
   detailReanalyzeAi: document.querySelector("#detail-reanalyze-ai"),
+  detailManagerStatisticsToggle: document.querySelector("#detail-manager-statistics-toggle"),
+  detailManagerStatisticsStatus: document.querySelector("#detail-manager-statistics-status"),
   detailQualityScore: document.querySelector("#detail-quality-score"),
   detailQualitySummary: document.querySelector("#detail-quality-summary"),
   detailQualityContext: document.querySelector("#detail-quality-context"),
@@ -405,6 +467,16 @@ let monitorPage = 1;
 let monitorPageSize = 10;
 let monitorTotalCalls = 0;
 let monitorListFingerprint = "";
+let monitorLoadSequence = 0;
+let monitorOperators = [];
+const monitorSelectedOperators = new Set();
+let activeCustomDatePicker = null;
+let pageLifecycleSuspended = false;
+let myWorkPage = 1;
+let myWorkPageSize = 10;
+let myWorkTotalCalls = 0;
+let myWorkActiveTab = "calls";
+let myWorkSummaryPayload = null;
 let currentUiState = "";
 let currentAdminMotionTab = "";
 let currentAiSettingsMotionTab = "";
@@ -418,11 +490,13 @@ let telegramReplyTarget = null;
 let currentTickets = [];
 let currentCalls = [];
 let currentManagerRating = null;
+let currentManagerRatingGroup = "core";
 let ticketsModalBackView = null;
 let ticketsModalOrderGroups = [];
 let currentDetailCallId = "";
 let currentDetailTickets = [];
 let currentDetailCall = null;
+let managerStatisticsSaving = false;
 let detailTicketsPhone = "";
 let detailTicketsLoaded = false;
 let detailTicketsLoading = false;
@@ -669,6 +743,17 @@ function renderProfileMenu() {
   for (const node of elements.teamAnalyticsOnly || []) {
     node.hidden = !canViewTeamAnalytics(user);
   }
+  for (const node of elements.myWorkOnly || []) {
+    node.hidden = user.role !== "user";
+  }
+  if (elements.detailBackLink) {
+    elements.detailBackLink.href = user.role === "user"
+      ? "/my-work"
+      : "/calls-monitor";
+    elements.detailBackLabel.textContent = user.role === "user"
+      ? "Назад до моєї роботи"
+      : "Назад до монітора";
+  }
   elements.noteForm?.classList.toggle("hidden", !canModifyData(user));
   elements.telegramCompose?.classList.toggle("hidden", !canModifyData(user));
 }
@@ -688,6 +773,31 @@ function currentTheme() {
   return document.body.dataset.theme === "dark" ? "dark" : "light";
 }
 
+function readStoredTheme() {
+  try {
+    const theme = localStorage.getItem(THEME_KEY);
+    return theme === "dark" || theme === "light" ? theme : "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredTheme(theme) {
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
+const themeMediaQuery = typeof window.matchMedia === "function"
+  ? window.matchMedia(THEME_MEDIA_QUERY)
+  : null;
+
+function preferredTheme() {
+  return readStoredTheme() || (themeMediaQuery?.matches ? "dark" : "light");
+}
+
 function updateThemeControl() {
   const isDark = currentTheme() === "dark";
   elements.themeToggle.setAttribute(
@@ -698,12 +808,13 @@ function updateThemeControl() {
 }
 
 function setTheme(theme, persist = true) {
-  document.documentElement.dataset.theme = theme;
-  document.body.dataset.theme = theme;
+  const normalizedTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = normalizedTheme;
+  document.documentElement.style.colorScheme = normalizedTheme;
+  document.body.dataset.theme = normalizedTheme;
+  document.body.style.colorScheme = normalizedTheme;
   if (persist) {
-    try {
-      localStorage.setItem(THEME_KEY, theme);
-    } catch {}
+    writeStoredTheme(normalizedTheme);
   }
   updateThemeControl();
   detailAudioState.palette = null;
@@ -941,6 +1052,592 @@ function enhanceCustomSelects(root = document) {
   for (const select of root.querySelectorAll("select")) {
     enhanceCustomSelect(select);
   }
+}
+
+function isCustomDateKey(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function customDateFromKey(value) {
+  if (!isCustomDateKey(value)) {
+    return new Date();
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function customDateKey(date) {
+  const value = date instanceof Date && Number.isFinite(date.getTime()) ? date : new Date();
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+}
+
+function customCalendarWeekStart(date) {
+  const result = new Date(date);
+  const day = result.getDay();
+  result.setDate(result.getDate() + (day === 0 ? -6 : 1 - day));
+  return result;
+}
+
+function customCalendarYearPageStart(year) {
+  const value = Number.isInteger(year) ? year : new Date().getFullYear();
+  return Math.floor(value / 12) * 12;
+}
+
+function renderCustomCalendarMarkup(picker) {
+  const selectedKey = isCustomDateKey(picker.input.value) ? picker.input.value : "";
+  const selectedDate = customDateFromKey(selectedKey);
+  const monthDate = picker.monthDate || new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+  const currentDate = new Date();
+
+  if (picker.mode === "years") {
+    const pageStart = Number.isInteger(picker.yearPageStart)
+      ? picker.yearPageStart
+      : customCalendarYearPageStart(monthDate.getFullYear());
+    const years = Array.from({ length: 12 }, (_, index) => {
+      const year = pageStart + index;
+      const classes = [
+        "booking-calendar-year",
+        year === monthDate.getFullYear() ? "is-selected" : "",
+        year === currentDate.getFullYear() ? "is-current" : ""
+      ].filter(Boolean).join(" ");
+      return `<button class="${classes}" type="button" data-custom-calendar-year="${year}">${year}</button>`;
+    }).join("");
+    return `
+      <div class="booking-calendar-head">
+        <button class="booking-calendar-nav" type="button" data-custom-calendar-year-page="-12" aria-label="Попередні роки">‹</button>
+        <strong class="booking-calendar-title">${pageStart}–${pageStart + 11}</strong>
+        <button class="booking-calendar-nav" type="button" data-custom-calendar-year-page="12" aria-label="Наступні роки">›</button>
+      </div>
+      <div class="booking-calendar-years">${years}</div>`;
+  }
+
+  if (picker.mode === "months") {
+    const formatter = new Intl.DateTimeFormat("uk-UA", { month: "short" });
+    const months = Array.from({ length: 12 }, (_, monthIndex) => {
+      const classes = [
+        "booking-calendar-month",
+        monthIndex === monthDate.getMonth() ? "is-selected" : "",
+        selectedKey &&
+        monthDate.getFullYear() === selectedDate.getFullYear() &&
+        monthIndex === selectedDate.getMonth()
+          ? "is-picked"
+          : "",
+        monthDate.getFullYear() === currentDate.getFullYear() &&
+        monthIndex === currentDate.getMonth()
+          ? "is-current"
+          : ""
+      ].filter(Boolean).join(" ");
+      const label = formatter.format(new Date(monthDate.getFullYear(), monthIndex, 1));
+      return `<button class="${classes}" type="button" data-custom-calendar-month-option="${monthIndex}">${escapeHtml(label)}</button>`;
+    }).join("");
+    return `
+      <div class="booking-calendar-head">
+        <button class="booking-calendar-nav" type="button" data-custom-calendar-year-page="-1" aria-label="Попередній рік">‹</button>
+        <strong class="booking-calendar-title">
+          <button class="booking-calendar-year-toggle" type="button" data-custom-calendar-year-toggle aria-label="Вибрати рік">${monthDate.getFullYear()}</button>
+        </strong>
+        <button class="booking-calendar-nav" type="button" data-custom-calendar-year-page="1" aria-label="Наступний рік">›</button>
+      </div>
+      <div class="booking-calendar-months">${months}</div>`;
+  }
+
+  const firstVisibleDate = customCalendarWeekStart(
+    new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)
+  );
+  const monthFormatter = new Intl.DateTimeFormat("uk-UA", { month: "long" });
+  const dateFormatter = new Intl.DateTimeFormat("uk-UA", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(firstVisibleDate);
+    day.setDate(firstVisibleDate.getDate() + index);
+    const key = customDateKey(day);
+    const classes = [
+      "booking-calendar-day",
+      day.getMonth() === monthDate.getMonth() ? "" : "is-muted",
+      key === customDateKey(currentDate) ? "is-today" : "",
+      key === selectedKey ? "is-selected" : ""
+    ].filter(Boolean).join(" ");
+    return `<button class="${classes}" type="button" data-custom-calendar-day="${key}" aria-label="${escapeHtml(dateFormatter.format(day))}">${day.getDate()}</button>`;
+  }).join("");
+  return `
+    <div class="booking-calendar-head">
+      <button class="booking-calendar-nav" type="button" data-custom-calendar-month="-1" aria-label="Попередній місяць">‹</button>
+      <strong class="booking-calendar-title">
+        <button class="booking-calendar-month-toggle" type="button" data-custom-calendar-month-toggle aria-label="Вибрати місяць">${escapeHtml(monthFormatter.format(monthDate))}</button>
+        <button class="booking-calendar-year-toggle" type="button" data-custom-calendar-year-toggle aria-label="Вибрати рік">${monthDate.getFullYear()}</button>
+      </strong>
+      <button class="booking-calendar-nav" type="button" data-custom-calendar-month="1" aria-label="Наступний місяць">›</button>
+    </div>
+    <div class="booking-calendar-weekdays">
+      ${["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"].map((day) => `<span>${day}</span>`).join("")}
+    </div>
+    <div class="booking-calendar-grid">${days}</div>`;
+}
+
+function positionCustomDatePicker(picker) {
+  if (!picker || picker.popover.hidden) {
+    return;
+  }
+  picker.popover.style.top = "";
+  picker.popover.style.right = "";
+  picker.popover.style.bottom = "";
+  picker.popover.style.left = "";
+  picker.popover.style.width = "";
+
+  if (window.matchMedia && window.matchMedia("(max-width: 760px)").matches) {
+    return;
+  }
+
+  const rect = picker.input.getBoundingClientRect();
+  const width = Math.min(320, window.innerWidth - 24);
+  const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12);
+  const estimatedHeight = picker.mode === "days" ? 350 : 250;
+  const below = rect.bottom + 8;
+  const top = below + estimatedHeight > window.innerHeight
+    ? Math.max(12, rect.top - estimatedHeight - 8)
+    : below;
+  picker.popover.style.width = `${width}px`;
+  picker.popover.style.left = `${left}px`;
+  picker.popover.style.top = `${top}px`;
+}
+
+function renderCustomDatePicker(picker) {
+  picker.popover.innerHTML = renderCustomCalendarMarkup(picker);
+}
+
+function closeCustomDatePicker(picker = activeCustomDatePicker, options = {}) {
+  if (!picker) {
+    return;
+  }
+  picker.popover.hidden = true;
+  picker.popover.classList.remove("is-open");
+  if (activeCustomDatePicker === picker) {
+    activeCustomDatePicker = null;
+    document.body.classList.remove("custom-calendar-open");
+  }
+  if (options.restoreFocus) {
+    picker.suppressNextFocus = true;
+    picker.input.focus({ preventScroll: true });
+  }
+}
+
+function openCustomDatePicker(picker) {
+  if (!picker || picker.input.disabled) {
+    return;
+  }
+  if (activeCustomDatePicker === picker && !picker.popover.hidden) {
+    return;
+  }
+  if (activeCustomDatePicker && activeCustomDatePicker !== picker) {
+    closeCustomDatePicker(activeCustomDatePicker);
+  }
+  closeCustomSelects();
+  closeMonitorOperatorPopover();
+  const selectedDate = customDateFromKey(picker.input.value || customDateKey(new Date()));
+  picker.monthDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+  picker.mode = "days";
+  picker.yearPageStart = customCalendarYearPageStart(selectedDate.getFullYear());
+  renderCustomDatePicker(picker);
+  picker.popover.hidden = false;
+  picker.popover.classList.add("is-open");
+  activeCustomDatePicker = picker;
+  document.body.classList.add("custom-calendar-open");
+  positionCustomDatePicker(picker);
+}
+
+function shiftCustomDatePickerMonth(picker, direction) {
+  const base = picker.monthDate || customDateFromKey(picker.input.value);
+  picker.monthDate = new Date(base.getFullYear(), base.getMonth() + direction, 1);
+  picker.mode = "days";
+  picker.yearPageStart = customCalendarYearPageStart(picker.monthDate.getFullYear());
+  renderCustomDatePicker(picker);
+  positionCustomDatePicker(picker);
+}
+
+function openCustomDatePickerYearPicker(picker) {
+  const base = picker.monthDate || customDateFromKey(picker.input.value);
+  picker.modeAfterYearSelect = picker.mode === "months" ? "months" : "days";
+  picker.mode = "years";
+  picker.yearPageStart = customCalendarYearPageStart(base.getFullYear());
+  renderCustomDatePicker(picker);
+  positionCustomDatePicker(picker);
+}
+
+function shiftCustomDatePickerYearPage(picker, direction) {
+  if (picker.mode === "months" && Math.abs(direction) === 1) {
+    const base = picker.monthDate || customDateFromKey(picker.input.value);
+    picker.monthDate = new Date(base.getFullYear() + direction, base.getMonth(), 1);
+    picker.yearPageStart = customCalendarYearPageStart(picker.monthDate.getFullYear());
+  } else {
+    const pageStart = Number.isInteger(picker.yearPageStart)
+      ? picker.yearPageStart
+      : customCalendarYearPageStart((picker.monthDate || new Date()).getFullYear());
+    picker.yearPageStart = pageStart + direction;
+    picker.mode = "years";
+  }
+  renderCustomDatePicker(picker);
+  positionCustomDatePicker(picker);
+}
+
+function setCustomDatePickerYear(picker, year) {
+  if (!Number.isInteger(year) || year < 1900 || year > 2200) {
+    return;
+  }
+  const base = picker.monthDate || customDateFromKey(picker.input.value);
+  picker.monthDate = new Date(year, base.getMonth(), 1);
+  picker.yearPageStart = customCalendarYearPageStart(year);
+  picker.mode = picker.modeAfterYearSelect === "months" ? "months" : "days";
+  renderCustomDatePicker(picker);
+  positionCustomDatePicker(picker);
+}
+
+function openCustomDatePickerMonthPicker(picker) {
+  const base = picker.monthDate || customDateFromKey(picker.input.value);
+  picker.monthDate = new Date(base.getFullYear(), base.getMonth(), 1);
+  picker.yearPageStart = customCalendarYearPageStart(base.getFullYear());
+  picker.mode = "months";
+  renderCustomDatePicker(picker);
+  positionCustomDatePicker(picker);
+}
+
+function setCustomDatePickerMonth(picker, monthIndex) {
+  if (!Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+    return;
+  }
+  const base = picker.monthDate || customDateFromKey(picker.input.value);
+  picker.monthDate = new Date(base.getFullYear(), monthIndex, 1);
+  picker.mode = "days";
+  renderCustomDatePicker(picker);
+  positionCustomDatePicker(picker);
+}
+
+function initCustomDatePicker(input) {
+  if (!input || input.dataset.customCalendarReady === "true") {
+    return;
+  }
+  input.dataset.customCalendarReady = "true";
+  const initialValue = input.value;
+  input.type = "text";
+  input.inputMode = "numeric";
+  input.autocomplete = "off";
+  input.readOnly = true;
+  input.classList.add("custom-date-input");
+  input.placeholder = input.placeholder || "РРРР-ММ-ДД";
+  input.value = isCustomDateKey(initialValue) ? initialValue : "";
+
+  const picker = {
+    input,
+    popover: document.createElement("div"),
+    monthDate: null,
+    mode: "days",
+    yearPageStart: null,
+    modeAfterYearSelect: "days"
+  };
+  input._customDatePicker = picker;
+  picker.popover.className = "booking-calendar-popover custom-calendar-popover";
+  picker.popover.hidden = true;
+  picker.popover.addEventListener("pointerdown", (event) => event.stopPropagation());
+  picker.popover.addEventListener("click", (event) => {
+    const yearToggle = event.target.closest("[data-custom-calendar-year-toggle]");
+    const monthToggle = event.target.closest("[data-custom-calendar-month-toggle]");
+    const yearPage = event.target.closest("[data-custom-calendar-year-page]");
+    const year = event.target.closest("[data-custom-calendar-year]");
+    const monthOption = event.target.closest("[data-custom-calendar-month-option]");
+    const month = event.target.closest("[data-custom-calendar-month]");
+    const day = event.target.closest("[data-custom-calendar-day]");
+    if (yearToggle) {
+      openCustomDatePickerYearPicker(picker);
+    } else if (monthToggle) {
+      openCustomDatePickerMonthPicker(picker);
+    } else if (yearPage) {
+      shiftCustomDatePickerYearPage(
+        picker,
+        Number(yearPage.dataset.customCalendarYearPage || 0)
+      );
+    } else if (year) {
+      setCustomDatePickerYear(picker, Number(year.dataset.customCalendarYear || 0));
+    } else if (monthOption) {
+      setCustomDatePickerMonth(
+        picker,
+        Number(monthOption.dataset.customCalendarMonthOption || 0)
+      );
+    } else if (month) {
+      shiftCustomDatePickerMonth(
+        picker,
+        Number(month.dataset.customCalendarMonth || 0)
+      );
+    } else if (day) {
+      input.value = day.dataset.customCalendarDay || "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      closeCustomDatePicker(picker, { restoreFocus: true });
+    }
+  });
+  document.body.append(picker.popover);
+
+  input.addEventListener("pointerdown", () => openCustomDatePicker(picker));
+  input.addEventListener("focus", () => {
+    if (picker.suppressNextFocus) {
+      picker.suppressNextFocus = false;
+      return;
+    }
+    openCustomDatePicker(picker);
+  });
+  input.addEventListener("keydown", (event) => {
+    if (!["Enter", " ", "ArrowDown"].includes(event.key)) {
+      return;
+    }
+    event.preventDefault();
+    openCustomDatePicker(picker);
+  });
+}
+
+function initCustomDatePickers(inputs) {
+  for (const input of inputs || []) {
+    initCustomDatePicker(input);
+  }
+}
+
+function monitorOperatorLabel(operator) {
+  const number = String(operator && operator.number || "").trim();
+  return String(
+    operator && (operator.label || operator.employeeName || operator.pbxName) ||
+    (number ? `вн. ${number}` : "Оператор")
+  ).trim();
+}
+
+function updateMonitorOperatorSummary() {
+  if (!elements.monitorOperatorSummary || !elements.monitorOperatorTrigger) {
+    return;
+  }
+  const selected = monitorOperators.filter((operator) =>
+    monitorSelectedOperators.has(String(operator.number || ""))
+  );
+  let summary = "Усі оператори";
+  if (selected.length === 1) {
+    summary = monitorOperatorLabel(selected[0]);
+  } else if (selected.length > 1) {
+    summary = `${selected.length} вибрано`;
+  } else if (!monitorOperators.length && elements.monitorOperatorTrigger.disabled) {
+    summary = elements.monitorOperatorTrigger.dataset.loading === "true"
+      ? "Завантаження…"
+      : elements.monitorOperatorTrigger.dataset.loadError === "true"
+        ? "Недоступно"
+        : "Немає операторів";
+  }
+  elements.monitorOperatorSummary.textContent = summary;
+  elements.monitorOperatorTrigger.title = selected.length
+    ? selected.map((operator) => monitorOperatorLabel(operator)).join(", ")
+    : summary;
+  elements.monitorOperatorClear.disabled = monitorSelectedOperators.size === 0;
+}
+
+function renderMonitorOperatorOptions() {
+  if (!elements.monitorOperatorOptions) {
+    return;
+  }
+  const query = String(elements.monitorOperatorSearch && elements.monitorOperatorSearch.value || "")
+    .trim()
+    .toLocaleLowerCase("uk");
+  const visibleOperators = monitorOperators.filter((operator) => {
+    const searchText = [
+      operator.number,
+      operator.label,
+      operator.employeeName,
+      operator.pbxName
+    ].join(" ").toLocaleLowerCase("uk");
+    return !query || searchText.includes(query);
+  });
+  elements.monitorOperatorOptions.replaceChildren();
+
+  if (!visibleOperators.length) {
+    const empty = document.createElement("p");
+    empty.className = "monitor-operator-empty";
+    empty.textContent = monitorOperators.length
+      ? "Нічого не знайдено"
+      : "Оператори ще не завантажені";
+    elements.monitorOperatorOptions.append(empty);
+    updateMonitorOperatorSummary();
+    return;
+  }
+
+  visibleOperators.forEach((operator, index) => {
+    const number = String(operator.number || "").trim();
+    const label = document.createElement("label");
+    label.className = "monitor-operator-option";
+    label.htmlFor = `monitor-operator-${index}`;
+
+    const checkbox = document.createElement("input");
+    checkbox.id = `monitor-operator-${index}`;
+    checkbox.type = "checkbox";
+    checkbox.value = number;
+    checkbox.checked = monitorSelectedOperators.has(number);
+    checkbox.dataset.monitorOperatorNumber = number;
+
+    const check = document.createElement("span");
+    check.className = "monitor-operator-check";
+    check.setAttribute("aria-hidden", "true");
+
+    const copy = document.createElement("span");
+    copy.className = "monitor-operator-copy";
+    const name = document.createElement("strong");
+    name.textContent = monitorOperatorLabel(operator);
+    const meta = document.createElement("small");
+    meta.textContent = `вн. ${number}`;
+    copy.append(name, meta);
+    label.append(checkbox, check, copy);
+    elements.monitorOperatorOptions.append(label);
+  });
+  updateMonitorOperatorSummary();
+}
+
+function portalMonitorOperatorPopover() {
+  const popover = elements.monitorOperatorPopover;
+  if (popover && popover.parentElement !== document.body) {
+    document.body.append(popover);
+  }
+}
+
+function positionMonitorOperatorPopover() {
+  const popover = elements.monitorOperatorPopover;
+  const trigger = elements.monitorOperatorTrigger;
+  if (!popover || !trigger || popover.hidden) {
+    return;
+  }
+  popover.style.top = "";
+  popover.style.right = "";
+  popover.style.bottom = "";
+  popover.style.left = "";
+  popover.style.width = "";
+
+  if (window.matchMedia && window.matchMedia("(max-width: 760px)").matches) {
+    return;
+  }
+
+  const rect = trigger.getBoundingClientRect();
+  const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+  const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+  const width = Math.min(360, viewportWidth - 24);
+  const preferredLeft = rect.right - width;
+  const left = Math.min(
+    Math.max(12, preferredLeft),
+    Math.max(12, viewportWidth - width - 12)
+  );
+  const height = Math.min(
+    popover.getBoundingClientRect().height || 420,
+    viewportHeight - 24
+  );
+  const below = rect.bottom + 8;
+  const top = below + height > viewportHeight
+    ? Math.max(12, rect.top - height - 8)
+    : below;
+  popover.style.width = `${width}px`;
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+}
+
+function closeMonitorOperatorPopover(options = {}) {
+  if (!elements.monitorOperatorPopover || elements.monitorOperatorPopover.hidden) {
+    return;
+  }
+  elements.monitorOperatorPopover.hidden = true;
+  elements.monitorOperatorFilter.classList.remove("is-open");
+  elements.monitorOperatorTrigger.setAttribute("aria-expanded", "false");
+  if (options.restoreFocus) {
+    elements.monitorOperatorTrigger.focus({ preventScroll: true });
+  }
+}
+
+function openMonitorOperatorPopover() {
+  if (
+    !elements.monitorOperatorPopover ||
+    !elements.monitorOperatorTrigger ||
+    elements.monitorOperatorTrigger.disabled
+  ) {
+    return;
+  }
+  closeCustomSelects();
+  closeCustomDatePicker();
+  elements.monitorOperatorSearch.value = "";
+  renderMonitorOperatorOptions();
+  elements.monitorOperatorPopover.hidden = false;
+  elements.monitorOperatorFilter.classList.add("is-open");
+  elements.monitorOperatorTrigger.setAttribute("aria-expanded", "true");
+  positionMonitorOperatorPopover();
+  requestAnimationFrame(() => elements.monitorOperatorSearch.focus({ preventScroll: true }));
+}
+
+async function loadMonitorOperators() {
+  if (!canViewTeamAnalytics() || !elements.monitorOperatorTrigger) {
+    return;
+  }
+  elements.monitorOperatorTrigger.disabled = true;
+  elements.monitorOperatorTrigger.dataset.loading = "true";
+  updateMonitorOperatorSummary();
+  try {
+    delete elements.monitorOperatorTrigger.dataset.loadError;
+    const response = await apiFetch("/api/binotel-monitor/operators", {
+      headers: { Accept: "application/json" }
+    });
+    const payload = await readJsonResponse(response, "Не вдалося завантажити операторів");
+    monitorOperators = (Array.isArray(payload.operators) ? payload.operators : [])
+      .map((operator) => ({
+        number: String(operator && operator.number || "").trim(),
+        label: String(operator && operator.label || "").trim(),
+        employeeName: String(operator && operator.employeeName || "").trim(),
+        pbxName: String(operator && operator.pbxName || "").trim()
+      }))
+      .filter((operator) => operator.number);
+    const availableNumbers = new Set(monitorOperators.map((operator) => operator.number));
+    for (const number of monitorSelectedOperators) {
+      if (!availableNumbers.has(number)) {
+        monitorSelectedOperators.delete(number);
+      }
+    }
+    elements.monitorOperatorTrigger.disabled = monitorOperators.length === 0;
+  } catch {
+    monitorOperators = [];
+    monitorSelectedOperators.clear();
+    elements.monitorOperatorTrigger.disabled = true;
+    elements.monitorOperatorTrigger.dataset.loadError = "true";
+  } finally {
+    delete elements.monitorOperatorTrigger.dataset.loading;
+    renderMonitorOperatorOptions();
+    updateMonitorOperatorSummary();
+  }
+}
+
+function setMonitorFilterMessage(message = "") {
+  if (!elements.monitorFilterMessage) {
+    return;
+  }
+  elements.monitorFilterMessage.textContent = message;
+  elements.monitorFilterMessage.hidden = !message;
+}
+
+function updateMonitorDateReset() {
+  if (!elements.monitorDateReset) {
+    return;
+  }
+  elements.monitorDateReset.hidden = !(
+    (elements.monitorFrom && elements.monitorFrom.value) ||
+    (elements.monitorTo && elements.monitorTo.value)
+  );
+}
+
+function validateMonitorDateRange() {
+  const from = String(elements.monitorFrom && elements.monitorFrom.value || "");
+  const to = String(elements.monitorTo && elements.monitorTo.value || "");
+  const invalid = Boolean(from && to && to < from);
+  elements.monitorFrom?.setAttribute("aria-invalid", String(invalid));
+  elements.monitorTo?.setAttribute("aria-invalid", String(invalid));
+  setMonitorFilterMessage(
+    invalid ? "Дата «До» має бути не раніше за дату «Від»." : ""
+  );
+  return !invalid;
 }
 
 function formatPhone(value) {
@@ -2592,17 +3289,29 @@ async function saveAiTermsModal(event) {
   );
 }
 
-function setProfileMenuOpen(open) {
+function setProfileMenuOpen(open, options = {}) {
   if (!elements.profileMenu || !elements.profileMenuPopover || !elements.profileMenuTrigger) {
     return;
   }
+  const wasOpen = elements.profileMenu.classList.contains("is-open");
   elements.profileMenu.classList.toggle("is-open", open);
   elements.profileMenuPopover.hidden = !open;
   elements.profileMenuTrigger.setAttribute("aria-expanded", String(open));
+  if (!open && wasOpen && options.restoreFocus) {
+    elements.profileMenuTrigger.focus({ preventScroll: true });
+  }
 }
 
 function toggleProfileMenu() {
   setProfileMenuOpen(!(elements.profileMenu && elements.profileMenu.classList.contains("is-open")));
+}
+
+function profileMenuItems() {
+  if (!elements.profileMenuPopover) {
+    return [];
+  }
+  return [...elements.profileMenuPopover.querySelectorAll('[role="menuitem"]')]
+    .filter((item) => !item.closest("[hidden]") && !item.matches(":disabled, [aria-disabled='true']"));
 }
 
 function setMessage(element, message = "", tone = "") {
@@ -3613,7 +4322,7 @@ async function loadMetricPromptUpdate(feedbackId, { regenerate = false } = {}) {
       elements.metricPromptSubtitle.textContent =
         draft && draft.cached
           ? "Показано збережений draft. Якщо треба іншу версію, натисніть «Згенерувати ще раз»."
-          : "Перегляньте diff: AI переписав prompt метрики та кожної оцінки без одноразового контексту дзвінка.";
+          : "AI врахував транскрипт, повний результат аналізу й контекст дзвінка, але не переніс одноразові дані в prompt.";
     }
     renderMetricPromptDiff(payload.currentPrompt, payload.proposal);
     setMetricPromptMessage(
@@ -3650,7 +4359,8 @@ async function openMetricPromptModal(feedbackId) {
       : "Застосувати правку";
   }
   if (elements.metricPromptSubtitle) {
-    elements.metricPromptSubtitle.textContent = "AI переписує інструкції метрики й усіх оцінок на основі цієї правки.";
+    elements.metricPromptSubtitle.textContent =
+      "AI переписує інструкції метрики й усіх оцінок на основі правки та повного контексту дзвінка.";
   }
   renderMetricPromptDiff(null, null);
   setMetricPromptActionState();
@@ -4923,6 +5633,9 @@ function routeState(pathname = window.location.pathname) {
   if (pathname === "/calls-monitor") {
     return "monitor";
   }
+  if (pathname === "/my-work") {
+    return "myWork";
+  }
   if (pathname === "/call-stats") {
     return "callStats";
   }
@@ -4940,6 +5653,7 @@ function routeState(pathname = window.location.pathname) {
 
 const LOADING_MESSAGES = {
   card: "Завантажуємо картку клієнта…",
+  myWork: "Завантажуємо вашу роботу…",
   monitor: "Завантажуємо дзвінки…",
   callStats: "Завантажуємо статистику дзвінків…",
   analytics: "Завантажуємо AI-аналітику…",
@@ -4959,7 +5673,12 @@ function syncDetailPanelHeights() {
 
   const aiPanel = grid.querySelector(".call-ai-panel");
   const qualityPanel = grid.querySelector(".call-quality-panel");
-  if (!aiPanel || !qualityPanel || window.matchMedia("(max-width: 980px)").matches) {
+  if (
+    !currentDetailCall ||
+    !aiPanel ||
+    !qualityPanel ||
+    window.matchMedia("(max-width: 980px)").matches
+  ) {
     return;
   }
 
@@ -4972,6 +5691,7 @@ function syncDetailPanelHeights() {
 
 function setState(state) {
   const navState = state === "loading" ? routeState() : state;
+  document.body.dataset.uiState = state;
   if (state === "loading" && elements.loadingMessage) {
     elements.loadingMessage.textContent = LOADING_MESSAGES[navState] || "Завантажуємо дані…";
   }
@@ -4979,6 +5699,7 @@ function setState(state) {
   elements.emptyState.classList.toggle("hidden", state !== "empty");
   elements.loadingState.classList.toggle("hidden", state !== "loading");
   elements.clientCard.classList.toggle("hidden", state !== "card");
+  elements.myWorkPage.classList.toggle("hidden", state !== "myWork");
   elements.monitorPage.classList.toggle("hidden", state !== "monitor");
   elements.callStatsPage.classList.toggle("hidden", state !== "callStats");
   elements.analyticsPage.classList.toggle("hidden", state !== "analytics");
@@ -4990,6 +5711,7 @@ function setState(state) {
     empty: "Картка клієнта",
     loading: "Завантаження",
     card: "Картка клієнта",
+    myWork: "Моя робота",
     monitor: "Дзвінки",
     callStats: "Статистика дзвінків",
     analytics: "AI-аналітика",
@@ -5006,8 +5728,13 @@ function setState(state) {
 
   for (const link of elements.viewLinks) {
     const view = link.getAttribute("data-view-link");
+    const detailNavigationView = authState.user && authState.user.role === "user"
+      ? "my-work"
+      : "calls-monitor";
     const isActive =
-      ((navState === "monitor" || navState === "detail") && view === "calls-monitor") ||
+      (navState === "detail" && view === detailNavigationView) ||
+        (navState === "monitor" && view === "calls-monitor") ||
+        (navState === "myWork" && view === "my-work") ||
         (navState === "callStats" && view === "call-stats") ||
         (navState === "analytics" && view === "call-analytics") ||
         (navState === "aiSettings" && view === "ai-settings") ||
@@ -5026,6 +5753,7 @@ function setState(state) {
       empty: elements.emptyState,
       loading: elements.loadingState,
       card: elements.clientCard,
+      myWork: elements.myWorkPage,
       monitor: elements.monitorPage,
       callStats: elements.callStatsPage,
       analytics: elements.analyticsPage,
@@ -8192,16 +8920,20 @@ function managerRatingScoreClass(value) {
 }
 
 function managerRatingPercent(value) {
-  return Number.isFinite(Number(value)) ? `${Math.round(Number(value))}%` : "—";
+  return value !== null && value !== "" && Number.isFinite(Number(value))
+    ? `${Math.round(Number(value))}%`
+    : "—";
 }
 
 function managerRatingPercentValue(item) {
-  const total = Number(item && item.totalPercent);
+  const totalValue = item && item.totalPercent;
+  const total = totalValue !== null && totalValue !== "" ? Number(totalValue) : Number.NaN;
   if (Number.isFinite(total)) {
     return total;
   }
 
-  const average = Number(item && item.averagePercent);
+  const averageValue = item && item.averagePercent;
+  const average = averageValue !== null && averageValue !== "" ? Number(averageValue) : Number.NaN;
   return Number.isFinite(average) ? average : null;
 }
 
@@ -8258,8 +8990,18 @@ function managerRatingColumnMetrics(rating, managers) {
         key,
         label: managerMetricLabel(metric),
         group: metric && metric.group || "",
-        color: metric && metric.color || ""
+        color: metric && metric.color || "",
+        scoredMetricCount: Number(metric && metric.scoredMetricCount) || 0
       });
+    } else if (key) {
+      const current = map.get(key);
+      current.scoredMetricCount = Math.max(
+        current.scoredMetricCount || 0,
+        Number(metric && metric.scoredMetricCount) || 0
+      );
+      if (!current.group && metric && metric.group) {
+        current.group = metric.group;
+      }
     }
   };
 
@@ -8273,6 +9015,121 @@ function managerRatingColumnMetrics(rating, managers) {
   }
 
   return [...map.values()];
+}
+
+function managerRatingGroupLabel(metric) {
+  return String(metric && metric.group || "").trim() || "Інші метрики";
+}
+
+function syncManagerRatingGroupControl(metrics) {
+  if (!elements.managerRatingGroup) {
+    return;
+  }
+
+  const groups = [...new Set(metrics
+    .map((metric) => String(metric && metric.group || "").trim())
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "uk"));
+  const hasCoreSubset = metrics.length > 8;
+  const available = new Set(["all", ...(hasCoreSubset ? ["core"] : []), ...groups]);
+  if (!available.has(currentManagerRatingGroup)) {
+    currentManagerRatingGroup = "all";
+  }
+
+  const options = [
+    ...(hasCoreSubset ? [["core", "Ключові метрики"]] : []),
+    ["all", "Усі метрики"],
+    ...groups.map((group) => [group, group])
+  ];
+  elements.managerRatingGroup.replaceChildren(...options.map(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    return option;
+  }));
+  elements.managerRatingGroup.value = currentManagerRatingGroup;
+  syncCustomSelect(elements.managerRatingGroup);
+}
+
+function managerRatingInitials(manager) {
+  const label = String(manager && manager.label || "").trim();
+  const initials = label
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  return initials || String(manager && manager.extension || "?").slice(-2);
+}
+
+function managerRatingDailyMap(manager) {
+  return new Map(
+    (Array.isArray(manager && manager.daily) ? manager.daily : [])
+      .map((day) => [String(day && day.dayKey || ""), day])
+      .filter(([dayKey]) => dayKey)
+  );
+}
+
+function managerRatingDayLabel(dayKey) {
+  const parsed = new Date(`${dayKey}T00:00:00Z`);
+  if (!Number.isFinite(parsed.getTime())) {
+    return dayKey;
+  }
+  return new Intl.DateTimeFormat("uk-UA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC"
+  }).format(parsed);
+}
+
+function managerRatingDayRange(observedDayKeys, limit = 14) {
+  const sorted = [...new Set(observedDayKeys)].sort();
+  if (!sorted.length) {
+    return [];
+  }
+
+  const last = new Date(`${sorted[sorted.length - 1]}T00:00:00Z`);
+  const firstObserved = new Date(`${sorted[0]}T00:00:00Z`);
+  if (!Number.isFinite(last.getTime()) || !Number.isFinite(firstObserved.getTime())) {
+    return sorted.slice(-limit);
+  }
+
+  const windowStart = new Date(last);
+  windowStart.setUTCDate(windowStart.getUTCDate() - Math.max(0, limit - 1));
+  const first = firstObserved > windowStart ? firstObserved : windowStart;
+  const dayKeys = [];
+  for (const cursor = new Date(first); cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    dayKeys.push(cursor.toISOString().slice(0, 10));
+  }
+  return dayKeys;
+}
+
+function managerRatingTrendTone(delta, hasComparison) {
+  if (!hasComparison || !Number.isFinite(delta)) {
+    return "is-baseline";
+  }
+  if (delta > 0.5) {
+    return "is-up";
+  }
+  if (delta < -0.5) {
+    return "is-down";
+  }
+  return "is-flat";
+}
+
+function managerRatingDeltaLabel(delta, hasComparison) {
+  if (!hasComparison || !Number.isFinite(delta)) {
+    return "";
+  }
+  const rounded = Math.round(delta);
+  if (rounded > 0) {
+    return `↗ +${rounded}`;
+  }
+  if (rounded < 0) {
+    return `↘ −${Math.abs(rounded)}`;
+  }
+  return "→ 0";
 }
 
 function managerRatingMeta(manager) {
@@ -8313,6 +9170,11 @@ function createManagerRatingCell(item, options = {}) {
   score.textContent = managerRatingPercent(percent);
 
   cell.append(score);
+  if (options.total) {
+    const detail = document.createElement("small");
+    detail.textContent = countLabel;
+    cell.append(detail);
+  }
   return cell;
 }
 
@@ -8391,6 +9253,17 @@ function appendManagerModalMetric(metric) {
   score.textContent = managerRatingPercent(percent);
   head.append(title, score);
 
+  const progress = document.createElement("div");
+  progress.className = "manager-rating-modal-progress";
+  progress.setAttribute("role", "progressbar");
+  progress.setAttribute("aria-label", managerMetricLabel(metric));
+  progress.setAttribute("aria-valuemin", "0");
+  progress.setAttribute("aria-valuemax", "100");
+  progress.setAttribute("aria-valuenow", String(Number.isFinite(percent) ? Math.round(percent) : 0));
+  const progressValue = document.createElement("span");
+  progressValue.style.width = `${Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0}%`;
+  progress.append(progressValue);
+
   const facts = document.createElement("dl");
   facts.className = "manager-rating-modal-metric-facts";
   const addFact = (factLabel, factValue) => {
@@ -8409,7 +9282,7 @@ function appendManagerModalMetric(metric) {
     ? `${formatMetricNumber(metric.averageScore)}/${formatMetricNumber(metric.averageMaxScore)}`
     : "—");
 
-  item.append(head, facts);
+  item.append(head, progress, facts);
   elements.managerRatingModalMetrics.append(item);
 }
 
@@ -8423,6 +9296,7 @@ function openManagerRatingModal(managerIndex) {
   }
 
   const percent = managerRatingPercentValue(manager);
+  const metrics = Array.isArray(manager.metrics) ? manager.metrics : [];
   elements.managerRatingModalTitle.textContent = manager.label || "Оператор не визначений";
   elements.managerRatingModalSubtitle.textContent = managerRatingMeta(manager);
   elements.managerRatingModalSummary.replaceChildren();
@@ -8440,15 +9314,14 @@ function openManagerRatingModal(managerIndex) {
   );
   appendManagerModalSummary(
     "Метрик",
-    formatNumber(manager.scoredMetricCount || 0),
-    "враховано в рейтингу"
+    formatNumber(metrics.length),
+    `${formatNumber(manager.scoredMetricCount || 0)} окремих оцінок`
   );
   appendManagerModalSummary(
     "Останній дзвінок",
     manager.lastCallAt ? formatDateTime(manager.lastCallAt) : "—"
   );
 
-  const metrics = Array.isArray(manager.metrics) ? manager.metrics : [];
   if (!metrics.length) {
     const message = document.createElement("p");
     message.className = "no-data";
@@ -8465,11 +9338,209 @@ function openManagerRatingModal(managerIndex) {
   showManagerRatingModalDialog();
 }
 
+function renderManagerRatingTrend(rating, managers) {
+  if (!elements.managerRatingTrend) {
+    return;
+  }
+  elements.managerRatingTrend.replaceChildren();
+
+  const observedDayKeys = managers.flatMap((manager) =>
+    (Array.isArray(manager && manager.daily) ? manager.daily : [])
+      .map((day) => String(day && day.dayKey || ""))
+      .filter(Boolean)
+  );
+  const dayKeys = managerRatingDayRange(observedDayKeys);
+
+  if (elements.managerRatingRange) {
+    elements.managerRatingRange.textContent = dayKeys.length
+      ? `${managerRatingDayLabel(dayKeys[0])} — ${managerRatingDayLabel(dayKeys[dayKeys.length - 1])}`
+      : "Період без даних";
+  }
+
+  if (!managers.length || !dayKeys.length) {
+    const empty = document.createElement("p");
+    empty.className = "no-data manager-rating-trend-empty";
+    empty.textContent = "Динаміка з’явиться, щойно будуть оцінки за окремі дні.";
+    elements.managerRatingTrend.append(empty);
+    return;
+  }
+
+  const table = document.createElement("table");
+  table.className = "manager-rating-trend-matrix";
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  const managerHead = document.createElement("th");
+  managerHead.scope = "col";
+  managerHead.className = "manager-rating-trend-manager";
+  managerHead.textContent = "Менеджер";
+  headRow.append(managerHead);
+  const trendHead = document.createElement("th");
+  trendHead.scope = "col";
+  trendHead.className = "manager-rating-trend-total";
+  trendHead.textContent = "Тренд";
+  headRow.append(trendHead);
+  for (const dayKey of dayKeys) {
+    const dayHead = document.createElement("th");
+    dayHead.scope = "col";
+    dayHead.textContent = managerRatingDayLabel(dayKey);
+    headRow.append(dayHead);
+  }
+  thead.append(headRow);
+
+  const tbody = document.createElement("tbody");
+  managers.forEach((manager, index) => {
+    const row = document.createElement("tr");
+    const nameCell = document.createElement("th");
+    nameCell.scope = "row";
+    nameCell.className = "manager-rating-trend-manager";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.managerRatingIndex = String(index);
+    button.setAttribute("aria-label", `Відкрити деталі менеджера ${manager.label || "Оператор не визначений"}`);
+    const avatar = document.createElement("span");
+    avatar.className = "manager-rating-trend-avatar";
+    avatar.textContent = managerRatingInitials(manager);
+    const identity = document.createElement("span");
+    identity.className = "manager-rating-trend-identity";
+    const name = document.createElement("strong");
+    name.textContent = manager.label || "Оператор не визначений";
+    const meta = document.createElement("small");
+    meta.textContent = `${formatNumber(manager.ratedCallCount || 0)} дзв. за період`;
+    identity.append(name, meta);
+    button.append(avatar, identity);
+    nameCell.append(button);
+    row.append(nameCell);
+
+    const daily = managerRatingDailyMap(manager);
+    const scoredDays = (Array.isArray(manager && manager.daily) ? manager.daily : [])
+      .map((day) => ({
+        dayKey: String(day && day.dayKey || ""),
+        day,
+        percent: managerRatingPercentValue(day)
+      }))
+      .filter((entry) => entry.dayKey)
+      .filter((entry) => Number.isFinite(entry.percent))
+      .sort((a, b) => a.dayKey.localeCompare(b.dayKey));
+    const firstScoredDay = scoredDays[0] || null;
+    const lastScoredDay = scoredDays[scoredDays.length - 1] || null;
+    const hasPeriodTrend = scoredDays.length > 1;
+    const periodDelta = hasPeriodTrend
+      ? lastScoredDay.percent - firstScoredDay.percent
+      : null;
+    const trendCell = document.createElement("td");
+    trendCell.className = "manager-rating-trend-total";
+    const trendValue = document.createElement("span");
+    trendValue.className = `manager-rating-trend-badge ${hasPeriodTrend
+      ? managerRatingTrendTone(periodDelta, true)
+      : "is-empty"}`;
+    trendValue.textContent = hasPeriodTrend
+      ? managerRatingDeltaLabel(periodDelta, true)
+      : "—";
+    trendValue.title = hasPeriodTrend
+      ? `${managerRatingDayLabel(firstScoredDay.dayKey)}: ${managerRatingPercent(firstScoredDay.percent)} → ${managerRatingDayLabel(lastScoredDay.dayKey)}: ${managerRatingPercent(lastScoredDay.percent)}`
+      : "Для тренду потрібно щонайменше два дні з оцінками";
+    trendValue.setAttribute("aria-label", hasPeriodTrend
+      ? `Тренд за період ${managerRatingDeltaLabel(periodDelta, true)}`
+      : "Тренд ще не доступний");
+    trendCell.append(trendValue);
+    row.append(trendCell);
+
+    let previousPercent = null;
+    for (const dayKey of dayKeys) {
+      const cell = document.createElement("td");
+      const day = daily.get(dayKey);
+      const percent = managerRatingPercentValue(day);
+      const value = document.createElement("span");
+      if (!Number.isFinite(percent)) {
+        value.className = "manager-rating-trend-score is-empty";
+        value.textContent = "—";
+        value.title = `${managerRatingDayLabel(dayKey)} · немає оцінок`;
+        value.setAttribute("aria-label", `${managerRatingDayLabel(dayKey)}: немає оцінок`);
+        cell.append(value);
+        row.append(cell);
+        continue;
+      }
+
+      const hasComparison = Number.isFinite(previousPercent);
+      const delta = hasComparison ? percent - previousPercent : null;
+      value.className = `manager-rating-trend-score ${managerRatingTrendTone(delta, hasComparison)}`;
+      const score = document.createElement("strong");
+      score.textContent = managerRatingPercent(percent);
+      const deltaLabel = document.createElement("small");
+      deltaLabel.textContent = managerRatingDeltaLabel(delta, hasComparison);
+      deltaLabel.setAttribute("aria-hidden", "true");
+      value.append(score, deltaLabel);
+      const comparisonText = hasComparison
+        ? ` · зміна ${managerRatingDeltaLabel(delta, true)}`
+        : " · перший результат у періоді";
+      value.title = `${managerRatingDayLabel(dayKey)} · ${formatNumber(day.ratedCallCount || 0)} дзв. · ${managerRatingPointLabel(day)}${comparisonText}`;
+      value.setAttribute("aria-label", `${managerRatingDayLabel(dayKey)}: ${managerRatingPercent(percent)}${comparisonText}`);
+      cell.append(value);
+      row.append(cell);
+      previousPercent = percent;
+    }
+    tbody.append(row);
+  });
+
+  table.append(thead, tbody);
+  elements.managerRatingTrend.append(table);
+}
+
+function renderManagerRatingCompany(rating) {
+  if (!elements.managerRatingCompany) {
+    return;
+  }
+  elements.managerRatingCompany.replaceChildren();
+
+  const percent = managerRatingPercentValue(rating);
+  const score = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
+  const visual = document.createElement("div");
+  visual.className = "manager-rating-company-visual";
+  const scale = document.createElement("div");
+  scale.className = "manager-rating-company-scale";
+  for (const marker of ["0", "25", "50", "75", "100"]) {
+    const label = document.createElement("span");
+    label.textContent = `${marker}%`;
+    scale.append(label);
+  }
+  const track = document.createElement("div");
+  track.className = "manager-rating-company-track";
+  track.setAttribute("role", "progressbar");
+  track.setAttribute("aria-label", "Середня оцінка компанії");
+  track.setAttribute("aria-valuemin", "0");
+  track.setAttribute("aria-valuemax", "100");
+  track.setAttribute("aria-valuenow", String(Math.round(score)));
+  const fill = document.createElement("span");
+  fill.style.width = `${score}%`;
+  track.append(fill);
+  visual.append(scale, track);
+
+  const stats = document.createElement("div");
+  stats.className = "manager-rating-company-stats";
+  const scoreStat = createManagerRatingChip("Середня оцінка", managerRatingPercent(percent));
+  const callStat = createManagerRatingChip(
+    "Дзвінків з оцінками",
+    formatNumber(rating && rating.ratedCalls || 0)
+  );
+  stats.append(scoreStat, callStat);
+  elements.managerRatingCompany.append(visual, stats);
+}
+
 function renderManagerRating(rating) {
   const managers = Array.isArray(rating && rating.managers)
     ? rating.managers
     : [];
-  const metricColumns = managerRatingColumnMetrics(rating, managers);
+  const allMetricColumns = managerRatingColumnMetrics(rating, managers);
+  syncManagerRatingGroupControl(allMetricColumns);
+  const metricColumns = currentManagerRatingGroup === "all"
+    ? allMetricColumns
+    : currentManagerRatingGroup === "core"
+      ? [...allMetricColumns]
+        .sort((a, b) => b.scoredMetricCount - a.scoredMetricCount)
+        .slice(0, 8)
+      : allMetricColumns.filter((metric) =>
+        managerRatingGroupLabel(metric) === currentManagerRatingGroup
+      );
   currentManagerRating = {
     ...(rating || {}),
     managers
@@ -8490,10 +9561,12 @@ function renderManagerRating(rating) {
   }
 
   const summaryItems = [
-    ["Менеджерів", formatNumber(rating && rating.managerCount || managers.length)],
+    ["Середня оцінка", managerRatingPercent(managerRatingPercentValue(rating))],
     ["Дзвінків з оцінками", formatNumber(rating && rating.ratedCalls || 0)],
-    ["Метрик у таблиці", formatNumber(metricColumns.length)],
-    ["Середня якість", managerRatingPercent(managerRatingPercentValue(rating))]
+    ["Менеджерів", formatNumber(rating && rating.managerCount || managers.length)],
+    ["Показано метрик", metricColumns.length === allMetricColumns.length
+      ? formatNumber(metricColumns.length)
+      : `${formatNumber(metricColumns.length)} / ${formatNumber(allMetricColumns.length)}`]
   ];
   for (const [label, value] of summaryItems) {
     elements.managerRatingSummary.append(createManagerRatingChip(label, value));
@@ -8501,6 +9574,8 @@ function renderManagerRating(rating) {
   stageMotionItems(elements.managerRatingSummary, ":scope > span", { maxIndex: 4 });
 
   if (!managers.length) {
+    renderManagerRatingTrend(rating, managers);
+    renderManagerRatingCompany(rating);
     return;
   }
 
@@ -8518,7 +9593,7 @@ function renderManagerRating(rating) {
   const totalHead = document.createElement("th");
   totalHead.className = "manager-rating-total-head";
   totalHead.scope = "col";
-  totalHead.textContent = "Загальна";
+  totalHead.textContent = "Загальна оцінка";
   headRow.append(totalHead);
 
   for (const metric of metricColumns) {
@@ -8556,7 +9631,10 @@ function renderManagerRating(rating) {
 
     const rank = document.createElement("span");
     rank.className = "manager-rating-rank";
-    rank.textContent = formatNumber(manager.rank || index + 1);
+    rank.textContent = `#${formatNumber(manager.rank || index + 1)}`;
+    const avatar = document.createElement("span");
+    avatar.className = "manager-rating-avatar";
+    avatar.textContent = managerRatingInitials(manager);
     const person = document.createElement("span");
     person.className = "manager-rating-person";
     const name = document.createElement("strong");
@@ -8564,7 +9642,7 @@ function renderManagerRating(rating) {
     const meta = document.createElement("small");
     meta.textContent = managerRatingMeta(manager);
     person.append(name, meta);
-    managerButton.append(rank, person);
+    managerButton.append(rank, avatar, person);
     managerCell.append(managerButton);
     row.append(managerCell);
 
@@ -8587,6 +9665,8 @@ function renderManagerRating(rating) {
   table.append(thead, tbody);
   elements.managerRatingTable.append(table);
   stageMotionItems(tbody, ":scope > .manager-rating-matrix-row", { maxIndex: 8 });
+  renderManagerRatingTrend(rating, managers);
+  renderManagerRatingCompany(rating);
 }
 
 function renderCallTypeAnalytics(payload) {
@@ -8733,8 +9813,13 @@ async function loadMonitorAnalytics(query = "") {
   const period = elements.monitorAnalyticsPeriod
     ? elements.monitorAnalyticsPeriod.value
     : "30";
+  const params = new URLSearchParams({ period, q: query });
+  if (period === "custom") {
+    params.set("from", elements.analyticsPeriodFrom?.value || "");
+    params.set("to", elements.analyticsPeriodTo?.value || "");
+  }
   const response = await apiFetch(
-    `/api/binotel-monitor/analytics?period=${encodeURIComponent(period)}&q=${encodeURIComponent(query)}`,
+    `/api/binotel-monitor/analytics?${params.toString()}`,
     { headers: { Accept: "application/json" } }
   );
   const payload = await response.json();
@@ -8744,6 +9829,102 @@ async function loadMonitorAnalytics(query = "") {
   }
 
   renderCallTypeAnalytics(payload);
+}
+
+function analyticsDateInputValue(timestamp = Date.now()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date(timestamp));
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return map.year && map.month && map.day
+    ? `${map.year}-${map.month}-${map.day}`
+    : "";
+}
+
+function setAnalyticsPeriodMessage(message = "") {
+  if (!elements.analyticsPeriodMessage) {
+    return;
+  }
+  elements.analyticsPeriodMessage.textContent = message;
+  elements.analyticsPeriodMessage.dataset.tone = message ? "error" : "";
+}
+
+function updateAnalyticsCustomPeriodFields(options = {}) {
+  const isCustom = elements.monitorAnalyticsPeriod?.value === "custom";
+  const today = analyticsDateInputValue();
+  if (elements.analyticsPeriodFilter) {
+    elements.analyticsPeriodFilter.dataset.custom = String(isCustom);
+  }
+  if (isCustom && options.initialize !== false) {
+    if (elements.analyticsPeriodTo && !elements.analyticsPeriodTo.value) {
+      elements.analyticsPeriodTo.value = today;
+    }
+    if (elements.analyticsPeriodFrom && !elements.analyticsPeriodFrom.value) {
+      elements.analyticsPeriodFrom.value = analyticsDateInputValue(
+        Date.now() - 29 * 24 * 60 * 60 * 1000
+      );
+    }
+  }
+  if (elements.analyticsPeriodFrom) {
+    elements.analyticsPeriodFrom.disabled = !isCustom;
+    elements.analyticsPeriodFrom.max = elements.analyticsPeriodTo?.value || today;
+  }
+  if (elements.analyticsPeriodTo) {
+    elements.analyticsPeriodTo.disabled = !isCustom;
+    elements.analyticsPeriodTo.min = elements.analyticsPeriodFrom?.value || "";
+    elements.analyticsPeriodTo.max = today;
+  }
+  if (elements.analyticsPeriodApply) {
+    elements.analyticsPeriodApply.disabled = !isCustom;
+  }
+}
+
+function validateAnalyticsCustomPeriod() {
+  if (elements.monitorAnalyticsPeriod?.value !== "custom") {
+    return true;
+  }
+  const from = elements.analyticsPeriodFrom?.value || "";
+  const to = elements.analyticsPeriodTo?.value || "";
+  const today = analyticsDateInputValue();
+  let message = "";
+  if (!from || !to) {
+    message = "Оберіть початкову та кінцеву дату.";
+  } else if (from > to) {
+    message = "Початкова дата не може бути пізнішою за кінцеву.";
+  } else if (to > today) {
+    message = "Кінцева дата не може бути в майбутньому.";
+  }
+  elements.analyticsPeriodFrom?.setAttribute("aria-invalid", String(Boolean(message)));
+  elements.analyticsPeriodTo?.setAttribute("aria-invalid", String(Boolean(message)));
+  setAnalyticsPeriodMessage(message);
+  return !message;
+}
+
+async function applyAnalyticsCustomPeriod() {
+  updateAnalyticsCustomPeriodFields({ initialize: false });
+  if (!validateAnalyticsCustomPeriod()) {
+    elements.analyticsPeriodFrom?.focus();
+    return;
+  }
+  const button = elements.analyticsPeriodApply;
+  const originalLabel = button?.textContent || "Застосувати";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Застосовуємо…";
+    button.setAttribute("aria-busy", "true");
+  }
+  try {
+    await loadAnalyticsPage(false);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+      button.removeAttribute("aria-busy");
+    }
+  }
 }
 
 async function loadAnalyticsPage(showLoading = true) {
@@ -9127,7 +10308,7 @@ function callStatsBaseChartOptions(extra = {}) {
           boxWidth: 12,
           boxHeight: 12,
           font: {
-            family: "Montserrat, Segoe UI, sans-serif",
+            family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
             weight: 800
           }
         }
@@ -9147,7 +10328,7 @@ function callStatsBaseChartOptions(extra = {}) {
           color: colors.muted,
           maxRotation: 0,
           font: {
-            family: "Montserrat, Segoe UI, sans-serif",
+            family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
             weight: 800
           }
         },
@@ -9161,7 +10342,7 @@ function callStatsBaseChartOptions(extra = {}) {
           color: colors.muted,
           precision: 0,
           font: {
-            family: "Montserrat, Segoe UI, sans-serif",
+            family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
             weight: 800
           }
         },
@@ -10006,6 +11187,22 @@ async function loadCallStatsPage(showLoading = true) {
   }
 }
 
+function callOverallScore(summary) {
+  const customScore = summary && summary.customEvaluation
+    ? summary.customEvaluation.overallScore
+    : null;
+  if (customScore !== null && customScore !== "" && Number.isFinite(Number(customScore))) {
+    return Number(customScore);
+  }
+
+  const legacyScore = summary && summary.operatorEvaluation
+    ? summary.operatorEvaluation.overallScore
+    : null;
+  return legacyScore !== null && legacyScore !== "" && Number.isFinite(Number(legacyScore))
+    ? Number(legacyScore)
+    : null;
+}
+
 function monitorCallDisplaySnapshot(call = {}) {
   const ai = call.ai || {};
   const summary = ai.summary || {};
@@ -10028,6 +11225,7 @@ function monitorCallDisplaySnapshot(call = {}) {
     aiTerminalFailure: Boolean(ai.terminalFailure),
     callType: String(summary.callType || ""),
     callTypeLabel: String(summary.callTypeLabel || ""),
+    overallScore: callOverallScore(summary),
     escalation: {
       needed: Boolean(escalation.needed),
       level: String(escalation.level || ""),
@@ -10245,6 +11443,8 @@ function appendMonitorCall(container, call) {
   const typeKey = summary && summary.callType;
   const detailLink = fragment.querySelector('[data-field="detail-link"]');
   const typeElement = fragment.querySelector('[data-field="type"]');
+  const scoreCell = fragment.querySelector('[data-field="score-cell"]');
+  const scoreElement = fragment.querySelector('[data-field="score"]');
   const alertsElement = fragment.querySelector('[data-field="alerts"]');
   const detailUrl = callDetailUrl(call);
   if (detailUrl) {
@@ -10263,6 +11463,15 @@ function appendMonitorCall(container, call) {
   typeElement.textContent = typeLabel || fallbackCallTypeText(call, ai, disposition);
   if (typeKey && CALL_TYPE_COLORS[typeKey]) {
     typeElement.style.setProperty("--call-type-color", CALL_TYPE_COLORS[typeKey]);
+  }
+  const overallScore = callOverallScore(summary);
+  if (overallScore !== null) {
+    const scoreText = formatScore(overallScore);
+    const accessibleScoreText = `Загальна оцінка дзвінка: ${scoreText}`;
+    scoreCell.hidden = false;
+    scoreElement.textContent = scoreText;
+    scoreElement.dataset.level = scoreLevel(overallScore);
+    scoreElement.setAttribute("aria-label", accessibleScoreText);
   }
   const alertCount = renderMonitorProblemBadges(alertsElement, summary);
   detailLink.classList.toggle("is-problem", alertCount > 0);
@@ -10440,7 +11649,7 @@ function confidenceTone(value) {
 }
 
 function scoreLevel(score) {
-  if (!Number.isFinite(Number(score))) {
+  if (score === null || score === "" || !Number.isFinite(Number(score))) {
     return "empty";
   }
 
@@ -10775,6 +11984,7 @@ function appendQualityNoteGroup(title, values) {
   }
 
   const group = document.createElement("div");
+  group.className = "quality-note-group";
   const heading = document.createElement("strong");
   const list = document.createElement("ul");
   heading.textContent = title;
@@ -10908,6 +12118,7 @@ function renderCallQuality(summary) {
     const label = document.createElement("strong");
     label.textContent = criterion.label || "Критерій";
     const score = document.createElement("span");
+    score.className = "quality-criterion-score";
     score.textContent = formatScore(criterion.score);
     header.append(label, score);
     item.append(header);
@@ -11515,6 +12726,96 @@ function updateDetailReanalyzeButton(call, ai) {
     : "Запустити AI-аналіз заново";
 }
 
+function updateDetailManagerStatisticsControl(call, errorMessage = "") {
+  const button = elements.detailManagerStatisticsToggle;
+  const status = elements.detailManagerStatisticsStatus;
+  if (!button || !status) {
+    return;
+  }
+
+  const canEdit = canViewTeamAnalytics();
+  const ai = call && call.ai;
+  const excluded = Boolean(call && call.managerStatistics && call.managerStatistics.excluded);
+  const hasAnalysis = Boolean(ai && ai.status === "done");
+  button.classList.toggle("hidden", !canEdit);
+  button.disabled = !canEdit || !hasAnalysis || managerStatisticsSaving;
+  button.dataset.excluded = String(excluded);
+  button.setAttribute("aria-pressed", String(excluded));
+  button.textContent = managerStatisticsSaving
+    ? "Зберігаємо..."
+    : excluded
+      ? "Враховувати у статистиці"
+      : "Не враховувати у статистиці";
+  button.title = excluded
+    ? "Повернути оцінку цього дзвінка у статистику менеджера"
+    : "Не враховувати оцінку цього дзвінка у статистиці менеджера";
+
+  status.classList.toggle("hidden", !errorMessage && !excluded);
+  status.dataset.tone = errorMessage ? "danger" : excluded ? "warning" : "";
+  status.textContent = errorMessage || (excluded
+    ? "Оцінка цього дзвінка не враховується у статистиці менеджера."
+    : "");
+}
+
+async function toggleCurrentCallManagerStatistics(anchor = null) {
+  const call = currentDetailCall;
+  const id = String(
+    call && (call.generalCallId || call.id || call.callId) || currentDetailCallId || ""
+  ).trim();
+  if (!id || !canViewTeamAnalytics() || managerStatisticsSaving) {
+    return;
+  }
+
+  const excluded = Boolean(call && call.managerStatistics && call.managerStatistics.excluded);
+  const nextExcluded = !excluded;
+  const confirmed = await showUiConfirmDialog({
+    title: nextExcluded
+      ? "Не враховувати цей дзвінок?"
+      : "Повернути дзвінок у статистику?",
+    message: nextExcluded
+      ? "Оцінка перестане впливати на статистику менеджера. AI-аналіз і виставлені бали залишаться видимими."
+      : "Оцінка цього дзвінка знову впливатиме на статистику менеджера.",
+    confirmLabel: nextExcluded ? "Не враховувати" : "Повернути",
+    cancelLabel: "Скасувати",
+    tone: nextExcluded ? "warning" : "success",
+    anchor
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  managerStatisticsSaving = true;
+  updateDetailManagerStatisticsControl(call);
+  let errorMessage = "";
+  try {
+    const response = await apiFetch("/api/binotel-monitor/call/manager-statistics", {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        callId: id,
+        excluded: nextExcluded
+      })
+    });
+    const payload = await readJsonResponse(
+      response,
+      "Не вдалося оновити участь дзвінка у статистиці."
+    );
+    if (currentDetailCall) {
+      currentDetailCall.managerStatistics = payload.managerStatistics || {
+        excluded: nextExcluded
+      };
+    }
+  } catch (error) {
+    errorMessage = error.message || "Не вдалося оновити участь дзвінка у статистиці.";
+  } finally {
+    managerStatisticsSaving = false;
+    updateDetailManagerStatisticsControl(currentDetailCall, errorMessage);
+  }
+}
+
 function renderCallDetail(call) {
   const ai = call.ai || {};
   const summary = ai.summary || {};
@@ -11551,6 +12852,7 @@ function renderCallDetail(call) {
   elements.detailAiStatus.textContent = aiStatus.label;
   elements.detailAiStatus.className = `status ${aiStatus.className}`;
   updateDetailReanalyzeButton(call, ai);
+  updateDetailManagerStatisticsControl(call);
   elements.detailSummary.textContent =
     summary.summary ||
     (ai.terminalFailure
@@ -11721,8 +13023,28 @@ async function loadCallDetail(callIdValue, showLoading = true, preservePlayback 
     }
   } catch (error) {
     currentDetailCall = null;
+    elements.detailPhone.textContent = "Дзвінок недоступний";
+    elements.detailDate.textContent = "Не вдалося завантажити дані";
+    elements.detailCallType.textContent = "Недоступно";
+    elements.detailCallType.className = "status status-cancelled";
+    elements.detailAiStatus.textContent = "Помилка";
+    elements.detailAiStatus.className = "status status-cancelled";
+    elements.detailOperator.textContent = "—";
+    elements.detailDirection.textContent = "—";
+    elements.detailDuration.textContent = "—";
+    elements.detailBinotelId.textContent = id || "—";
+    updateDetailReanalyzeButton(null, null);
+    updateDetailManagerStatisticsControl(null);
+    elements.detailAnalysisList.replaceChildren();
+    renderCallQuality(null);
+    elements.detailQualitySummary.textContent = "Дані оцінки недоступні.";
+    resetDetailAudioPlayer();
+    elements.detailAudioStatus.textContent = "Запис дзвінка недоступний.";
+    elements.detailLanguage.textContent = "";
+    elements.detailTechnical.replaceChildren();
+    appendDetailValue(elements.detailTechnical, "Помилка завантаження", error.message);
     setState("detail");
-    elements.detailSummary.textContent = error.message;
+    elements.detailSummary.textContent = "Не вдалося завантажити дані цього дзвінка.";
     detailTicketsPhone = "";
     detailTicketsLoaded = true;
     detailTicketsLoading = false;
@@ -11785,8 +13107,374 @@ async function reanalyzeCurrentCall(anchor = null) {
   }
 }
 
+function setMyWorkPeriodMessage(message = "") {
+  if (!elements.myWorkPeriodMessage) {
+    return;
+  }
+  elements.myWorkPeriodMessage.textContent = message;
+  elements.myWorkPeriodMessage.dataset.tone = message ? "error" : "";
+}
+
+function updateMyWorkCustomPeriodFields(options = {}) {
+  const isCustom = elements.myWorkPeriod?.value === "custom";
+  const today = analyticsDateInputValue();
+  elements.myWorkPeriodFilter?.setAttribute("data-custom", String(isCustom));
+
+  if (isCustom && options.initialize !== false) {
+    if (elements.myWorkTo && !elements.myWorkTo.value) {
+      elements.myWorkTo.value = today;
+    }
+    if (elements.myWorkFrom && !elements.myWorkFrom.value) {
+      elements.myWorkFrom.value = analyticsDateInputValue(
+        Date.now() - 29 * 24 * 60 * 60 * 1000
+      );
+    }
+  }
+
+  if (elements.myWorkFrom) {
+    elements.myWorkFrom.disabled = !isCustom;
+    elements.myWorkFrom.max = elements.myWorkTo?.value || today;
+  }
+  if (elements.myWorkTo) {
+    elements.myWorkTo.disabled = !isCustom;
+    elements.myWorkTo.min = elements.myWorkFrom?.value || "";
+    elements.myWorkTo.max = today;
+  }
+  if (elements.myWorkPeriodApply) {
+    elements.myWorkPeriodApply.disabled = !isCustom;
+  }
+}
+
+function validateMyWorkCustomPeriod() {
+  if (elements.myWorkPeriod?.value !== "custom") {
+    setMyWorkPeriodMessage();
+    return true;
+  }
+
+  const from = elements.myWorkFrom?.value || "";
+  const to = elements.myWorkTo?.value || "";
+  const today = analyticsDateInputValue();
+  let message = "";
+  if (!from || !to) {
+    message = "Оберіть початкову та кінцеву дату.";
+  } else if (from > to) {
+    message = "Початкова дата не може бути пізнішою за кінцеву.";
+  } else if (to > today) {
+    message = "Кінцева дата не може бути в майбутньому.";
+  }
+
+  elements.myWorkFrom?.setAttribute("aria-invalid", String(Boolean(message)));
+  elements.myWorkTo?.setAttribute("aria-invalid", String(Boolean(message)));
+  setMyWorkPeriodMessage(message);
+  return !message;
+}
+
+function myWorkPeriodParams() {
+  const period = elements.myWorkPeriod?.value || "30";
+  const params = new URLSearchParams({ period });
+  if (period === "custom") {
+    params.set("from", elements.myWorkFrom?.value || "");
+    params.set("to", elements.myWorkTo?.value || "");
+  }
+  return params;
+}
+
+function myWorkScore(value) {
+  if (value === null || value === undefined || value === "") {
+    return "—";
+  }
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? callStatsPercent(numericValue) : "—";
+}
+
+function setMyWorkTab(tab) {
+  myWorkActiveTab = tab === "ratings" ? "ratings" : "calls";
+  for (const button of elements.myWorkTabButtons || []) {
+    const active = button.dataset.myWorkTab === myWorkActiveTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
+  }
+  for (const panel of elements.myWorkPanels || []) {
+    panel.classList.toggle("hidden", panel.dataset.myWorkPanel !== myWorkActiveTab);
+  }
+}
+
+function renderMyWorkMetrics(rating) {
+  if (!elements.myWorkMetricList) {
+    return;
+  }
+
+  const metrics = Array.isArray(rating && rating.metrics) ? rating.metrics : [];
+  elements.myWorkMetricList.replaceChildren();
+  if (!metrics.length) {
+    const empty = document.createElement("p");
+    empty.className = "no-data";
+    empty.textContent = "За вибраний період ще немає оцінених метрик.";
+    elements.myWorkMetricList.append(empty);
+    return;
+  }
+
+  for (const metric of metrics) {
+    const percent = metric.averagePercent === null ||
+      metric.averagePercent === undefined ||
+      metric.averagePercent === ""
+      ? Number.NaN
+      : Number(metric.averagePercent);
+    const item = document.createElement("article");
+    item.className = "my-work-metric";
+    item.style.setProperty(
+      "--metric-score",
+      `${Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0}%`
+    );
+    item.style.setProperty("--metric-color", safeMetricColor(metric.color, "var(--brand)"));
+
+    const heading = document.createElement("div");
+    const title = document.createElement("strong");
+    const score = document.createElement("b");
+    title.textContent = metric.label || metric.key || "Метрика";
+    score.textContent = myWorkScore(percent);
+    heading.append(title, score);
+
+    const track = document.createElement("span");
+    track.className = "my-work-metric-track";
+    track.setAttribute("aria-hidden", "true");
+
+    const caption = document.createElement("small");
+    caption.textContent = [
+      `${formatNumber(metric.scoredMetricCount || 0)} оцінок`,
+      Number.isFinite(Number(metric.averageScore)) &&
+      Number.isFinite(Number(metric.averageMaxScore))
+        ? `${formatMetricNumber(metric.averageScore)}/${formatMetricNumber(metric.averageMaxScore)} бала`
+        : ""
+    ].filter(Boolean).join(" · ");
+
+    item.append(heading, track, caption);
+    elements.myWorkMetricList.append(item);
+  }
+}
+
+function renderMyWorkTrend(rating) {
+  if (!elements.myWorkRatingTrend) {
+    return;
+  }
+
+  const daily = (Array.isArray(rating && rating.daily) ? rating.daily : []).slice(-14);
+  elements.myWorkRatingTrend.replaceChildren();
+  if (!daily.length) {
+    const empty = document.createElement("p");
+    empty.className = "no-data";
+    empty.textContent = "Динаміка з’явиться після перших оцінених дзвінків.";
+    elements.myWorkRatingTrend.append(empty);
+    return;
+  }
+
+  for (const day of daily) {
+    const percent = day.averagePercent === null ||
+      day.averagePercent === undefined ||
+      day.averagePercent === ""
+      ? Number.NaN
+      : Number(day.averagePercent);
+    const row = document.createElement("div");
+    row.className = "my-work-trend-row";
+    row.style.setProperty(
+      "--trend-score",
+      `${Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0}%`
+    );
+
+    const date = document.createElement("span");
+    date.textContent = formatDate(day.dayKey, { short: true });
+    const track = document.createElement("span");
+    track.className = "my-work-trend-track";
+    track.setAttribute("aria-hidden", "true");
+    const value = document.createElement("strong");
+    value.textContent = myWorkScore(percent);
+    const count = document.createElement("small");
+    count.textContent = `${formatNumber(day.ratedCallCount || 0)} дзв.`;
+    row.append(date, track, value, count);
+    elements.myWorkRatingTrend.append(row);
+  }
+}
+
+function renderMyWorkSummary(payload) {
+  myWorkSummaryPayload = payload || {};
+  const statistics = payload && payload.statistics || {};
+  const summary = statistics.summary || {};
+  const rating = payload && payload.rating || {};
+  const teamBenchmark = payload && payload.teamBenchmark || {};
+  const totalCalls = callStatsValue(summary.totalCalls);
+  const answeredCalls = callStatsValue(summary.answeredCalls);
+  const missedCalls = callStatsValue(summary.missedCalls);
+  const avgBillSec = callStatsValue(summary.avgBillSec);
+  const ratedCalls = callStatsValue(rating.ratedCalls);
+  const managerAssignmentMissing = Boolean(payload && payload.managerAssignmentMissing);
+
+  setCallStatsText(elements.myWorkTotalCalls, formatNumber(totalCalls));
+  setCallStatsText(
+    elements.myWorkTotalCaption,
+    managerAssignmentMissing
+      ? "менеджера Binotel не прив’язано"
+      : `${formatNumber(summary.incomingCalls || 0)} вхідних · ${formatNumber(summary.outgoingCalls || 0)} вихідних`
+  );
+  setCallStatsText(elements.myWorkAnswerRate, callStatsPercent(summary.answerRate));
+  setCallStatsText(
+    elements.myWorkAnswerCaption,
+    `${formatNumber(answeredCalls)} відповіли · ${formatNumber(missedCalls)} пропущено`
+  );
+  setCallStatsText(
+    elements.myWorkAverageDuration,
+    avgBillSec ? formatDuration(avgBillSec) : "—"
+  );
+  setCallStatsText(
+    elements.myWorkDurationCaption,
+    `${formatDuration(summary.totalBillSec || 0)} розмов загалом`
+  );
+  setCallStatsText(elements.myWorkAverageRating, myWorkScore(rating.averagePercent));
+  setCallStatsText(
+    elements.myWorkRatingCaption,
+    ratedCalls ? `${formatNumber(ratedCalls)} оцінених дзвінків` : "оцінок ще немає"
+  );
+
+  setCallStatsText(elements.myWorkOwnScore, myWorkScore(rating.averagePercent));
+  setCallStatsText(
+    elements.myWorkOwnScoreCaption,
+    ratedCalls
+      ? `${formatNumber(rating.scoredMetrics || 0)} оцінених метрик`
+      : "Ще немає оцінених дзвінків"
+  );
+  setCallStatsText(elements.myWorkTeamScore, myWorkScore(teamBenchmark.averagePercent));
+  setCallStatsText(
+    elements.myWorkTeamScoreCaption,
+    teamBenchmark.ratedCalls
+      ? `Анонімно · ${formatNumber(teamBenchmark.ratedCalls)} дзвінків`
+      : "Анонімний орієнтир"
+  );
+  setCallStatsText(elements.myWorkRatedCalls, formatNumber(ratedCalls));
+  setCallStatsText(
+    elements.myWorkRatedCaption,
+    `${formatNumber(rating.scoredMetrics || 0)} оцінених метрик`
+  );
+
+  renderMyWorkMetrics(rating);
+  renderMyWorkTrend(rating);
+}
+
+function renderMyWorkPagination() {
+  const totalPages = Math.max(1, Math.ceil(myWorkTotalCalls / myWorkPageSize));
+  const currentPage = Math.min(Math.max(1, myWorkPage), totalPages);
+  const start = myWorkTotalCalls ? (currentPage - 1) * myWorkPageSize + 1 : 0;
+  const end = Math.min(myWorkTotalCalls, currentPage * myWorkPageSize);
+
+  elements.myWorkPagination?.classList.toggle("hidden", myWorkTotalCalls <= myWorkPageSize);
+  if (elements.myWorkPrevPage) {
+    elements.myWorkPrevPage.disabled = currentPage <= 1;
+  }
+  if (elements.myWorkNextPage) {
+    elements.myWorkNextPage.disabled = currentPage >= totalPages;
+  }
+  setCallStatsText(
+    elements.myWorkPageInfo,
+    myWorkTotalCalls ? `${start}-${end} з ${myWorkTotalCalls}` : ""
+  );
+}
+
+function renderMyWorkCalls(payload) {
+  const calls = Array.isArray(payload && payload.calls) ? payload.calls : [];
+  myWorkTotalCalls = Number(payload && payload.total) || 0;
+  const managerAssignmentMissing = Boolean(payload && payload.managerAssignmentMissing);
+  elements.myWorkCallList.replaceChildren();
+  setCallStatsText(
+    elements.myWorkCallsCount,
+    managerAssignmentMissing
+      ? "Прив’язка до Binotel не налаштована"
+      : `${formatNumber(myWorkTotalCalls)} дзвінків`
+  );
+
+  if (!calls.length) {
+    const empty = document.createElement("p");
+    empty.className = "no-data";
+    empty.textContent = managerAssignmentMissing
+      ? "Адміністратор ще не прив’язав ваш профіль до менеджера Binotel."
+      : "За вибраний період дзвінків не знайдено.";
+    elements.myWorkCallList.append(empty);
+    renderMyWorkPagination();
+    return;
+  }
+
+  for (const call of calls) {
+    appendMonitorCall(elements.myWorkCallList, call);
+  }
+  renderMyWorkPagination();
+}
+
+function myWorkCallsUrl() {
+  const params = myWorkPeriodParams();
+  params.set("limit", String(myWorkPageSize));
+  params.set("offset", String(Math.max(0, (myWorkPage - 1) * myWorkPageSize)));
+  const query = elements.myWorkQuery?.value.trim();
+  if (query) {
+    params.set("q", query);
+  }
+  return `/api/binotel-monitor/calls?${params.toString()}`;
+}
+
+async function loadMyWorkCalls() {
+  const response = await apiFetch(myWorkCallsUrl(), {
+    headers: { Accept: "application/json" }
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || "Не вдалося завантажити ваші дзвінки");
+  }
+  renderMyWorkCalls(payload);
+}
+
+async function loadMyWorkPage(showLoading = true) {
+  clearTimeout(summaryPollTimer);
+  clearTimeout(monitorPollTimer);
+  clearTimeout(detailPollTimer);
+  currentSummaryCallId = "";
+  currentPhone = "";
+
+  updateMyWorkCustomPeriodFields({ initialize: false });
+  if (!validateMyWorkCustomPeriod()) {
+    setState("myWork");
+    return;
+  }
+  if (showLoading) {
+    setState("loading");
+  }
+
+  const params = myWorkPeriodParams();
+  try {
+    const [summaryResponse] = await Promise.all([
+      apiFetch(`/api/my-work/summary?${params.toString()}`, {
+        headers: { Accept: "application/json" }
+      }),
+      loadMyWorkCalls()
+    ]);
+    const summaryPayload = await summaryResponse.json();
+    if (!summaryResponse.ok || summaryPayload.ok === false) {
+      throw new Error(summaryPayload.message || summaryPayload.error || "Не вдалося завантажити вашу статистику");
+    }
+    renderMyWorkSummary(summaryPayload);
+    setState("myWork");
+  } catch (error) {
+    setState("myWork");
+    const message = document.createElement("p");
+    message.className = "no-data";
+    message.textContent = error.message;
+    elements.myWorkCallList.replaceChildren(message);
+    elements.myWorkMetricList.replaceChildren(message.cloneNode(true));
+    elements.myWorkRatingTrend.replaceChildren(message.cloneNode(true));
+  }
+}
+
 function scheduleMonitorPoll() {
   clearTimeout(monitorPollTimer);
+  if (pageLifecycleSuspended || routeState() !== "monitor") {
+    return;
+  }
   monitorPollTimer = setTimeout(() => {
     if (isMonitorAudioActive()) {
       scheduleMonitorPoll();
@@ -11803,6 +13491,10 @@ function isMonitorAudioActive() {
 }
 
 async function loadMonitor(showLoading = true, preservePlayback = false) {
+  if (!validateMonitorDateRange()) {
+    return;
+  }
+  const loadSequence = ++monitorLoadSequence;
   clearTimeout(summaryPollTimer);
   clearTimeout(detailPollTimer);
   currentSummaryCallId = "";
@@ -11820,6 +13512,8 @@ async function loadMonitor(showLoading = true, preservePlayback = false) {
     const problemFilter = elements.monitorProblemFilter
       ? elements.monitorProblemFilter.value
       : "";
+    const from = elements.monitorFrom ? elements.monitorFrom.value : "";
+    const to = elements.monitorTo ? elements.monitorTo.value : "";
     const limit = Number(elements.monitorPageSize && elements.monitorPageSize.value) || monitorPageSize || 10;
     monitorPageSize = limit;
     const offset = Math.max(0, (Math.max(1, monitorPage) - 1) * limit);
@@ -11835,6 +13529,15 @@ async function loadMonitor(showLoading = true, preservePlayback = false) {
     }
     if (problemFilter) {
       params.set("problem", problemFilter);
+    }
+    if (from) {
+      params.set("from", from);
+    }
+    if (to) {
+      params.set("to", to);
+    }
+    for (const number of monitorSelectedOperators) {
+      params.append("operator", number);
     }
     const [statusResponse, callsResponse] = await Promise.all([
       apiFetch("/api/binotel-monitor/status", { headers: { Accept: "application/json" } }),
@@ -11854,23 +13557,45 @@ async function loadMonitor(showLoading = true, preservePlayback = false) {
       throw new Error(calls.error || "Не вдалося отримати дзвінки");
     }
 
+    if (loadSequence !== monitorLoadSequence || pageLifecycleSuspended) {
+      return;
+    }
+
     renderMonitorStatus(status);
     if (!(preservePlayback && isMonitorAudioActive())) {
       renderMonitorCalls(calls);
     }
     setState("monitor");
   } catch (error) {
+    const failureAction = window.DumaPageLifecycle.monitorFailureAction({
+      error,
+      isPageSuspended: pageLifecycleSuspended,
+      isStaleRequest: loadSequence !== monitorLoadSequence
+    });
+    if (failureAction === "ignore") {
+      return;
+    }
     setState("monitor");
     if (!(preservePlayback && isMonitorAudioActive())) {
       monitorListFingerprint = "";
+      monitorTotalCalls = 0;
+      elements.monitorCountLabel.textContent = "Не вдалося оновити список";
       elements.monitorList.replaceChildren();
       const message = document.createElement("p");
       message.className = "no-data";
-      message.textContent = error.message;
+      message.textContent = ["Load failed", "Failed to fetch"].includes(error.message)
+        ? "Не вдалося завантажити дзвінки. Перевірте з’єднання та спробуйте ще раз."
+        : error.message;
       elements.monitorList.append(message);
+      renderMonitorPagination();
     }
   } finally {
-    scheduleMonitorPoll();
+    if (
+      loadSequence === monitorLoadSequence &&
+      !pageLifecycleSuspended
+    ) {
+      scheduleMonitorPoll();
+    }
   }
 }
 
@@ -11879,6 +13604,10 @@ if (elements.detailReanalyzeAi) {
     void reanalyzeCurrentCall(elements.detailReanalyzeAi);
   });
 }
+
+elements.detailManagerStatisticsToggle?.addEventListener("click", () => {
+  void toggleCurrentCallManagerStatistics(elements.detailManagerStatisticsToggle);
+});
 
 elements.detailAudioPlay.addEventListener("pointerdown", (event) => {
   event.stopPropagation();
@@ -12000,11 +13729,18 @@ window.addEventListener("resize", () => {
     buildSyntheticDetailPeaks();
   }
   drawDetailAudioCanvas();
+  positionCustomDatePicker(activeCustomDatePicker);
+  positionMonitorOperatorPopover();
 });
 
 populateMonitorCallTypeFilter();
 enhanceCustomSelects();
+initCustomDatePickers([elements.monitorFrom, elements.monitorTo]);
+portalMonitorOperatorPopover();
 initCallStatsHeatmapTooltips();
+updateMyWorkCustomPeriodFields();
+updateMonitorDateReset();
+updateMonitorOperatorSummary();
 
 elements.searchForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -12013,12 +13749,145 @@ elements.searchForm.addEventListener("submit", (event) => {
 
 elements.monitorSearchForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (!validateMonitorDateRange()) {
+    elements.monitorTo?.focus();
+    return;
+  }
   monitorPage = 1;
   loadMonitor();
 });
 
 elements.monitorRefresh.addEventListener("click", () => {
   loadMonitor();
+});
+
+for (const input of [elements.monitorFrom, elements.monitorTo]) {
+  input?.addEventListener("change", () => {
+    updateMonitorDateReset();
+    validateMonitorDateRange();
+  });
+}
+
+elements.monitorDateReset?.addEventListener("click", () => {
+  elements.monitorFrom.value = "";
+  elements.monitorTo.value = "";
+  updateMonitorDateReset();
+  validateMonitorDateRange();
+});
+
+elements.monitorOperatorTrigger?.addEventListener("click", () => {
+  if (elements.monitorOperatorPopover.hidden) {
+    openMonitorOperatorPopover();
+  } else {
+    closeMonitorOperatorPopover({ restoreFocus: true });
+  }
+});
+
+elements.monitorOperatorTrigger?.addEventListener("keydown", (event) => {
+  if (event.key !== "ArrowDown") {
+    return;
+  }
+  event.preventDefault();
+  openMonitorOperatorPopover();
+});
+
+elements.monitorOperatorClose?.addEventListener("click", () => {
+  closeMonitorOperatorPopover({ restoreFocus: true });
+});
+
+elements.monitorOperatorDone?.addEventListener("click", () => {
+  closeMonitorOperatorPopover({ restoreFocus: true });
+});
+
+elements.monitorOperatorClear?.addEventListener("click", () => {
+  monitorSelectedOperators.clear();
+  renderMonitorOperatorOptions();
+});
+
+elements.monitorOperatorSearch?.addEventListener("input", renderMonitorOperatorOptions);
+elements.monitorOperatorSearch?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+  }
+});
+
+elements.monitorOperatorOptions?.addEventListener("change", (event) => {
+  const checkbox = event.target.closest("input[data-monitor-operator-number]");
+  if (!checkbox) {
+    return;
+  }
+  const number = checkbox.dataset.monitorOperatorNumber || "";
+  if (checkbox.checked) {
+    monitorSelectedOperators.add(number);
+  } else {
+    monitorSelectedOperators.delete(number);
+  }
+  updateMonitorOperatorSummary();
+});
+
+for (const button of elements.myWorkTabButtons || []) {
+  button.addEventListener("click", () => {
+    setMyWorkTab(button.dataset.myWorkTab || "calls");
+  });
+}
+
+elements.myWorkPeriod?.addEventListener("change", () => {
+  setMyWorkPeriodMessage();
+  updateMyWorkCustomPeriodFields();
+  if (elements.myWorkPeriod.value !== "custom") {
+    myWorkPage = 1;
+    void loadMyWorkPage(false);
+  }
+});
+
+for (const input of [elements.myWorkFrom, elements.myWorkTo]) {
+  input?.addEventListener("input", () => {
+    updateMyWorkCustomPeriodFields({ initialize: false });
+    setMyWorkPeriodMessage();
+  });
+}
+
+elements.myWorkPeriodFilter?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  updateMyWorkCustomPeriodFields({ initialize: false });
+  if (!validateMyWorkCustomPeriod()) {
+    elements.myWorkFrom?.focus();
+    return;
+  }
+  myWorkPage = 1;
+  void loadMyWorkPage(false);
+});
+
+elements.myWorkCallSearch?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  myWorkPage = 1;
+  void loadMyWorkCalls().catch((error) => {
+    const message = document.createElement("p");
+    message.className = "no-data";
+    message.textContent = error.message;
+    elements.myWorkCallList.replaceChildren(message);
+  });
+});
+
+elements.myWorkRefresh?.addEventListener("click", () => {
+  void loadMyWorkPage(false);
+});
+
+elements.myWorkPrevPage?.addEventListener("click", () => {
+  if (myWorkPage <= 1) {
+    return;
+  }
+  myWorkPage -= 1;
+  void loadMyWorkCalls();
+});
+
+elements.myWorkNextPage?.addEventListener("click", () => {
+  const totalPages = Math.max(1, Math.ceil(myWorkTotalCalls / myWorkPageSize));
+  if (myWorkPage >= totalPages) {
+    return;
+  }
+  myWorkPage += 1;
+  void loadMyWorkCalls();
 });
 
 elements.monitorCallTypeFilter?.addEventListener("change", () => {
@@ -12043,8 +13912,32 @@ elements.callStatsPeriod?.addEventListener("change", () => {
   }
 });
 
-elements.monitorAnalyticsPeriod.addEventListener("change", () => {
-  loadAnalyticsPage(false);
+elements.analyticsPeriodFilter?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void applyAnalyticsCustomPeriod();
+});
+
+elements.monitorAnalyticsPeriod?.addEventListener("change", () => {
+  setAnalyticsPeriodMessage();
+  updateAnalyticsCustomPeriodFields();
+  if (elements.monitorAnalyticsPeriod.value !== "custom") {
+    void loadAnalyticsPage(false);
+  }
+});
+
+for (const input of [elements.analyticsPeriodFrom, elements.analyticsPeriodTo]) {
+  input?.addEventListener("input", () => {
+    setAnalyticsPeriodMessage();
+    input.setAttribute("aria-invalid", "false");
+    updateAnalyticsCustomPeriodFields({ initialize: false });
+  });
+}
+
+updateAnalyticsCustomPeriodFields();
+
+elements.managerRatingGroup?.addEventListener("change", () => {
+  currentManagerRatingGroup = elements.managerRatingGroup.value || "core";
+  renderManagerRating(currentManagerRating);
 });
 
 hydrateAiStaticIcons();
@@ -12120,9 +14013,35 @@ elements.themeToggle.addEventListener("click", () => {
   setTheme(currentTheme() === "dark" ? "light" : "dark");
 });
 
+const syncSystemTheme = (event) => {
+  if (!readStoredTheme()) {
+    setTheme(event.matches ? "dark" : "light", false);
+  }
+};
+if (themeMediaQuery?.addEventListener) {
+  themeMediaQuery.addEventListener("change", syncSystemTheme);
+} else {
+  themeMediaQuery?.addListener?.(syncSystemTheme);
+}
+
+window.addEventListener("storage", (event) => {
+  if (event.key === THEME_KEY) {
+    setTheme(preferredTheme(), false);
+  }
+});
+
 elements.profileMenuTrigger?.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleProfileMenu();
+});
+
+elements.profileMenuTrigger?.addEventListener("keydown", (event) => {
+  if (event.key !== "ArrowDown" || !elements.profileMenuPopover?.hidden) {
+    return;
+  }
+  event.preventDefault();
+  setProfileMenuOpen(true);
+  profileMenuItems()[0]?.focus({ preventScroll: true });
 });
 
 elements.profileMenuPopover?.addEventListener("click", (event) => {
@@ -12133,12 +14052,43 @@ elements.profileMenuPopover?.addEventListener("click", (event) => {
   event.stopPropagation();
 });
 
+elements.profileMenuPopover?.addEventListener("keydown", (event) => {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+    return;
+  }
+  const items = profileMenuItems();
+  if (!items.length) {
+    return;
+  }
+  const currentIndex = items.indexOf(document.activeElement);
+  const step = event.key === "ArrowDown" ? 1 : -1;
+  const nextIndex = currentIndex < 0
+    ? 0
+    : (currentIndex + step + items.length) % items.length;
+  event.preventDefault();
+  items[nextIndex]?.focus({ preventScroll: true });
+});
+
 document.addEventListener("click", (event) => {
   if (elements.profileMenu && !elements.profileMenu.contains(event.target)) {
     setProfileMenuOpen(false);
   }
   if (!event.target.closest || !event.target.closest(".custom-select")) {
     closeCustomSelects();
+  }
+  if (
+    activeCustomDatePicker &&
+    event.target !== activeCustomDatePicker.input &&
+    !activeCustomDatePicker.popover.contains(event.target)
+  ) {
+    closeCustomDatePicker(activeCustomDatePicker);
+  }
+  if (
+    elements.monitorOperatorFilter &&
+    !elements.monitorOperatorFilter.contains(event.target) &&
+    !elements.monitorOperatorPopover.contains(event.target)
+  ) {
+    closeMonitorOperatorPopover();
   }
   if (
     elements.telegramAccountDropdown &&
@@ -12151,7 +14101,9 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeCustomSelects();
-    setProfileMenuOpen(false);
+    closeCustomDatePicker(activeCustomDatePicker, { restoreFocus: true });
+    closeMonitorOperatorPopover({ restoreFocus: true });
+    setProfileMenuOpen(false, { restoreFocus: true });
     setTelegramAccountDropdownOpen(false);
     closeChangePasswordModal();
     closeAdminUserModal();
@@ -12162,6 +14114,11 @@ document.addEventListener("keydown", (event) => {
     closeAiTermsModal();
   }
 });
+
+window.addEventListener("scroll", () => {
+  positionCustomDatePicker(activeCustomDatePicker);
+  positionMonitorOperatorPopover();
+}, true);
 
 elements.changePasswordButton?.addEventListener("click", openChangePasswordModal);
 elements.changePasswordForm?.addEventListener("submit", handleChangePasswordSubmit);
@@ -12276,6 +14233,14 @@ elements.telegramReplyCancel?.addEventListener("click", clearTelegramReplyTarget
 elements.telegramChat?.addEventListener("click", handleTelegramChatClick);
 
 elements.managerRatingTable?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-manager-rating-index]");
+  if (!button) {
+    return;
+  }
+  openManagerRatingModal(button.dataset.managerRatingIndex);
+});
+
+elements.managerRatingTrend?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-manager-rating-index]");
   if (!button) {
     return;
@@ -12416,8 +14381,28 @@ elements.noteForm.addEventListener("submit", async (event) => {
 
 const initialPhone = new URLSearchParams(window.location.search).get("phone");
 const callDetailMatch = window.location.pathname.match(/^\/calls\/([^/]+)$/);
-document.body.dataset.theme = document.documentElement.dataset.theme || "light";
-updateThemeControl();
+setTheme(preferredTheme(), false);
+
+window.addEventListener("pagehide", () => {
+  pageLifecycleSuspended = true;
+  monitorLoadSequence += 1;
+  clearTimeout(monitorPollTimer);
+});
+
+window.addEventListener("pageshow", (event) => {
+  const shouldRestore = pageLifecycleSuspended || event.persisted;
+  pageLifecycleSuspended = false;
+  if (!shouldRestore) {
+    return;
+  }
+
+  if (routeState() === "monitor") {
+    monitorListFingerprint = "";
+    void loadMonitor(false);
+  } else if (routeState() === "myWork") {
+    void loadMyWorkPage(false);
+  }
+});
 
 async function boot() {
   try {
@@ -12428,7 +14413,11 @@ async function boot() {
 
   if (callDetailMatch) {
     loadCallDetail(decodeURIComponent(callDetailMatch[1]));
+  } else if (window.location.pathname === "/my-work") {
+    setMyWorkTab("calls");
+    loadMyWorkPage();
   } else if (window.location.pathname === "/calls-monitor") {
+    void loadMonitorOperators();
     loadMonitor();
   } else if (window.location.pathname === "/call-stats") {
     loadCallStatsPage();

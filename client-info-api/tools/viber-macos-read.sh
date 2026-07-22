@@ -11,7 +11,7 @@ set -euo pipefail
 #   ./tools/viber-macos-read.sh 380981234567
 #
 # Useful overrides:
-#   DUMA_CLIENT_INFO_ROOT=/path/to/client-info-api
+#   DUMA_CLIENT_INFO_ROOT=/path/to/client-info
 #   VIBER_DB_PATH="/Users/me/Library/Application Support/ViberPC/380.../viber.db"
 #   VIBER_DB_KEY="<hex SEE key>"
 #   VIBER_PLUGIN_PATH="/Applications/Viber.app/Contents/PlugIns"
@@ -26,10 +26,10 @@ elif [[ -f "$SCRIPT_DIR/viber-reader.cpp" ]]; then
   ROOT="$SCRIPT_DIR"
 elif [[ -f "$SCRIPT_DIR/../tools/viber-reader.cpp" ]]; then
   ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-elif [[ -f "/Users/exqusic/microsip-ewe/client-info-api/tools/viber-reader.cpp" ]]; then
-  ROOT="/Users/exqusic/microsip-ewe/client-info-api"
+elif [[ -f "/Users/exqusic/client-info/tools/viber-reader.cpp" ]]; then
+  ROOT="/Users/exqusic/client-info"
 else
-  echo "Cannot find viber-reader.cpp. Set DUMA_CLIENT_INFO_ROOT=/path/to/client-info-api" >&2
+  echo "Cannot find viber-reader.cpp. Set DUMA_CLIENT_INFO_ROOT=/path/to/client-info" >&2
   exit 2
 fi
 

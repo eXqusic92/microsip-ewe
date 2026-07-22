@@ -17,7 +17,7 @@ function usage() {
     "  node tools/viber-read.js --print-env",
     "",
     "Environment overrides:",
-    "  DUMA_CLIENT_INFO_ROOT=/path/to/client-info-api",
+    "  DUMA_CLIENT_INFO_ROOT=/path/to/client-info",
     "  VIBER_DB_PATH=/path/to/ViberPC/<account-phone>/viber.db",
     "  VIBER_DB_KEY=<hex SEE key>",
     "  VIBER_PLUGIN_PATH=/path/that/contains/sqldrivers",
@@ -103,8 +103,8 @@ function rootDir() {
   if (exists(path.join(scriptDir, "viber-reader.cpp"))) {
     return scriptDir;
   }
-  if (exists("/Users/exqusic/microsip-ewe/client-info-api/tools/viber-reader.cpp")) {
-    return "/Users/exqusic/microsip-ewe/client-info-api";
+  if (exists("/Users/exqusic/client-info/tools/viber-reader.cpp")) {
+    return "/Users/exqusic/client-info";
   }
   return repoRoot;
 }
@@ -117,7 +117,7 @@ function readerBin(root) {
   return firstExisting([
     path.join(root, "bin", binaryName),
     path.join(__dirname, "bin", binaryName),
-    path.join("/Users/exqusic/microsip-ewe/client-info-api/bin", binaryName)
+    path.join("/Users/exqusic/client-info/bin", binaryName)
   ]) || path.join(root, "bin", binaryName);
 }
 
